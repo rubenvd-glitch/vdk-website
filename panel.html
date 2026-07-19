@@ -58,10 +58,11 @@
     .late { color: #e5484d; font-weight: 700; }
     .rem-actions { display: flex; flex-direction: row; gap: 8px; align-items: center; }
     .rem-actions button {
-      background: transparent; border: 1px solid #39424e; color: #cfd6de;
-      font-size: 15px; cursor: pointer; border-radius: 8px;
-      width: 38px; height: 36px; line-height: 1; text-align: center; padding: 0;
+      background: transparent; border: 1px solid #39424e; color: #aeb6c0;
+      cursor: pointer; border-radius: 9px; width: 38px; height: 36px; padding: 0;
+      display: inline-flex; align-items: center; justify-content: center;
     }
+    .rem-actions button svg { width: 16px; height: 16px; }
     .rem-actions button:hover { background: #1c222b; }
     .rem-actions button.ok { border-color: #2ea36f; color: #3fc98b; font-weight: 700; }
     .rem-actions button.ok:hover { background: rgba(46, 163, 111, .14); }
@@ -224,6 +225,13 @@
       return `<span>${dateStr}</span>`;
     }
 
+    const IC = {
+      check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>',
+      pencil: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>',
+      trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>',
+      undo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-15-6.7L3 13"/></svg>',
+    };
+
     function render() {
       const shown = reminders
         .filter((r) => (view === 'active' ? !r.done : r.done))
@@ -244,10 +252,10 @@
           </div>
           <div class="rem-actions">
             ${r.done
-              ? `<button title="Heropenen" onclick="toggleDone('${r.id}', false)">↩</button>`
-              : `<button class="ok" title="Afgerond" onclick="toggleDone('${r.id}', true)">✓</button>
-                 <button title="Bewerken" onclick="openModal('${r.id}')">✏️</button>`}
-            <button class="danger" title="Verwijderen" onclick="removeRem('${r.id}')">🗑</button>
+              ? `<button title="Heropenen" onclick="toggleDone('${r.id}', false)">${IC.undo}</button>`
+              : `<button class="ok" title="Afgerond" onclick="toggleDone('${r.id}', true)">${IC.check}</button>
+                 <button title="Bewerken" onclick="openModal('${r.id}')">${IC.pencil}</button>`}
+            <button class="danger" title="Verwijderen" onclick="removeRem('${r.id}')">${IC.trash}</button>
           </div>
         </div>`).join('');
     }
