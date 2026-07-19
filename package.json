@@ -1,0 +1,12 @@
+{
+  "name": "vdk-business-services",
+  "version": "1.0.0",
+  "description": "VDK Business Services website with 2FA-protected admin panel",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

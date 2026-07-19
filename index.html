@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VDK Business Services</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      background: #cfd4d0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Helvetica Neue', Arial, sans-serif;
+    }
+    .logo-wrap { text-align: center; padding: 24px; }
+    .logo-wrap img, .logo-wrap svg { max-width: min(420px, 80vw); height: auto; }
+  </style>
+</head>
+<body>
+  <div class="logo-wrap">
+    <img src="/logo.png" alt="VDK Business Services"
+         onerror="this.style.display='none';document.getElementById('logo-fallback').style.display='inline';">
+    <svg id="logo-fallback" style="display:none" viewBox="0 0 500 250" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="VDK Business Services">
+      <g fill="#22251f">
+        <polygon points="50,30 78,30 118,110 158,30 186,30 132,140 104,140"/>
+        <path fill-rule="evenodd" d="M200,30 H265 L300,62 V108 L265,140 H200 Z M222,52 H256 L278,68 V102 L256,118 H222 Z"/>
+        <polygon points="320,30 342,30 342,140 320,140"/>
+        <polygon points="342,78 400,30 434,30 362,88 342,92"/>
+        <polygon points="342,92 362,88 434,140 400,140 342,102"/>
+      </g>
+      <g fill="#22251f" transform="translate(250,85) scale(1.15)">
+        <rect x="-22" y="-6" width="18" height="9" rx="4" transform="rotate(-20 -13 -1.5)"/>
+        <rect x="4" y="-6" width="18" height="9" rx="4" transform="rotate(20 13 -1.5)"/>
+        <rect x="-8" y="-4" width="16" height="12" rx="5"/>
+      </g>
+      <text x="250" y="210" text-anchor="middle" fill="#22251f" textLength="280" lengthAdjust="spacingAndGlyphs"
+            font-family="'Helvetica Neue', Arial, sans-serif" font-size="19" font-weight="600" letter-spacing="5">BUSINESS SERVICES</text>
+      <line x1="52" y1="203" x2="100" y2="203" stroke="#22251f" stroke-width="3"/>
+      <line x1="400" y1="203" x2="448" y2="203" stroke="#22251f" stroke-width="3"/>
+    </svg>
+  </div>
+</body>
+</html>

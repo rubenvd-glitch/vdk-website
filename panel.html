@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin panel — VDK Business Services</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { min-height: 100vh; background: #f4f5f4; font-family: 'Helvetica Neue', Arial, sans-serif; color: #22251f; }
+    header {
+      background: #22251f; color: #fff; padding: 16px 28px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    header h1 { font-size: 17px; letter-spacing: 2px; }
+    header button {
+      background: transparent; color: #fff; border: 1px solid #ffffff55;
+      padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 13px;
+    }
+    header button:hover { background: #ffffff22; }
+    main { max-width: 900px; margin: 32px auto; padding: 0 20px; }
+    .welcome { font-size: 14px; color: #555; margin-bottom: 24px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
+    .tile {
+      background: #fff; border-radius: 10px; padding: 22px;
+      box-shadow: 0 2px 10px rgba(0,0,0,.06);
+    }
+    .tile h2 { font-size: 15px; margin-bottom: 8px; }
+    .tile p { font-size: 13px; color: #666; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>VDK ADMIN</h1>
+    <button id="logoutBtn">Log out</button>
+  </header>
+  <main>
+    <p class="welcome">Logged in as <strong id="who">...</strong></p>
+    <div class="grid">
+      <div class="tile"><h2>Website content</h2><p>Placeholder — content management can be added here.</p></div>
+      <div class="tile"><h2>Statistics</h2><p>Placeholder — visitor stats can be added here.</p></div>
+      <div class="tile"><h2>Settings</h2><p>Placeholder — site settings can be added here.</p></div>
+    </div>
+  </main>
+  <script>
+    fetch('/admin/me').then(r => r.ok ? r.json() : Promise.reject())
+      .then(d => document.getElementById('who').textContent = d.email)
+      .catch(() => window.location.href = '/admin');
+    document.getElementById('logoutBtn').onclick = async () => {
+      await fetch('/admin/logout', { method: 'POST' });
+      window.location.href = '/';
+    };
+  </script>
+</body>
+</html>
