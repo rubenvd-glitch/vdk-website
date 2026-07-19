@@ -3,6 +3,7 @@
 'use strict';
 
 const http = require('http');
+const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -28,10 +29,55 @@ const CODE_TTL = 10 * 60 * 1000; // 10 minutes
 
 // ---------- Minimal SMTP client (STARTTLS on 587 or implicit TLS on 465) ----------
 function smtpConfigured() {
-  return !!(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
+  return !!process.env.RESEND_API_KEY ||
+    !!(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
 }
 
-function sendMail({ to, subject, text }) {
+// Preferred: Resend HTTPS API (Render's free tier blocks SMTP ports).
+function sendViaResend({ to, subject, text }) {
+  return new Promise((resolve, reject) => {
+    const from = process.env.MAIL_FROM || 'onboarding@resend.dev';
+    const payload = JSON.stringify({
+      from: `VDK Business Services <${from}>`,
+      to: [to],
+      subject,
+      text,
+    });
+    const req = https.request(
+      {
+        hostname: 'api.resend.com',
+        path: '/emails',
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${process.env.RESEND_API_KEY.trim()}`,
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(payload),
+        },
+        timeout: 15000,
+      },
+      (res) => {
+        let body = '';
+        res.on('data', (c) => (body += c));
+        res.on('end', () => {
+          if (res.statusCode >= 200 && res.statusCode < 300) return resolve();
+          reject(new Error(`Resend API ${res.statusCode}: ${body}`));
+        });
+      }
+    );
+    req.on('timeout', () => { req.destroy(); reject(new Error('Resend API timeout')); });
+    req.on('error', reject);
+    req.write(payload);
+    req.end();
+  });
+}
+
+function sendMail(mail) {
+  if (process.env.RESEND_API_KEY) return sendViaResend(mail);
+  return sendViaSmtp(mail);
+}
+
+// Fallback: raw SMTP (works on hosts that allow ports 465/587, e.g. a VPS).
+function sendViaSmtp({ to, subject, text }) {
   return new Promise((resolve, reject) => {
     const host = process.env.SMTP_HOST;
     const port = Number(process.env.SMTP_PORT || 465);
