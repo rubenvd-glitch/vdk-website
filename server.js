@@ -37,7 +37,7 @@ function sendMail({ to, subject, text }) {
     const port = Number(process.env.SMTP_PORT || 587);
     const secure = process.env.SMTP_SECURE === 'true' || port === 465;
     const user = process.env.SMTP_USER;
-    const pass = process.env.SMTP_PASS;
+    const pass = (process.env.SMTP_PASS || '').replace(/\s+/g, '');
     const from = process.env.MAIL_FROM || user;
 
     let socket;
