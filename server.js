@@ -34,123 +34,91 @@ function smtpConfigured() {
 function sendMail({ to, subject, text }) {
   return new Promise((resolve, reject) => {
     const host = process.env.SMTP_HOST;
-    const port = Number(process.env.SMTP_PORT || 587);
-    const secure = process.env.SMTP_SECURE === 'true' || port === 465;
+    const port = Number(process.env.SMTP_PORT || 465);
+    const startWithTls = process.env.SMTP_SECURE === 'true' || port === 465;
     const user = process.env.SMTP_USER;
     const pass = (process.env.SMTP_PASS || '').replace(/\s+/g, '');
     const from = process.env.MAIL_FROM || user;
 
     let socket;
+    let settled = false;
     let buffer = '';
-    let steps = [];
-    let stepIndex = 0;
-    let upgraded = false;
+    let stage = 'greeting';
 
-    const fail = (err) => { try { socket.destroy(); } catch (_) {} reject(err); };
+    const done = (err) => {
+      if (settled) return;
+      settled = true;
+      try { socket.destroy(); } catch (_) {}
+      err ? reject(err) : resolve();
+    };
     const write = (line) => socket.write(line + '\r\n');
 
-    function buildSteps() {
-      steps = [
-        { expect: 220, send: () => write('EHLO vdkbusiness-services.nl') },
-      ];
-      if (!secure && !upgraded) {
-        steps.push({ expect: 250, send: () => write('STARTTLS') });
-        steps.push({ expect: 220, send: upgradeTls });
-      } else {
-        steps.push({ expect: 250, send: () => write('AUTH LOGIN') });
-        steps.push({ expect: 334, send: () => write(Buffer.from(user).toString('base64')) });
-        steps.push({ expect: 334, send: () => write(Buffer.from(pass).toString('base64')) });
-        steps.push({ expect: 235, send: () => write(`MAIL FROM:<${from}>`) });
-        steps.push({ expect: 250, send: () => write(`RCPT TO:<${to}>`) });
-        steps.push({ expect: 250, send: () => write('DATA') });
-        steps.push({ expect: 354, send: () => {
-          const msg = [
-            `From: VDK Business Services <${from}>`,
-            `To: <${to}>`,
-            `Subject: ${subject}`,
-            `Date: ${new Date().toUTCString()}`,
-            `Message-ID: <${crypto.randomUUID()}@vdkbusiness-services.nl>`,
-            'MIME-Version: 1.0',
-            'Content-Type: text/plain; charset=utf-8',
-            '',
-            text.replace(/\n/g, '\r\n'),
-            '.',
-          ].join('\r\n');
-          socket.write(msg + '\r\n');
-        }});
-        steps.push({ expect: 250, send: () => { write('QUIT'); resolve(); } });
-      }
-    }
+    const message = [
+      `From: VDK Business Services <${from}>`,
+      `To: <${to}>`,
+      `Subject: ${subject}`,
+      `Date: ${new Date().toUTCString()}`,
+      `Message-ID: <${crypto.randomUUID()}@vdkbusiness-services.nl>`,
+      'MIME-Version: 1.0',
+      'Content-Type: text/plain; charset=utf-8',
+      '',
+      text.replace(/\r?\n/g, '\r\n'),
+    ].join('\r\n');
 
-    function upgradeTls() {
-      socket.removeAllListeners('data');
-      const plain = socket;
-      socket = tls.connect({ socket: plain, servername: host }, () => {
-        upgraded = true;
-        stepIndex = 0;
-        buffer = '';
-        buildSteps();
-        // After TLS upgrade, we re-send EHLO ourselves (no 220 greeting)
-        steps[0] = { expect: 250, send: () => {} }; // placeholder, EHLO response handled below
-        write('EHLO vdkbusiness-services.nl');
-        // Rebuild steps so the flow continues from AUTH after EHLO's 250
-        steps = [
-          { expect: 250, send: () => write('AUTH LOGIN') },
-          { expect: 334, send: () => write(Buffer.from(user).toString('base64')) },
-          { expect: 334, send: () => write(Buffer.from(pass).toString('base64')) },
-          { expect: 235, send: () => write(`MAIL FROM:<${from}>`) },
-          { expect: 250, send: () => write(`RCPT TO:<${to}>`) },
-          { expect: 250, send: () => write('DATA') },
-          { expect: 354, send: () => {
-            const msg = [
-              `From: VDK Business Services <${from}>`,
-              `To: <${to}>`,
-              `Subject: ${subject}`,
-              `Date: ${new Date().toUTCString()}`,
-              `Message-ID: <${crypto.randomUUID()}@vdkbusiness-services.nl>`,
-              'MIME-Version: 1.0',
-              'Content-Type: text/plain; charset=utf-8',
-              '',
-              text.replace(/\n/g, '\r\n'),
-              '.',
-            ].join('\r\n');
-            socket.write(msg + '\r\n');
-          }},
-          { expect: 250, send: () => { write('QUIT'); resolve(); } },
-        ];
-        stepIndex = 0;
-        socket.on('data', onData);
-        socket.on('error', fail);
-      });
-      socket.on('error', fail);
+    // Advance the SMTP conversation based on the reply code + current stage.
+    function handle(code, fullReply) {
+      switch (stage) {
+        case 'greeting':
+          if (code !== 220) return done(new Error(`greeting failed: ${fullReply}`));
+          stage = 'ehlo'; write('EHLO vdkbusiness-services.nl'); break;
+        case 'ehlo':
+          if (code !== 250) return done(new Error(`EHLO failed: ${fullReply}`));
+          stage = 'auth'; write('AUTH LOGIN'); break;
+        case 'auth':
+          if (code !== 334) return done(new Error(`AUTH LOGIN failed: ${fullReply}`));
+          stage = 'user'; write(Buffer.from(user).toString('base64')); break;
+        case 'user':
+          if (code !== 334) return done(new Error(`username rejected: ${fullReply}`));
+          stage = 'pass'; write(Buffer.from(pass).toString('base64')); break;
+        case 'pass':
+          if (code !== 235) return done(new Error(`login rejected: ${fullReply}`));
+          stage = 'mailfrom'; write(`MAIL FROM:<${from}>`); break;
+        case 'mailfrom':
+          if (code !== 250) return done(new Error(`MAIL FROM failed: ${fullReply}`));
+          stage = 'rcpt'; write(`RCPT TO:<${to}>`); break;
+        case 'rcpt':
+          if (code !== 250) return done(new Error(`RCPT TO failed: ${fullReply}`));
+          stage = 'data'; write('DATA'); break;
+        case 'data':
+          if (code !== 354) return done(new Error(`DATA failed: ${fullReply}`));
+          stage = 'body'; socket.write(message + '\r\n.\r\n'); break;
+        case 'body':
+          if (code !== 250) return done(new Error(`message rejected: ${fullReply}`));
+          stage = 'quit'; write('QUIT'); done(); break;
+      }
     }
 
     function onData(chunk) {
       buffer += chunk.toString();
-      // Process complete lines; multi-line replies end with "NNN " (space after code)
       let idx;
       while ((idx = buffer.indexOf('\r\n')) !== -1) {
         const line = buffer.slice(0, idx);
         buffer = buffer.slice(idx + 2);
-        if (!/^\d{3} /.test(line)) continue; // continuation line
-        const code = Number(line.slice(0, 3));
-        const step = steps[stepIndex];
-        if (!step) return;
-        if (code !== step.expect) return fail(new Error(`SMTP error: expected ${step.expect}, got "${line}"`));
-        stepIndex++;
-        step.send();
+        // Continuation lines look like "250-...", the final line "250 ..."
+        if (!/^\d{3} /.test(line)) continue;
+        handle(Number(line.slice(0, 3)), line);
       }
     }
 
-    buildSteps();
-    if (secure) {
-      socket = tls.connect({ host, port, servername: host }, () => {});
-    } else {
-      socket = net.connect({ host, port });
-    }
-    socket.setTimeout(15000, () => fail(new Error('SMTP timeout')));
+    const connectOpts = { host, port };
+    if (startWithTls) connectOpts.servername = host;
+    socket = startWithTls
+      ? tls.connect({ ...connectOpts, servername: host })
+      : net.connect(connectOpts);
+    socket.setTimeout(20000, () => done(new Error('SMTP timeout')));
     socket.on('data', onData);
-    socket.on('error', fail);
+    socket.on('error', (e) => done(e instanceof Error ? e : new Error(String(e))));
+    socket.on('end', () => done(new Error('connection closed by server')));
   });
 }
 
@@ -264,7 +232,7 @@ const server = http.createServer(async (req, res) => {
           text: `Your login code for the VDK Business Services admin panel is: ${code}\n\nIt expires in 10 minutes. If you did not request this, ignore this email.`,
         });
       } catch (err) {
-        console.error('SMTP send failed:', err.message);
+        console.error('SMTP send failed:', (err && (err.stack || err.message)) || String(err));
         return json(res, 500, { error: 'Could not send email. Check SMTP settings.' });
       }
     } else {
