@@ -168,6 +168,24 @@ function sendViaSmtp({ to, subject, text }) {
   });
 }
 
+// ---------- Key-value storage (Upstash Redis REST API over HTTPS) ----------
+const KV_URL = process.env.UPSTASH_REDIS_REST_URL;
+const KV_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
+
+async function kvCmd(...cmd) {
+  if (!KV_URL || !KV_TOKEN) throw new Error('storage not configured');
+  const r = await fetch(KV_URL, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${KV_TOKEN.trim()}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(cmd),
+  });
+  const d = await r.json();
+  if (d.error) throw new Error(`KV error: ${d.error}`);
+  return d.result;
+}
+const kvGetJson = async (k) => { const v = await kvCmd('GET', k); return v ? JSON.parse(v) : null; };
+const kvSetJson = (k, obj) => kvCmd('SET', k, JSON.stringify(obj));
+
 // ---------- Sessions (HMAC-signed cookie, in-memory store) ----------
 const sessions = new Map(); // id -> { email, expires }
 
@@ -265,7 +283,17 @@ const server = http.createServer(async (req, res) => {
     const body = await readBody(req);
     const email = String(body.email || '').trim().toLowerCase();
     const generic = { ok: true, message: 'If this email is authorized, a code has been sent.' };
-    if (email !== ADMIN_EMAIL) return json(res, 200, generic);
+    let allowed = email === ADMIN_EMAIL && email.includes('@');
+    if (!allowed && email.includes('@') && KV_URL) {
+      try {
+        if (await kvGetJson(`user:${email}`)) allowed = true;
+        else {
+          const st = await kvGetJson('settings');
+          if (st && st.lockedToAdmin === false) allowed = true;
+        }
+      } catch (e) { console.error('KV check failed:', e.message); }
+    }
+    if (!allowed) return json(res, 200, generic);
 
     const code = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
     codes.set(email, { hash: hashCode(code), expires: Date.now() + CODE_TTL, attempts: 0 });
@@ -303,6 +331,19 @@ const server = http.createServer(async (req, res) => {
     const ok = crypto.timingSafeEqual(Buffer.from(hashCode(code)), Buffer.from(entry.hash));
     if (!ok) return json(res, 401, { error: 'Invalid or expired code.' });
     codes.delete(email);
+    // First login of a non-admin: create the account (only while registration is open)
+    if (email !== ADMIN_EMAIL && KV_URL) {
+      try {
+        if (!(await kvGetJson(`user:${email}`))) {
+          const st = await kvGetJson('settings');
+          if (!st || st.lockedToAdmin !== false) return json(res, 401, { error: 'Invalid or expired code.' });
+          await kvSetJson(`user:${email}`, { createdAt: Date.now() });
+        }
+      } catch (e) {
+        console.error('KV user create failed:', e.message);
+        return json(res, 500, { error: 'Storage unavailable.' });
+      }
+    }
     const cookie = createSession(email);
     return json(res, 200, { ok: true }, { 'Set-Cookie': sessionCookie(cookie, SESSION_TTL) });
   }
@@ -311,6 +352,74 @@ const server = http.createServer(async (req, res) => {
     const s = getSession(req);
     if (s) sessions.delete(s.id);
     return json(res, 200, { ok: true }, { 'Set-Cookie': sessionCookie('', 0) });
+  }
+
+  // --- Panel API ---
+  if (p === '/api/me') {
+    const s = getSession(req);
+    if (!s) return json(res, 401, { error: 'Not logged in' });
+    return json(res, 200, { email: s.email, isAdmin: s.email === ADMIN_EMAIL });
+  }
+
+  if (p === '/api/reminders') {
+    const s = getSession(req);
+    if (!s) return json(res, 401, { error: 'Not logged in' });
+    const key = `rem:${s.email}`;
+    try {
+      if (req.method === 'GET') return json(res, 200, (await kvGetJson(key)) || []);
+      if (req.method === 'POST') {
+        const body = await readBody(req);
+        let list = (await kvGetJson(key)) || [];
+        if (body.action === 'create') {
+          const title = String(body.title || '').trim().slice(0, 200);
+          if (!title) return json(res, 400, { error: 'Titel is verplicht' });
+          list.push({
+            id: crypto.randomUUID(),
+            title,
+            note: String(body.note || '').trim().slice(0, 2000),
+            due: String(body.due || '').slice(0, 10),
+            prio: Math.min(4, Math.max(1, Number(body.prio) || 4)),
+            done: false,
+            createdAt: Date.now(),
+          });
+        } else if (body.action === 'update') {
+          const r = list.find((x) => x.id === body.id);
+          if (!r) return json(res, 404, { error: 'Niet gevonden' });
+          if (body.title !== undefined) r.title = String(body.title).trim().slice(0, 200) || r.title;
+          if (body.note !== undefined) r.note = String(body.note).trim().slice(0, 2000);
+          if (body.due !== undefined) r.due = String(body.due).slice(0, 10);
+          if (body.prio !== undefined) r.prio = Math.min(4, Math.max(1, Number(body.prio) || 4));
+          if (body.done !== undefined) r.done = !!body.done;
+        } else if (body.action === 'delete') {
+          list = list.filter((x) => x.id !== body.id);
+        } else {
+          return json(res, 400, { error: 'Onbekende actie' });
+        }
+        await kvSetJson(key, list);
+        return json(res, 200, { ok: true, reminders: list });
+      }
+    } catch (e) {
+      console.error('reminders API error:', e.message);
+      return json(res, 500, { error: 'Opslag niet bereikbaar. Is Upstash gekoppeld?' });
+    }
+  }
+
+  if (p === '/api/settings') {
+    const s = getSession(req);
+    if (!s) return json(res, 401, { error: 'Not logged in' });
+    if (s.email !== ADMIN_EMAIL) return json(res, 403, { error: 'Geen toegang' });
+    try {
+      if (req.method === 'GET') return json(res, 200, (await kvGetJson('settings')) || { lockedToAdmin: true });
+      if (req.method === 'POST') {
+        const body = await readBody(req);
+        const st = { lockedToAdmin: body.lockedToAdmin !== false };
+        await kvSetJson('settings', st);
+        return json(res, 200, st);
+      }
+    } catch (e) {
+      console.error('settings API error:', e.message);
+      return json(res, 500, { error: 'Opslag niet bereikbaar. Is Upstash gekoppeld?' });
+    }
   }
 
   // --- Admin pages ---
