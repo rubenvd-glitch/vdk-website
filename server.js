@@ -378,6 +378,7 @@ const server = http.createServer(async (req, res) => {
             title,
             note: String(body.note || '').trim().slice(0, 2000),
             due: String(body.due || '').slice(0, 10),
+            time: /^\d{2}:\d{2}$/.test(String(body.time || '')) ? String(body.time) : '',
             prio: Math.min(4, Math.max(1, Number(body.prio) || 4)),
             done: false,
             createdAt: Date.now(),
@@ -388,6 +389,7 @@ const server = http.createServer(async (req, res) => {
           if (body.title !== undefined) r.title = String(body.title).trim().slice(0, 200) || r.title;
           if (body.note !== undefined) r.note = String(body.note).trim().slice(0, 2000);
           if (body.due !== undefined) r.due = String(body.due).slice(0, 10);
+          if (body.time !== undefined) r.time = /^\d{2}:\d{2}$/.test(String(body.time)) ? String(body.time) : '';
           if (body.prio !== undefined) r.prio = Math.min(4, Math.max(1, Number(body.prio) || 4));
           if (body.done !== undefined) r.done = !!body.done;
         } else if (body.action === 'delete') {
