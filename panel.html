@@ -56,11 +56,11 @@
     .rem-note { font-size: 13px; color: #aeb6c0; margin-top: 4px; word-break: break-word; }
     .rem-meta { font-size: 12.5px; color: #8b94a1; margin-top: 7px; }
     .late { color: #e5484d; font-weight: 700; }
-    .rem-actions { display: flex; flex-direction: column; gap: 7px; align-items: stretch; }
+    .rem-actions { display: flex; flex-direction: row; gap: 8px; align-items: center; }
     .rem-actions button {
       background: transparent; border: 1px solid #39424e; color: #cfd6de;
-      font-size: 13px; cursor: pointer; padding: 7px 14px; border-radius: 8px;
-      white-space: nowrap; text-align: center;
+      font-size: 15px; cursor: pointer; border-radius: 8px;
+      width: 38px; height: 36px; line-height: 1; text-align: center; padding: 0;
     }
     .rem-actions button:hover { background: #1c222b; }
     .rem-actions button.ok { border-color: #2ea36f; color: #3fc98b; font-weight: 700; }
@@ -244,10 +244,10 @@
           </div>
           <div class="rem-actions">
             ${r.done
-              ? `<button onclick="toggleDone('${r.id}', false)">Heropenen</button>`
-              : `<button class="ok" onclick="toggleDone('${r.id}', true)">✓ Afgerond</button>
-                 <button onclick="openModal('${r.id}')">Plan opnieuw</button>`}
-            <button class="danger" onclick="removeRem('${r.id}')">Verwijderen</button>
+              ? `<button title="Heropenen" onclick="toggleDone('${r.id}', false)">↩</button>`
+              : `<button class="ok" title="Afgerond" onclick="toggleDone('${r.id}', true)">✓</button>
+                 <button title="Bewerken" onclick="openModal('${r.id}')">✏️</button>`}
+            <button class="danger" title="Verwijderen" onclick="removeRem('${r.id}')">🗑</button>
           </div>
         </div>`).join('');
     }
