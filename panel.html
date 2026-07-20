@@ -109,6 +109,23 @@
     }
     .modal .err { color: #e5484d; font-size: 13px; margin-top: 10px; min-height: 16px; }
 
+    .icon-btn {
+      background: none; border: none; color: #e6e9ed; cursor: pointer;
+      padding: 7px; border-radius: 8px; display: flex; align-items: center;
+    }
+    .icon-btn:hover { background: #1c222b; }
+    .menu {
+      display: none; position: absolute; top: 42px; left: 0; z-index: 100;
+      background: #171c24; border: 1px solid #2a323d; border-radius: 10px;
+      min-width: 190px; padding: 6px; box-shadow: 0 12px 32px rgba(0,0,0,.45);
+    }
+    .menu.open { display: block; }
+    .menu button {
+      display: block; width: 100%; text-align: left; background: none; border: none;
+      color: #e6e9ed; font-size: 14px; padding: 10px 12px; border-radius: 7px;
+      cursor: pointer; font-family: inherit;
+    }
+    .menu button:hover { background: #1c222b; }
     .collapse-head {
       background: none; border: none; color: #8b94a1; font-size: 14.5px; font-weight: 700;
       display: flex; align-items: center; gap: 9px; cursor: pointer; padding: 10px 2px;
@@ -151,47 +168,59 @@
 </head>
 <body>
   <header>
-    <h1>VDK ADMIN</h1>
+    <div style="position:relative;">
+      <button id="menuBtn" class="icon-btn" title="Menu">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:20px;height:20px;"><path d="M3 6h18"/><path d="M3 12h18"/><path d="M3 18h18"/></svg>
+      </button>
+      <div class="menu" id="menu">
+        <button onclick="showView('home')">Start</button>
+        <button onclick="showView('reminders')">Herinneringen</button>
+        <button onclick="showView('sugs')">Suggesties</button>
+      </div>
+    </div>
     <button id="logoutBtn">Uitloggen</button>
   </header>
 
   <main>
-    <div class="greeting" id="greeting">…</div>
-    <div class="greeting-sub" id="today"></div>
+    <div id="view-home">
+      <div class="greeting" id="greeting">…</div>
+      <div class="greeting-sub" id="today"></div>
 
-    <div id="sugCards"></div>
+      <div id="sugCards"></div>
 
-    <div class="section-head">
-      <h2>Herinneringen</h2>
-      <button class="btn-primary" id="newBtn">+ Nieuwe herinnering</button>
+      <h2 style="font-size:19px; margin:26px 0 4px;">Komende week</h2>
+      <div class="section-sub">Je herinneringen voor de komende 7 dagen.</div>
+      <div id="weekList"></div>
     </div>
-    <div class="section-sub">Plan je taken en houd de eerstvolgende herinnering in de gaten.</div>
 
-    <div class="tabs">
-      <button id="tabActive" class="active">Actief</button>
-      <button id="tabDone">Afgerond</button>
-      <select id="filterSel">
-        <option value="all">Alles</option>
-        <option value="today">Vandaag</option>
-        <option value="week">Komende week</option>
-        <option value="month">Komende 30 dagen</option>
-        <option value="late">Te laat</option>
-      </select>
-    </div>
-    <div id="list"></div>
-
-    <div style="margin-top:46px; border-top:1px solid #232a33; padding-top:8px;">
-      <button class="collapse-head" id="sugToggle">
-        <svg id="sugChev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;transition:transform .15s;"><path d="M6 9l6 6 6-6"/></svg>
-        Suggesties
-      </button>
-      <div id="sugBody" style="display:none; padding-top:14px;">
-        <div class="section-head">
-          <div class="section-sub" style="margin-bottom:0;">Terugkerende ideeën die vanzelf bovenaan verschijnen wanneer het tijd is.</div>
-          <button class="btn-primary" id="newSugBtn">+ Nieuwe suggestie</button>
-        </div>
-        <div id="sugList" style="margin-top:16px;"></div>
+    <div id="view-reminders" style="display:none;">
+      <div class="section-head">
+        <h2>Herinneringen</h2>
+        <button class="btn-primary" id="newBtn">+ Nieuwe herinnering</button>
       </div>
+      <div class="section-sub">Plan je taken en houd de eerstvolgende herinnering in de gaten.</div>
+
+      <div class="tabs">
+        <button id="tabActive" class="active">Actief</button>
+        <button id="tabDone">Afgerond</button>
+        <select id="filterSel">
+          <option value="all">Alles</option>
+          <option value="today">Vandaag</option>
+          <option value="week">Komende week</option>
+          <option value="month">Komende 30 dagen</option>
+          <option value="late">Te laat</option>
+        </select>
+      </div>
+      <div id="list"></div>
+    </div>
+
+    <div id="view-sugs" style="display:none;">
+      <div class="section-head">
+        <h2>Suggesties</h2>
+        <button class="btn-primary" id="newSugBtn">+ Nieuwe suggestie</button>
+      </div>
+      <div class="section-sub">Terugkerende ideeën die vanzelf op de startpagina verschijnen wanneer het tijd is.</div>
+      <div id="sugList"></div>
     </div>
   </main>
 
@@ -320,6 +349,7 @@
     };
 
     function render() {
+      renderHome();
       const todayISO = iso(new Date());
       const plusDays = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return iso(d); };
       const filter = $('filterSel').value;
@@ -392,6 +422,7 @@
           </div>`).join('')
         : '<div class="empty">Nog geen suggesties. Maak er een aan, bijvoorbeeld: bloemen kopen, elke maand.</div>';
     }
+
 
     window.sugAct = async (id, action) => {
       try {
@@ -470,11 +501,34 @@
     };
 
     $('newSugBtn').onclick = () => openSugModal(null);
-    $('sugToggle').onclick = () => {
-      const open = $('sugBody').style.display !== 'none';
-      $('sugBody').style.display = open ? 'none' : 'block';
-      $('sugChev').style.transform = open ? '' : 'rotate(180deg)';
+
+    const views = { home: 'view-home', reminders: 'view-reminders', sugs: 'view-sugs' };
+    window.showView = (v) => {
+      for (const k in views) $(views[k]).style.display = k === v ? 'block' : 'none';
+      $('menu').classList.remove('open');
+      window.scrollTo(0, 0);
     };
+    $('menuBtn').onclick = (e) => { e.stopPropagation(); $('menu').classList.toggle('open'); };
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('#menu') && !e.target.closest('#menuBtn')) $('menu').classList.remove('open');
+    });
+
+    function renderHome() {
+      const plus7 = (() => { const d = new Date(); d.setDate(d.getDate() + 7); return iso(d); })();
+      const items = reminders
+        .filter((r) => !r.done && r.due && r.due <= plus7)
+        .sort((a, b) => a.prio - b.prio || a.due.localeCompare(b.due));
+      $('weekList').innerHTML = items.length
+        ? items.map((r) => `
+          <div class="rem" style="cursor:pointer;" onclick="showView('reminders')">
+            <span class="prio p${r.prio}">P${r.prio}</span>
+            <div class="rem-body">
+              <div class="rem-title">${esc(r.title)}</div>
+              <div class="rem-meta">${dueInfo(r)}</div>
+            </div>
+          </div>`).join('')
+        : '<div class="empty">Niets gepland voor de komende week.</div>';
+    }
 
     async function api(path, opts) {
       const r = await fetch(path, opts);
