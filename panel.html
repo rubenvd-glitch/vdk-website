@@ -114,18 +114,24 @@
       padding: 7px; border-radius: 8px; display: flex; align-items: center;
     }
     .icon-btn:hover { background: #1c222b; }
-    .menu {
-      display: none; position: absolute; top: 42px; left: 0; z-index: 100;
-      background: #171c24; border: 1px solid #2a323d; border-radius: 10px;
-      min-width: 190px; padding: 6px; box-shadow: 0 12px 32px rgba(0,0,0,.45);
+    .backdrop {
+      position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 150;
+      opacity: 0; pointer-events: none; transition: opacity .22s ease;
     }
-    .menu.open { display: block; }
-    .menu button {
+    .backdrop.show { opacity: 1; pointer-events: auto; }
+    .drawer {
+      position: fixed; top: 0; left: 0; bottom: 0; width: 220px; z-index: 200;
+      background: #12161d; border-right: 1px solid #232a33;
+      padding: 22px 12px; display: flex; flex-direction: column; gap: 4px;
+      transform: translateX(-100%); transition: transform .22s ease;
+    }
+    .drawer.open { transform: translateX(0); }
+    .drawer button {
       display: block; width: 100%; text-align: left; background: none; border: none;
-      color: #e6e9ed; font-size: 14px; padding: 10px 12px; border-radius: 7px;
+      color: #e6e9ed; font-size: 15px; padding: 12px 14px; border-radius: 9px;
       cursor: pointer; font-family: inherit;
     }
-    .menu button:hover { background: #1c222b; }
+    .drawer button:hover { background: #1c222b; }
     .collapse-head {
       background: none; border: none; color: #8b94a1; font-size: 14.5px; font-weight: 700;
       display: flex; align-items: center; gap: 9px; cursor: pointer; padding: 10px 2px;
@@ -147,9 +153,8 @@
     .sug-card .acts button.ok { border-color: #2ea36f; color: #3fc98b; font-weight: 700; }
     .sug-card .acts button.ok:hover { background: rgba(46,163,111,.14); }
     .lock {
-      position: fixed; left: 18px; bottom: 18px; z-index: 20;
-      background: #151a21; border: 1px solid #232a33; border-radius: 12px;
-      padding: 12px 16px; display: none; align-items: center; gap: 12px; max-width: 330px;
+      margin-top: auto; background: #151a21; border: 1px solid #232a33;
+      border-radius: 10px; padding: 12px; display: none; align-items: center; gap: 10px;
     }
     .lock.show { display: flex; }
     .lock .txt { font-size: 12.5px; color: #aeb6c0; line-height: 1.45; }
@@ -168,18 +173,25 @@
 </head>
 <body>
   <header>
-    <div style="position:relative;">
-      <button id="menuBtn" class="icon-btn" title="Menu">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:20px;height:20px;"><path d="M3 6h18"/><path d="M3 12h18"/><path d="M3 18h18"/></svg>
-      </button>
-      <div class="menu" id="menu">
-        <button onclick="showView('home')">Start</button>
-        <button onclick="showView('reminders')">Herinneringen</button>
-        <button onclick="showView('sugs')">Suggesties</button>
-      </div>
-    </div>
+    <button id="menuBtn" class="icon-btn" title="Menu">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:20px;height:20px;"><path d="M3 6h18"/><path d="M3 12h18"/><path d="M3 18h18"/></svg>
+    </button>
     <button id="logoutBtn">Uitloggen</button>
   </header>
+
+  <div class="backdrop" id="backdrop"></div>
+  <nav class="drawer" id="drawer">
+    <button onclick="showView('home')">Start</button>
+    <button onclick="showView('reminders')">Herinneringen</button>
+    <button onclick="showView('sugs')">Suggesties</button>
+    <div class="lock" id="lockBox">
+      <label class="switch">
+        <input type="checkbox" id="lockToggle">
+        <span class="slider"></span>
+      </label>
+      <div class="txt" id="lockTxt">Alleen mijn e-mail kan inloggen</div>
+    </div>
+  </nav>
 
   <main>
     <div id="view-home">
@@ -223,14 +235,6 @@
       <div id="sugList"></div>
     </div>
   </main>
-
-  <div class="lock" id="lockBox">
-    <label class="switch">
-      <input type="checkbox" id="lockToggle">
-      <span class="slider"></span>
-    </label>
-    <div class="txt" id="lockTxt">Alleen mijn e-mail kan inloggen</div>
-  </div>
 
   <div class="overlay" id="overlay">
     <div class="modal">
@@ -503,15 +507,17 @@
     $('newSugBtn').onclick = () => openSugModal(null);
 
     const views = { home: 'view-home', reminders: 'view-reminders', sugs: 'view-sugs' };
+    function closeDrawer() { $('drawer').classList.remove('open'); $('backdrop').classList.remove('show'); }
     window.showView = (v) => {
       for (const k in views) $(views[k]).style.display = k === v ? 'block' : 'none';
-      $('menu').classList.remove('open');
+      closeDrawer();
       window.scrollTo(0, 0);
     };
-    $('menuBtn').onclick = (e) => { e.stopPropagation(); $('menu').classList.toggle('open'); };
-    document.addEventListener('click', (e) => {
-      if (!e.target.closest('#menu') && !e.target.closest('#menuBtn')) $('menu').classList.remove('open');
-    });
+    $('menuBtn').onclick = () => {
+      $('drawer').classList.toggle('open');
+      $('backdrop').classList.toggle('show');
+    };
+    $('backdrop').onclick = closeDrawer;
 
     function renderHome() {
       const plus7 = (() => { const d = new Date(); d.setDate(d.getDate() + 7); return iso(d); })();
