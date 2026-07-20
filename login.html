@@ -12,85 +12,172 @@
       font-family: 'Helvetica Neue', Arial, sans-serif; color: #22251f;
     }
     .card {
-      background: #fff; border-radius: 12px; padding: 40px;
-      width: min(400px, 92vw); box-shadow: 0 8px 30px rgba(0,0,0,.12);
+      background: #fff; border-radius: 14px; padding: 40px;
+      width: min(420px, 92vw); box-shadow: 0 8px 30px rgba(0,0,0,.12);
     }
     h1 { font-size: 20px; letter-spacing: 2px; margin-bottom: 6px; }
-    p.sub { color: #666; font-size: 14px; margin-bottom: 24px; }
-    label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
-    input {
+    p.sub { color: #666; font-size: 14px; margin-bottom: 26px; }
+    label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 8px; }
+    input[type=email] {
       width: 100%; padding: 12px; font-size: 16px; border: 1px solid #c5c9c6;
-      border-radius: 8px; margin-bottom: 16px;
+      border-radius: 9px; margin-bottom: 16px;
     }
     input:focus { outline: 2px solid #22251f; border-color: transparent; }
-    button {
-      width: 100%; padding: 13px; font-size: 15px; font-weight: 600;
-      background: #22251f; color: #fff; border: none; border-radius: 8px; cursor: pointer;
+    .btn {
+      width: 100%; padding: 13px; font-size: 15px; font-weight: 700;
+      background: #22251f; color: #fff; border: none; border-radius: 9px; cursor: pointer;
     }
-    button:disabled { opacity: .6; cursor: wait; }
-    .msg { font-size: 13px; margin-top: 14px; min-height: 18px; }
+    .btn:disabled { opacity: .6; cursor: wait; }
+    .codes { display: flex; gap: 9px; justify-content: space-between; margin-bottom: 18px; }
+    .codes input {
+      width: 100%; aspect-ratio: 4/5; max-width: 52px; text-align: center;
+      font-size: 24px; font-weight: 700; border: 1px solid #c5c9c6; border-radius: 10px;
+    }
+    .resend {
+      display: block; width: 100%; text-align: center; background: none; border: none;
+      color: #666; font-size: 13px; margin-top: 16px; cursor: pointer; font-family: inherit;
+    }
+    .resend:not(:disabled) { color: #22251f; font-weight: 600; text-decoration: underline; }
+    .resend:disabled { cursor: default; }
+    .msg { font-size: 13px; margin-top: 14px; min-height: 18px; text-align: center; }
     .msg.err { color: #b00020; }
     .msg.ok { color: #1a7a3a; }
     #step2 { display: none; }
-    .code-input { letter-spacing: 8px; text-align: center; font-size: 22px; }
   </style>
 </head>
 <body>
   <div class="card">
     <h1>VDK ADMIN</h1>
-    <p class="sub">Two-factor login via email</p>
+    <p class="sub" id="subTxt">Log in met je e-mailadres</p>
 
     <div id="step1">
-      <label for="email">Email address</label>
-      <input type="email" id="email" placeholder="info@vdkbusiness-services.nl" autocomplete="email">
-      <button id="sendBtn">Send login code</button>
+      <label for="email">E-mailadres</label>
+      <input type="email" id="email" autocomplete="email">
+      <button class="btn" id="sendBtn">Verstuur logincode</button>
     </div>
 
     <div id="step2">
-      <label for="code">6-digit code from your email</label>
-      <input type="text" id="code" class="code-input" maxlength="6" inputmode="numeric" placeholder="••••••">
-      <button id="verifyBtn">Verify &amp; log in</button>
+      <label>Vul de 6-cijferige code in</label>
+      <div class="codes" id="codes">
+        <input type="text" inputmode="numeric" maxlength="1" autocomplete="one-time-code">
+        <input type="text" inputmode="numeric" maxlength="1">
+        <input type="text" inputmode="numeric" maxlength="1">
+        <input type="text" inputmode="numeric" maxlength="1">
+        <input type="text" inputmode="numeric" maxlength="1">
+        <input type="text" inputmode="numeric" maxlength="1">
+      </div>
+      <button class="btn" id="verifyBtn">Inloggen</button>
+      <button class="resend" id="resendBtn" disabled>Code opnieuw versturen (30)</button>
     </div>
 
     <div class="msg" id="msg"></div>
   </div>
 
   <script>
-    const msg = document.getElementById('msg');
-    const emailInput = document.getElementById('email');
+    const $ = (id) => document.getElementById(id);
+    const boxes = [...document.querySelectorAll('#codes input')];
+    let email = '';
+    let timer = null;
 
-    function show(text, cls) { msg.textContent = text; msg.className = 'msg ' + (cls || ''); }
+    function show(text, cls) { $('msg').textContent = text; $('msg').className = 'msg ' + (cls || ''); }
 
-    document.getElementById('sendBtn').onclick = async (e) => {
+    function startResendTimer() {
+      let left = 30;
+      $('resendBtn').disabled = true;
+      $('resendBtn').textContent = `Code opnieuw versturen (${left})`;
+      clearInterval(timer);
+      timer = setInterval(() => {
+        left--;
+        if (left <= 0) {
+          clearInterval(timer);
+          $('resendBtn').disabled = false;
+          $('resendBtn').textContent = 'Code opnieuw versturen';
+        } else {
+          $('resendBtn').textContent = `Code opnieuw versturen (${left})`;
+        }
+      }, 1000);
+    }
+
+    async function sendCode() {
+      const r = await fetch('/admin/request-code', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'Versturen mislukt');
+    }
+
+    $('sendBtn').onclick = async (e) => {
+      email = $('email').value.trim();
+      if (!email.includes('@')) { show('Vul een geldig e-mailadres in.', 'err'); return; }
       e.target.disabled = true;
-      show('Sending...');
+      show('Versturen…');
       try {
-        const r = await fetch('/admin/request-code', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: emailInput.value })
-        });
-        const d = await r.json();
-        if (!r.ok) throw new Error(d.error || 'Failed');
-        show('If this email is authorized, a code has been sent.', 'ok');
-        document.getElementById('step2').style.display = 'block';
-        document.getElementById('code').focus();
-      } catch (err) { show(err.message, 'err'); }
-      e.target.disabled = false;
+        await sendCode();
+        $('step1').style.display = 'none';
+        $('step2').style.display = 'block';
+        $('subTxt').textContent = `Code verstuurd naar ${email}`;
+        show('');
+        boxes[0].focus();
+        startResendTimer();
+      } catch (err) {
+        show(err.message, 'err');
+        e.target.disabled = false;
+      }
     };
 
-    document.getElementById('verifyBtn').onclick = async (e) => {
-      e.target.disabled = true;
-      show('Checking...');
+    $('resendBtn').onclick = async () => {
+      show('Versturen…');
+      try {
+        await sendCode();
+        show('Nieuwe code verstuurd.', 'ok');
+        boxes.forEach((b) => (b.value = ''));
+        boxes[0].focus();
+        startResendTimer();
+      } catch (err) { show(err.message, 'err'); }
+    };
+
+    boxes.forEach((b, i) => {
+      b.addEventListener('input', () => {
+        b.value = b.value.replace(/\D/g, '').slice(0, 1);
+        if (b.value && i < 5) boxes[i + 1].focus();
+        if (boxes.every((x) => x.value)) verify();
+      });
+      b.addEventListener('keydown', (e) => {
+        if (e.key === 'Backspace' && !b.value && i > 0) boxes[i - 1].focus();
+      });
+      b.addEventListener('paste', (e) => {
+        e.preventDefault();
+        const digits = (e.clipboardData.getData('text') || '').replace(/\D/g, '').slice(0, 6);
+        digits.split('').forEach((c, j) => { if (boxes[j]) boxes[j].value = c; });
+        boxes[Math.min(digits.length, 5)].focus();
+        if (digits.length === 6) verify();
+      });
+    });
+
+    async function verify() {
+      const code = boxes.map((b) => b.value).join('');
+      if (code.length !== 6) { show('Vul alle 6 cijfers in.', 'err'); return; }
+      $('verifyBtn').disabled = true;
+      show('Controleren…');
       try {
         const r = await fetch('/admin/verify', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: emailInput.value, code: document.getElementById('code').value })
+          body: JSON.stringify({ email, code }),
         });
         const d = await r.json();
-        if (!r.ok) throw new Error(d.error || 'Failed');
+        if (!r.ok) throw new Error(d.error || 'Inloggen mislukt');
         window.location.href = '/admin';
-      } catch (err) { show(err.message, 'err'); e.target.disabled = false; }
-    };
+      } catch (err) {
+        show(err.message, 'err');
+        $('verifyBtn').disabled = false;
+        boxes.forEach((b) => (b.value = ''));
+        boxes[0].focus();
+      }
+    }
+    $('verifyBtn').onclick = verify;
+
+    $('email').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('sendBtn').click(); });
   </script>
 </body>
 </html>

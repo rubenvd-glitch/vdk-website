@@ -471,6 +471,63 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
+  if (p === '/api/ideas') {
+    const s = getSession(req);
+    if (!s) return json(res, 401, { error: 'Not logged in' });
+    const key = `idea:${s.email}`;
+    try {
+      if (req.method === 'GET') return json(res, 200, (await kvGetJson(key)) || []);
+      if (req.method === 'POST') {
+        const body = await readBody(req);
+        let list = (await kvGetJson(key)) || [];
+        const todayISO = new Date().toISOString().slice(0, 10);
+        const plus = (n) => {
+          const d = new Date(todayISO + 'T00:00:00Z');
+          d.setUTCDate(d.getUTCDate() + n);
+          return d.toISOString().slice(0, 10);
+        };
+        if (body.action === 'create') {
+          const title = String(body.title || '').trim().slice(0, 200);
+          if (!title) return json(res, 400, { error: 'Titel is verplicht' });
+          list.push({
+            id: crypto.randomUUID(),
+            title,
+            desc: String(body.desc || '').trim().slice(0, 3000),
+            createdAt: Date.now(),
+            nextReview: plus(14),
+            reviews: 0,
+            archived: false,
+          });
+        } else {
+          const r = list.find((x) => x.id === body.id);
+          if (!r) return json(res, 404, { error: 'Niet gevonden' });
+          if (body.action === 'update') {
+            if (body.title !== undefined) r.title = String(body.title).trim().slice(0, 200) || r.title;
+            if (body.desc !== undefined) r.desc = String(body.desc).trim().slice(0, 3000);
+          } else if (body.action === 'keep') {
+            r.reviews = (r.reviews || 0) + 1;
+            r.nextReview = plus(r.reviews === 1 ? 42 : 90);
+          } else if (body.action === 'archive') {
+            r.archived = true;
+          } else if (body.action === 'restore') {
+            r.archived = false;
+            r.reviews = 0;
+            r.nextReview = plus(14);
+          } else if (body.action === 'delete') {
+            list = list.filter((x) => x.id !== body.id);
+          } else {
+            return json(res, 400, { error: 'Onbekende actie' });
+          }
+        }
+        await kvSetJson(key, list);
+        return json(res, 200, { ok: true, ideas: list });
+      }
+    } catch (e) {
+      console.error('ideas API error:', e.message);
+      return json(res, 500, { error: 'Opslag niet bereikbaar. Is Upstash gekoppeld?' });
+    }
+  }
+
   if (p === '/api/settings') {
     const s = getSession(req);
     if (!s) return json(res, 401, { error: 'Not logged in' });

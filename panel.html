@@ -152,6 +152,25 @@
     .sug-card .acts button:hover { background: #1c222b; }
     .sug-card .acts button.ok { border-color: #2ea36f; color: #3fc98b; font-weight: 700; }
     .sug-card .acts button.ok:hover { background: rgba(46,163,111,.14); }
+    .idea-card {
+      background: #171522; border: 1px solid #7b6ef666; border-radius: 12px;
+      padding: 15px 18px; margin-bottom: 12px; cursor: pointer;
+      font-size: 15px; font-weight: 700;
+    }
+    .idea-card:hover { border-color: #7b6ef6aa; }
+    .advice {
+      background: #10141a; border: 1px solid #2a323d; border-radius: 10px;
+      padding: 12px 14px; margin-top: 12px;
+    }
+    .advice .q { font-size: 13.5px; color: #aeb6c0; margin-bottom: 10px; }
+    .advice .acts { display: flex; gap: 8px; flex-wrap: wrap; }
+    .advice .acts button {
+      background: transparent; border: 1px solid #39424e; color: #cfd6de;
+      font-size: 12.5px; cursor: pointer; padding: 7px 12px; border-radius: 8px;
+    }
+    .advice .acts button:hover { background: #1c222b; }
+    .advice .acts button.ok { border-color: #2ea36f; color: #3fc98b; font-weight: 700; }
+    .advice .acts button.warn { border-color: #55282b; color: #e5484d; }
     .lock {
       margin-top: auto; background: #151a21; border: 1px solid #232a33;
       border-radius: 10px; padding: 12px; display: none; align-items: center; gap: 10px;
@@ -181,9 +200,10 @@
 
   <div class="backdrop" id="backdrop"></div>
   <nav class="drawer" id="drawer">
-    <button onclick="showView('home')">Start</button>
+    <button onclick="showView('home')">Dashboard</button>
     <button onclick="showView('reminders')">Herinneringen</button>
     <button onclick="showView('sugs')">Suggesties</button>
+    <button onclick="showView('ideas')">Ideeënbox</button>
     <div class="lock" id="lockBox">
       <label class="switch">
         <input type="checkbox" id="lockToggle">
@@ -199,6 +219,7 @@
       <div class="greeting-sub" id="today"></div>
 
       <div id="sugCards"></div>
+      <div id="ideaCards"></div>
 
       <h2 style="font-size:19px; margin:26px 0 4px;">Komende week</h2>
       <div class="section-sub">Je herinneringen voor de komende 7 dagen.</div>
@@ -210,7 +231,7 @@
         <h2>Herinneringen</h2>
         <button class="btn-primary" id="newBtn">+ Nieuwe herinnering</button>
       </div>
-      <div class="section-sub">Plan je taken en houd de eerstvolgende herinnering in de gaten.</div>
+      <div class="section-sub">Plan hier taken met een datum, tijd en prioriteit. Alles wat binnen 7 dagen valt zie je ook op het dashboard.</div>
 
       <div class="tabs">
         <button id="tabActive" class="active">Actief</button>
@@ -231,8 +252,21 @@
         <h2>Suggesties</h2>
         <button class="btn-primary" id="newSugBtn">+ Nieuwe suggestie</button>
       </div>
-      <div class="section-sub">Terugkerende ideeën die vanzelf op de startpagina verschijnen wanneer het tijd is.</div>
+      <div class="section-sub">Dingen die je regelmatig wilt blijven doen, zoals bloemen kopen of een date plannen. Op het ritme dat jij instelt verschijnen ze vanzelf op het dashboard.</div>
       <div id="sugList"></div>
+    </div>
+
+    <div id="view-ideas" style="display:none;">
+      <div class="section-head">
+        <h2>Ideeënbox</h2>
+        <button class="btn-primary" id="newIdeaBtn">+ Nieuw idee</button>
+      </div>
+      <div class="section-sub">Parkeer hier elk idee dat langskomt, zodat het je focus niet steelt. De box vraagt er later nuchter naar: is dit je tijd en moeite waard? Houden, uitwerken of loslaten.</div>
+      <div class="tabs">
+        <button id="ideaTabBox" class="active">In de box</button>
+        <button id="ideaTabArch">Losgelaten</button>
+      </div>
+      <div id="ideaList"></div>
     </div>
   </main>
 
@@ -278,6 +312,25 @@
     </div>
   </div>
 
+  <div class="overlay" id="ideaOverlay">
+    <div class="modal">
+      <h3 id="ideaModalTitle">Nieuw idee</h3>
+      <div class="sub">Drop het hier en ga verder met waar je mee bezig was. Over 2 weken vraagt de box er vanzelf naar.</div>
+
+      <label>Titel *</label>
+      <input type="text" id="iTitle" maxlength="200">
+
+      <label>Omschrijving (optioneel)</label>
+      <textarea id="iDesc" maxlength="3000" style="min-height:100px;"></textarea>
+
+      <div class="err" id="ideaErr"></div>
+      <div class="modal-actions">
+        <button class="btn-ghost" id="ideaCancelBtn">Annuleren</button>
+        <button class="btn-primary" id="ideaSaveBtn">Opslaan</button>
+      </div>
+    </div>
+  </div>
+
   <div class="overlay" id="sugOverlay">
     <div class="modal">
       <h3 id="sugModalTitle">Nieuwe suggestie</h3>
@@ -315,8 +368,9 @@
   </div>
 
   <script>
-    let me = null, reminders = [], suggestions = [], view = 'active';
-    let editing = null, sugEditing = null, sugFreq = 'm1', pendingConvert = null;
+    let me = null, reminders = [], suggestions = [], ideas = [], view = 'active', ideaView = 'box';
+    let editing = null, sugEditing = null, ideaEditing = null, sugFreq = 'm1';
+    let pendingConvert = null, pendingIdeaConvert = null;
     let selDays = 0, selPrio = 4, pickedDate = null;
 
     const $ = (id) => document.getElementById(id);
@@ -506,7 +560,113 @@
 
     $('newSugBtn').onclick = () => openSugModal(null);
 
-    const views = { home: 'view-home', reminders: 'view-reminders', sugs: 'view-sugs' };
+    function ideaAge(ts) {
+      const days = Math.floor((Date.now() - ts) / 86400000);
+      if (days < 1) return 'vandaag gedropt';
+      if (days === 1) return 'ligt er 1 dag';
+      if (days < 14) return `ligt er ${days} dagen`;
+      if (days < 60) return `ligt er ${Math.floor(days / 7)} weken`;
+      return `ligt er ${Math.floor(days / 30)} maanden`;
+    }
+
+    function ideaAdvice(r) {
+      if ((r.reviews || 0) >= 3) {
+        return `Je hebt dit idee nu ${r.reviews} keer bekeken zonder er iets mee te doen. Eerlijk zijn: is dit je tijd en moeite echt waard, of mag het los?`;
+      }
+      return `Dit idee ${ideaAge(r.createdAt)}. De eerste opwinding is eraf — is dit je tijd en moeite waard?`;
+    }
+
+    function renderIdeas() {
+      const todayISO = iso(new Date());
+      const due = ideas.filter((r) => !r.archived && r.nextReview <= todayISO);
+      $('ideaCards').innerHTML = due.map((r) => `
+        <div class="idea-card" onclick="showView('ideas')">Idee-check: “${esc(r.title)}” — is dit je tijd en moeite waard?</div>`).join('');
+
+      const shown = ideas.filter((r) => (ideaView === 'box' ? !r.archived : r.archived));
+      $('ideaTabBox').textContent = `In de box (${ideas.filter((r) => !r.archived).length})`;
+      $('ideaTabArch').textContent = `Losgelaten (${ideas.filter((r) => r.archived).length})`;
+      $('ideaList').innerHTML = shown.length
+        ? shown.slice().sort((a, b) => b.createdAt - a.createdAt).map((r) => `
+          <div class="rem">
+            <div class="rem-body">
+              <div class="rem-title">${esc(r.title)}</div>
+              ${r.desc ? `<div class="rem-note">${linkify(r.desc)}</div>` : ''}
+              <div class="rem-meta">${ideaAge(r.createdAt)}${r.archived ? ' · losgelaten' : ` · ${r.reviews || 0} keer bekeken · check op ${fmt(new Date(r.nextReview + 'T00:00:00'))}`}</div>
+              ${!r.archived && r.nextReview <= todayISO ? `
+                <div class="advice">
+                  <div class="q">${ideaAdvice(r)}</div>
+                  <div class="acts">
+                    <button onclick="ideaAct('${r.id}','keep')">Houden</button>
+                    <button class="ok" onclick="convertIdea('${r.id}')">Uitwerken</button>
+                    <button class="warn" onclick="ideaAct('${r.id}','archive')">Loslaten</button>
+                  </div>
+                </div>` : ''}
+            </div>
+            <div class="rem-actions">
+              ${r.archived
+                ? `<button title="Terug in de box" onclick="ideaAct('${r.id}','restore')">${IC.undo}</button>`
+                : `<button title="Bewerken" onclick="openIdeaModal('${r.id}')">${IC.pencil}</button>`}
+              <button class="danger" title="Definitief verwijderen" onclick="removeIdea('${r.id}')">${IC.trash}</button>
+            </div>
+          </div>`).join('')
+        : `<div class="empty">${ideaView === 'box' ? 'De box is leeg. Drop je volgende ingeving hier.' : 'Nog niets losgelaten.'}</div>`;
+    }
+
+    window.ideaAct = async (id, action) => {
+      try {
+        const d = await api('/api/ideas', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action, id }),
+        });
+        ideas = d.ideas; renderIdeas();
+      } catch (e) { alert(e.message); }
+    };
+
+    window.convertIdea = (id) => {
+      const r = ideas.find((x) => x.id === id);
+      if (!r) return;
+      pendingIdeaConvert = id;
+      openModal(null);
+      $('fTitle').value = r.title;
+      if (r.desc) $('fNote').value = r.desc;
+    };
+
+    window.removeIdea = async (id) => {
+      if (!confirm('Dit idee definitief verwijderen?')) return;
+      await ideaAct(id, 'delete');
+    };
+
+    window.openIdeaModal = (id) => {
+      ideaEditing = id || null;
+      const r = id ? ideas.find((x) => x.id === id) : null;
+      $('ideaModalTitle').textContent = r ? 'Idee aanpassen' : 'Nieuw idee';
+      $('iTitle').value = r ? r.title : '';
+      $('iDesc').value = r ? r.desc : '';
+      $('ideaErr').textContent = '';
+      $('ideaOverlay').classList.add('open');
+      $('iTitle').focus();
+    };
+
+    $('ideaCancelBtn').onclick = () => $('ideaOverlay').classList.remove('open');
+    $('ideaOverlay').onclick = (e) => { if (e.target === $('ideaOverlay')) $('ideaOverlay').classList.remove('open'); };
+    $('ideaSaveBtn').onclick = async () => {
+      const title = $('iTitle').value.trim();
+      if (!title) { $('ideaErr').textContent = 'Vul een titel in.'; return; }
+      try {
+        const d = await api('/api/ideas', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: ideaEditing ? 'update' : 'create', id: ideaEditing || undefined, title, desc: $('iDesc').value }),
+        });
+        ideas = d.ideas;
+        $('ideaOverlay').classList.remove('open');
+        renderIdeas();
+      } catch (e) { $('ideaErr').textContent = e.message; }
+    };
+    $('newIdeaBtn').onclick = () => openIdeaModal(null);
+    $('ideaTabBox').onclick = () => { ideaView = 'box'; $('ideaTabBox').classList.add('active'); $('ideaTabArch').classList.remove('active'); renderIdeas(); };
+    $('ideaTabArch').onclick = () => { ideaView = 'arch'; $('ideaTabArch').classList.add('active'); $('ideaTabBox').classList.remove('active'); renderIdeas(); };
+
+    const views = { home: 'view-home', reminders: 'view-reminders', sugs: 'view-sugs', ideas: 'view-ideas' };
     function closeDrawer() { $('drawer').classList.remove('open'); $('backdrop').classList.remove('show'); }
     window.showView = (v) => {
       for (const k in views) $(views[k]).style.display = k === v ? 'block' : 'none';
@@ -555,6 +715,10 @@
       try {
         suggestions = await api('/api/suggestions');
         renderSug();
+      } catch (e) { /* opslag nog niet gekoppeld */ }
+      try {
+        ideas = await api('/api/ideas');
+        renderIdeas();
       } catch (e) { /* opslag nog niet gekoppeld */ }
       if (me.isAdmin) {
         try {
@@ -637,8 +801,8 @@
       selPrio = Number(b.dataset.p); paintChips();
     };
 
-    $('cancelBtn').onclick = () => { pendingConvert = null; $('overlay').classList.remove('open'); };
-    $('overlay').onclick = (e) => { if (e.target === $('overlay')) { pendingConvert = null; $('overlay').classList.remove('open'); } };
+    $('cancelBtn').onclick = () => { pendingConvert = null; pendingIdeaConvert = null; $('overlay').classList.remove('open'); };
+    $('overlay').onclick = (e) => { if (e.target === $('overlay')) { pendingConvert = null; pendingIdeaConvert = null; $('overlay').classList.remove('open'); } };
 
     $('saveBtn').onclick = async () => {
       const payload = {
@@ -662,6 +826,10 @@
         if (pendingConvert) {
           const cid = pendingConvert; pendingConvert = null;
           await sugAct(cid, 'done');
+        }
+        if (pendingIdeaConvert) {
+          const iid = pendingIdeaConvert; pendingIdeaConvert = null;
+          await ideaAct(iid, 'archive');
         }
       } catch (e) { $('modalErr').textContent = e.message; }
     };
