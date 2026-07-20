@@ -406,6 +406,71 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
+  if (p === '/api/suggestions') {
+    const s = getSession(req);
+    if (!s) return json(res, 401, { error: 'Not logged in' });
+    const key = `sug:${s.email}`;
+    try {
+      if (req.method === 'GET') return json(res, 200, (await kvGetJson(key)) || []);
+      if (req.method === 'POST') {
+        const body = await readBody(req);
+        let list = (await kvGetJson(key)) || [];
+        const todayISO = new Date().toISOString().slice(0, 10);
+        const addCycle = (r, fromISO) => {
+          const d = new Date(fromISO + 'T00:00:00Z');
+          if (r.ftype === 'months') {
+            const day = r.fday || 1;
+            d.setUTCDate(1);
+            d.setUTCMonth(d.getUTCMonth() + (r.fn || 1));
+            const max = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();
+            d.setUTCDate(Math.min(day, max));
+          } else {
+            d.setUTCDate(d.getUTCDate() + (r.fn || 1) * (r.ftype === 'weeks' ? 7 : 1));
+          }
+          return d.toISOString().slice(0, 10);
+        };
+        const sanitize = (r, body) => {
+          if (body.text !== undefined) r.text = String(body.text).trim().slice(0, 300) || r.text;
+          if (body.ftype !== undefined) r.ftype = ['days', 'weeks', 'months'].includes(body.ftype) ? body.ftype : 'months';
+          if (body.fn !== undefined) r.fn = Math.min(365, Math.max(1, Number(body.fn) || 1));
+          if (body.fday !== undefined) r.fday = Math.min(31, Math.max(1, Number(body.fday) || 1));
+          if (body.first !== undefined && /^\d{4}-\d{2}-\d{2}$/.test(String(body.first))) r.nextDue = body.first;
+        };
+        if (body.action === 'create') {
+          const text = String(body.text || '').trim().slice(0, 300);
+          if (!text) return json(res, 400, { error: 'Tekst is verplicht' });
+          const r = { id: crypto.randomUUID(), text, ftype: 'months', fn: 1, fday: 1, nextDue: todayISO, createdAt: Date.now() };
+          sanitize(r, body);
+          list.push(r);
+        } else {
+          const r = list.find((x) => x.id === body.id);
+          if (body.action === 'delete') {
+            if (!r) return json(res, 404, { error: 'Niet gevonden' });
+            list = list.filter((x) => x.id !== body.id);
+          } else if (body.action === 'update') {
+            if (!r) return json(res, 404, { error: 'Niet gevonden' });
+            sanitize(r, body);
+          } else if (body.action === 'done' || body.action === 'skip') {
+            if (!r) return json(res, 404, { error: 'Niet gevonden' });
+            r.nextDue = addCycle(r, r.nextDue > todayISO ? r.nextDue : todayISO);
+          } else if (body.action === 'snooze') {
+            if (!r) return json(res, 404, { error: 'Niet gevonden' });
+            const d = new Date(todayISO + 'T00:00:00Z');
+            d.setUTCDate(d.getUTCDate() + Math.min(30, Math.max(1, Number(body.days) || 3)));
+            r.nextDue = d.toISOString().slice(0, 10);
+          } else {
+            return json(res, 400, { error: 'Onbekende actie' });
+          }
+        }
+        await kvSetJson(key, list);
+        return json(res, 200, { ok: true, suggestions: list });
+      }
+    } catch (e) {
+      console.error('suggestions API error:', e.message);
+      return json(res, 500, { error: 'Opslag niet bereikbaar. Is Upstash gekoppeld?' });
+    }
+  }
+
   if (p === '/api/settings') {
     const s = getSession(req);
     if (!s) return json(res, 401, { error: 'Not logged in' });
