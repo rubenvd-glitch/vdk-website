@@ -554,6 +554,32 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
+  if (p === '/api/profile') {
+    const s = getSession(req);
+    if (!s) return json(res, 401, { error: 'Not logged in' });
+    const key = `pref:${s.email}`;
+    const defaults = { name: '', sugSnoozeDays: 3, showSugCards: true, showIdeaCards: true };
+    try {
+      if (req.method === 'GET') {
+        const pr = (await kvGetJson(key)) || {};
+        return json(res, 200, { ...defaults, ...pr });
+      }
+      if (req.method === 'POST') {
+        const body = await readBody(req);
+        const pr = { ...defaults, ...((await kvGetJson(key)) || {}) };
+        if (body.name !== undefined) pr.name = String(body.name).trim().slice(0, 60);
+        if (body.sugSnoozeDays !== undefined) pr.sugSnoozeDays = Math.min(30, Math.max(1, Number(body.sugSnoozeDays) || 3));
+        if (body.showSugCards !== undefined) pr.showSugCards = !!body.showSugCards;
+        if (body.showIdeaCards !== undefined) pr.showIdeaCards = !!body.showIdeaCards;
+        await kvSetJson(key, pr);
+        return json(res, 200, pr);
+      }
+    } catch (e) {
+      console.error('profile API error:', e.message);
+      return json(res, 500, { error: 'Opslag niet bereikbaar. Is Upstash gekoppeld?' });
+    }
+  }
+
   if (p === '/api/settings') {
     const s = getSession(req);
     if (!s) return json(res, 401, { error: 'Not logged in' });

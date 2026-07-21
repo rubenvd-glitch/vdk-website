@@ -152,6 +152,36 @@
     .sug-card .acts button:hover { background: #1c222b; }
     .sug-card .acts button.ok { border-color: #2ea36f; color: #3fc98b; font-weight: 700; }
     .sug-card .acts button.ok:hover { background: rgba(46,163,111,.14); }
+    .set-card {
+      background: #151a21; border: 1px solid #232a33; border-radius: 12px;
+      padding: 18px 20px; margin-bottom: 16px;
+    }
+    .set-card h3 { font-size: 15px; margin-bottom: 6px; }
+    .set-row {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 14px; padding: 11px 0; border-top: 1px solid #1c222b;
+    }
+    .set-row:first-of-type { border-top: none; }
+    .set-row .lbl { font-size: 14px; font-weight: 600; }
+    .set-row .hint { font-size: 12.5px; color: #8b94a1; font-weight: 400; margin-top: 3px; }
+    .set-card input[type=text] {
+      background: #10141a; color: #e6e9ed; border: 1px solid #2a323d;
+      border-radius: 8px; padding: 9px 11px; font-size: 14px; font-family: inherit;
+    }
+    .btn-ghost-border {
+      background: transparent; border: 1px solid #39424e; color: #8b94a1;
+      padding: 9px 14px; border-radius: 8px; font-size: 13px; font-family: inherit;
+    }
+    .name-card {
+      background: #151a21; border: 1px solid #232a33; border-radius: 12px;
+      padding: 15px 18px; margin-bottom: 12px; display: flex; gap: 12px;
+      align-items: center; flex-wrap: wrap;
+    }
+    .name-card .txt { font-size: 14.5px; font-weight: 700; flex: 1; min-width: 200px; }
+    .name-card input {
+      background: #10141a; color: #e6e9ed; border: 1px solid #2a323d;
+      border-radius: 8px; padding: 9px 11px; font-size: 14px; font-family: inherit; width: 160px;
+    }
     .idea-card {
       background: #171522; border: 1px solid #7b6ef666; border-radius: 12px;
       padding: 15px 18px; margin-bottom: 12px; cursor: pointer;
@@ -204,6 +234,7 @@
     <button onclick="showView('reminders')">Herinneringen</button>
     <button onclick="showView('sugs')">Suggesties</button>
     <button onclick="showView('ideas')">Ideeënbox</button>
+    <button onclick="showView('settings')">Instellingen</button>
     <div class="lock" id="lockBox">
       <label class="switch">
         <input type="checkbox" id="lockToggle">
@@ -217,6 +248,12 @@
     <div id="view-home">
       <div class="greeting" id="greeting">…</div>
       <div class="greeting-sub" id="today"></div>
+
+      <div class="name-card" id="nameCard" style="display:none;">
+        <div class="txt">Hoe mag ik je noemen?</div>
+        <input type="text" id="nameInput" maxlength="60">
+        <button class="btn-primary" id="nameSaveBtn" style="padding:9px 14px;">Opslaan</button>
+      </div>
 
       <div id="sugCards"></div>
       <div id="ideaCards"></div>
@@ -267,6 +304,54 @@
         <button id="ideaTabArch">Losgelaten</button>
       </div>
       <div id="ideaList"></div>
+    </div>
+
+    <div id="view-settings" style="display:none;">
+      <div class="section-head">
+        <h2>Instellingen</h2>
+      </div>
+      <div class="section-sub">Je account en de basisinstellingen van je tools.</div>
+
+      <div class="set-card">
+        <h3>Account</h3>
+        <div class="set-row">
+          <div class="lbl">Naam<div class="hint">Zo spreekt het paneel je aan.</div></div>
+          <div style="display:flex; gap:8px;">
+            <input type="text" id="setName" maxlength="60" style="width:180px;">
+            <button class="btn-primary" id="saveNameBtn" style="padding:9px 14px;">Opslaan</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="set-card">
+        <h3>Suggesties</h3>
+        <div class="set-row">
+          <div class="lbl">Uitstel bij "Later"<div class="hint">Aantal dagen dat een suggestie wordt uitgesteld.</div></div>
+          <input type="text" id="setSnooze" inputmode="numeric" maxlength="2" style="width:70px; text-align:center;">
+        </div>
+        <div class="set-row">
+          <div class="lbl">Suggesties op het dashboard<div class="hint">Toon rijpe suggesties als kaart.</div></div>
+          <label class="switch"><input type="checkbox" id="setShowSug"><span class="slider"></span></label>
+        </div>
+        <div class="set-row">
+          <div class="lbl">Idee-checks op het dashboard<div class="hint">Toon de idee-checkvraag als kaart.</div></div>
+          <label class="switch"><input type="checkbox" id="setShowIdea"><span class="slider"></span></label>
+        </div>
+      </div>
+
+      <div class="set-card">
+        <h3>Agenda koppelen</h3>
+        <div class="section-sub" style="margin:8px 0 4px;">Zodra je agenda gekoppeld is kunnen suggesties rekening houden met je beschikbaarheid, bijvoorbeeld een date voorstellen op een rustige dag.</div>
+        <div class="set-row">
+          <div class="lbl">Google Calendar</div>
+          <button class="btn-ghost-border" disabled>Binnenkort beschikbaar</button>
+        </div>
+        <div class="set-row">
+          <div class="lbl">Apple Calendar</div>
+          <button class="btn-ghost-border" disabled>Binnenkort beschikbaar</button>
+        </div>
+      </div>
+      <div class="empty" id="setMsg" style="padding:8px 0;"></div>
     </div>
   </main>
 
@@ -369,6 +454,8 @@
 
   <script>
     let me = null, reminders = [], suggestions = [], ideas = [], view = 'active', ideaView = 'box';
+    let profile = { name: '', sugSnoozeDays: 3, showSugCards: true, showIdeaCards: true };
+    let profileLoaded = false;
     let editing = null, sugEditing = null, ideaEditing = null, sugFreq = 'm1';
     let pendingConvert = null, pendingIdeaConvert = null;
     let selDays = 0, selPrio = 4, pickedDate = null;
@@ -380,7 +467,7 @@
     function greet() {
       const h = new Date().getHours();
       const word = h < 6 ? 'Goedenacht' : h < 12 ? 'Goedemorgen' : h < 18 ? 'Goedemiddag' : 'Goedenavond';
-      const name = me.isAdmin ? 'Ruben' : me.email.split('@')[0];
+      const name = profile.name || (me.isAdmin ? 'Ruben' : me.email.split('@')[0]);
       $('greeting').textContent = `${word}, ${name.charAt(0).toUpperCase() + name.slice(1)}`;
       $('today').textContent = new Date().toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
     }
@@ -456,7 +543,7 @@
     function renderSug() {
       const todayISO = iso(new Date());
       const due = suggestions.filter((r) => r.nextDue <= todayISO);
-      $('sugCards').innerHTML = due.map((r) => `
+      $('sugCards').innerHTML = profile.showSugCards === false ? '' : due.map((r) => `
         <div class="sug-card">
           <div class="txt">${esc(r.text)}</div>
         </div>`).join('');
@@ -471,7 +558,7 @@
             <div class="rem-actions">
               ${r.nextDue <= todayISO ? `
                 <button class="ok" title="Gedaan" onclick="sugAct('${r.id}','done')">${IC.check}</button>
-                <button title="Later (3 dagen)" onclick="sugAct('${r.id}','snooze')">${IC.clock}</button>
+                <button title="Later (${profile.sugSnoozeDays || 3} dagen)" onclick="sugAct('${r.id}','snooze')">${IC.clock}</button>
                 <button title="Deze keer overslaan" onclick="sugAct('${r.id}','skip')">${IC.skip}</button>` : ''}
               <button title="Maak er een reminder van" onclick="convertSug('${r.id}')">${IC.calplus}</button>
               <button title="Bewerken" onclick="openSugModal('${r.id}')">${IC.pencil}</button>
@@ -486,10 +573,61 @@
       try {
         const d = await api('/api/suggestions', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action, id, days: 3 }),
+          body: JSON.stringify({ action, id, days: profile.sugSnoozeDays || 3 }),
         });
         suggestions = d.suggestions; renderSug();
       } catch (e) { alert(e.message); }
+    };
+
+    async function saveProfile(partial) {
+      const d = await api('/api/profile', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(partial),
+      });
+      profile = d;
+      greet();
+      renderSug();
+      renderIdeas();
+      return d;
+    }
+
+    function fillSettings() {
+      $('setName').value = profile.name || '';
+      $('setSnooze').value = String(profile.sugSnoozeDays || 3);
+      $('setShowSug').checked = profile.showSugCards !== false;
+      $('setShowIdea').checked = profile.showIdeaCards !== false;
+    }
+
+    function flashSetMsg(t) {
+      $('setMsg').textContent = t;
+      setTimeout(() => { if ($('setMsg').textContent === t) $('setMsg').textContent = ''; }, 2500);
+    }
+
+    $('saveNameBtn').onclick = async () => {
+      try { await saveProfile({ name: $('setName').value }); flashSetMsg('Naam opgeslagen.'); }
+      catch (e) { flashSetMsg(e.message); }
+    };
+    $('nameSaveBtn').onclick = async () => {
+      const n = $('nameInput').value.trim();
+      if (!n) return;
+      try {
+        await saveProfile({ name: n });
+        $('nameCard').style.display = 'none';
+        fillSettings();
+      } catch (e) { alert(e.message); }
+    };
+    $('nameInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('nameSaveBtn').click(); });
+    $('setSnooze').onchange = async () => {
+      try { await saveProfile({ sugSnoozeDays: Number($('setSnooze').value) || 3 }); fillSettings(); flashSetMsg('Opgeslagen.'); }
+      catch (e) { flashSetMsg(e.message); }
+    };
+    $('setShowSug').onchange = async () => {
+      try { await saveProfile({ showSugCards: $('setShowSug').checked }); flashSetMsg('Opgeslagen.'); }
+      catch (e) { flashSetMsg(e.message); }
+    };
+    $('setShowIdea').onchange = async () => {
+      try { await saveProfile({ showIdeaCards: $('setShowIdea').checked }); flashSetMsg('Opgeslagen.'); }
+      catch (e) { flashSetMsg(e.message); }
     };
 
     window.convertSug = (id) => {
@@ -579,7 +717,7 @@
     function renderIdeas() {
       const todayISO = iso(new Date());
       const due = ideas.filter((r) => !r.archived && r.nextReview <= todayISO);
-      $('ideaCards').innerHTML = due.map((r) => `
+      $('ideaCards').innerHTML = profile.showIdeaCards === false ? '' : due.map((r) => `
         <div class="idea-card" onclick="showView('ideas')">Idee-check: “${esc(r.title)}” — is dit je tijd en moeite waard?</div>`).join('');
 
       const shown = ideas.filter((r) => (ideaView === 'box' ? !r.archived : r.archived));
@@ -666,7 +804,7 @@
     $('ideaTabBox').onclick = () => { ideaView = 'box'; $('ideaTabBox').classList.add('active'); $('ideaTabArch').classList.remove('active'); renderIdeas(); };
     $('ideaTabArch').onclick = () => { ideaView = 'arch'; $('ideaTabArch').classList.add('active'); $('ideaTabBox').classList.remove('active'); renderIdeas(); };
 
-    const views = { home: 'view-home', reminders: 'view-reminders', sugs: 'view-sugs', ideas: 'view-ideas' };
+    const views = { home: 'view-home', reminders: 'view-reminders', sugs: 'view-sugs', ideas: 'view-ideas', settings: 'view-settings' };
     function closeDrawer() { $('drawer').classList.remove('open'); $('backdrop').classList.remove('show'); }
     window.showView = (v) => {
       for (const k in views) $(views[k]).style.display = k === v ? 'block' : 'none';
@@ -706,6 +844,13 @@
     async function load() {
       try { me = await api('/api/me'); } catch { location.href = '/admin'; return; }
       greet();
+      try {
+        profile = await api('/api/profile');
+        profileLoaded = true;
+        greet();
+        fillSettings();
+        if (!profile.name) $('nameCard').style.display = 'flex';
+      } catch (e) { /* opslag nog niet gekoppeld */ }
       try {
         reminders = await api('/api/reminders');
         render();
