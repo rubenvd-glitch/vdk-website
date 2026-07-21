@@ -225,7 +225,14 @@
     <button id="menuBtn" class="icon-btn" title="Menu">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:20px;height:20px;"><path d="M3 6h18"/><path d="M3 12h18"/><path d="M3 18h18"/></svg>
     </button>
-    <button id="logoutBtn">Uitloggen</button>
+    <div style="display:flex; gap:6px;">
+      <button class="icon-btn" title="Instellingen" onclick="showView('settings')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:19px;height:19px;"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </button>
+      <button class="icon-btn" id="logoutBtn" title="Uitloggen">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:19px;height:19px;"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+      </button>
+    </div>
   </header>
 
   <div class="backdrop" id="backdrop"></div>
@@ -330,11 +337,11 @@
           <input type="text" id="setSnooze" inputmode="numeric" maxlength="2" style="width:70px; text-align:center;">
         </div>
         <div class="set-row">
-          <div class="lbl">Suggesties op het dashboard<div class="hint">Toon rijpe suggesties als kaart.</div></div>
+          <div class="lbl">Suggesties op het dashboard<div class="hint">Toon suggesties op het dashboard.</div></div>
           <label class="switch"><input type="checkbox" id="setShowSug"><span class="slider"></span></label>
         </div>
         <div class="set-row">
-          <div class="lbl">Idee-checks op het dashboard<div class="hint">Toon de idee-checkvraag als kaart.</div></div>
+          <div class="lbl">Idee-checks op het dashboard<div class="hint">Toon idee-checks op het dashboard.</div></div>
           <label class="switch"><input type="checkbox" id="setShowIdea"><span class="slider"></span></label>
         </div>
       </div>
