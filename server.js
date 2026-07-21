@@ -186,6 +186,71 @@ async function kvCmd(...cmd) {
 const kvGetJson = async (k) => { const v = await kvCmd('GET', k); return v ? JSON.parse(v) : null; };
 const kvSetJson = (k, obj) => kvCmd('SET', k, JSON.stringify(obj));
 
+// ---------- Analytics + event log (fire-and-forget, never blocks a request) ----------
+const statDay = () => new Date().toISOString().slice(0, 10);
+
+function bump(k) {
+  if (!KV_URL) return;
+  const key = `st:${statDay()}:${k}`;
+  kvCmd('INCR', key).then(() => kvCmd('EXPIRE', key, '2678400')).catch(() => {});
+}
+function bumpUniq(ip) {
+  if (!KV_URL) return;
+  const h = crypto.createHash('sha256').update(`${ip}|vdk`).digest('hex').slice(0, 16);
+  const key = `st:${statDay()}:u`;
+  kvCmd('PFADD', key, h).then(() => kvCmd('EXPIRE', key, '2678400')).catch(() => {});
+}
+function logEvent(type, msg) {
+  if (!KV_URL) return;
+  kvCmd('LPUSH', 'log', JSON.stringify({ t: Date.now(), type, msg }))
+    .then(() => kvCmd('LTRIM', 'log', '0', '299'))
+    .catch(() => {});
+}
+
+// ---------- Telegram ----------
+async function tgSend(text) {
+  const token = (process.env.TELEGRAM_BOT_TOKEN || '').trim();
+  if (!token || !KV_URL) return false;
+  try {
+    const chat = await kvCmd('GET', 'tg:chat');
+    if (!chat) return false;
+    const r = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: chat, text }),
+    });
+    return r.ok;
+  } catch (e) {
+    console.error('telegram send failed:', e.message);
+    return false;
+  }
+}
+
+async function dailySummaryText() {
+  const d = statDay();
+  const get = async (k) => Number(await kvCmd('GET', `st:${d}:${k}`).catch(() => 0)) || 0;
+  const uniq = Number(await kvCmd('PFCOUNT', `st:${d}:u`).catch(() => 0)) || 0;
+  const [v, l, rc, rd, id] = await Promise.all([get('v'), get('l'), get('rc'), get('rd'), get('id')]);
+  let logins = [];
+  try {
+    const raw = (await kvCmd('LRANGE', 'log', '0', '99')) || [];
+    const dayStart = new Date(d + 'T00:00:00Z').getTime();
+    logins = raw.map((x) => JSON.parse(x))
+      .filter((e) => e.type === 'login' && e.t >= dayStart)
+      .map((e) => e.msg);
+    logins = [...new Set(logins)];
+  } catch (e) { /* ignore */ }
+  const lines = [
+    `Dagoverzicht ${d}`,
+    ``,
+    `Website: ${v} bezoeken, ${uniq} unieke bezoekers`,
+    `Logins: ${l}${logins.length ? ` (${logins.join(', ')})` : ''}`,
+    `Reminders: ${rc} aangemaakt, ${rd} afgerond`,
+    `Ideeën gedropt: ${id}`,
+  ];
+  return lines.join('\n');
+}
+
 // ---------- Sessions (HMAC-signed cookie, in-memory store) ----------
 const sessions = new Map(); // id -> { email, expires }
 
@@ -361,15 +426,21 @@ const server = http.createServer(async (req, res) => {
         if (!(await kvGetJson(`user:${email}`))) {
           const st = await kvGetJson('settings');
           if (!st || st.lockedToAdmin !== false) {
+            logEvent('geweigerd', email);
             return json(res, 403, { error: 'Dit e-mailadres heeft geen toegang tot dit paneel.' });
           }
           await kvSetJson(`user:${email}`, { createdAt: Date.now() });
+          logEvent('nieuw account', email);
+          tgSend(`Nieuw account aangemaakt in je VDK-paneel: ${email}`).catch(() => {});
         }
       } catch (e) {
         console.error('KV user create failed:', e.message);
         return json(res, 500, { error: 'Storage unavailable.' });
       }
     }
+    bump('l');
+    logEvent('login', email);
+    if (email !== ADMIN_EMAIL) tgSend(`Login op je VDK-paneel: ${email}`).catch(() => {});
     const cookie = createSession(email);
     return json(res, 200, { ok: true }, { 'Set-Cookie': sessionCookie(cookie, SESSION_TTL) });
   }
@@ -409,6 +480,8 @@ const server = http.createServer(async (req, res) => {
             done: false,
             createdAt: Date.now(),
           });
+          bump('rc');
+          logEvent('reminder aangemaakt', title);
         } else if (body.action === 'update') {
           const r = list.find((x) => x.id === body.id);
           if (!r) return json(res, 404, { error: 'Niet gevonden' });
@@ -417,7 +490,10 @@ const server = http.createServer(async (req, res) => {
           if (body.due !== undefined) r.due = String(body.due).slice(0, 10);
           if (body.time !== undefined) r.time = /^\d{2}:\d{2}$/.test(String(body.time)) ? String(body.time) : '';
           if (body.prio !== undefined) r.prio = Math.min(4, Math.max(1, Number(body.prio) || 4));
-          if (body.done !== undefined) r.done = !!body.done;
+          if (body.done !== undefined) {
+            if (body.done && !r.done) { bump('rd'); logEvent('reminder afgerond', r.title); }
+            r.done = !!body.done;
+          }
         } else if (body.action === 'delete') {
           list = list.filter((x) => x.id !== body.id);
         } else {
@@ -524,6 +600,8 @@ const server = http.createServer(async (req, res) => {
             reviews: 0,
             archived: false,
           });
+          bump('id');
+          logEvent('idee gedropt', title);
         } else {
           const r = list.find((x) => x.id === body.id);
           if (!r) return json(res, 404, { error: 'Niet gevonden' });
@@ -580,6 +658,80 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
+  if (p === '/api/log') {
+    const s = getSession(req);
+    if (!s) return json(res, 401, { error: 'Not logged in' });
+    if (s.email !== ADMIN_EMAIL) return json(res, 403, { error: 'Geen toegang' });
+    try {
+      const raw = (await kvCmd('LRANGE', 'log', '0', '99')) || [];
+      const events = raw.map((x) => { try { return JSON.parse(x); } catch { return null; } }).filter(Boolean);
+      const days = [];
+      for (let i = 0; i < 7; i++) {
+        const dt = new Date(); dt.setUTCDate(dt.getUTCDate() - i);
+        const d = dt.toISOString().slice(0, 10);
+        const get = async (k) => Number(await kvCmd('GET', `st:${d}:${k}`).catch(() => 0)) || 0;
+        const uniq = Number(await kvCmd('PFCOUNT', `st:${d}:u`).catch(() => 0)) || 0;
+        days.push({ date: d, v: await get('v'), u: uniq, l: await get('l'), rd: await get('rd') });
+      }
+      return json(res, 200, { events, days });
+    } catch (e) {
+      console.error('log API error:', e.message);
+      return json(res, 500, { error: 'Opslag niet bereikbaar. Is Upstash gekoppeld?' });
+    }
+  }
+
+  if (p === '/api/telegram') {
+    const s = getSession(req);
+    if (!s) return json(res, 401, { error: 'Not logged in' });
+    if (s.email !== ADMIN_EMAIL) return json(res, 403, { error: 'Geen toegang' });
+    const token = (process.env.TELEGRAM_BOT_TOKEN || '').trim();
+    try {
+      if (req.method === 'GET') {
+        const chat = KV_URL ? await kvCmd('GET', 'tg:chat').catch(() => null) : null;
+        return json(res, 200, { configured: !!token, linked: !!chat });
+      }
+      if (req.method === 'POST') {
+        const body = await readBody(req);
+        if (!token) return json(res, 400, { error: 'Zet eerst TELEGRAM_BOT_TOKEN in Render.' });
+        if (body.action === 'link') {
+          const r = await fetch(`https://api.telegram.org/bot${token}/getUpdates`);
+          const d = await r.json();
+          if (!d.ok) return json(res, 400, { error: 'Bot-token lijkt ongeldig.' });
+          const withMsg = (d.result || []).filter((u) => u.message && u.message.chat);
+          if (!withMsg.length) return json(res, 400, { error: 'Geen bericht gevonden. Stuur eerst een berichtje naar je bot en probeer opnieuw.' });
+          const chat = withMsg[withMsg.length - 1].message.chat.id;
+          await kvCmd('SET', 'tg:chat', String(chat));
+          await tgSend('Gekoppeld! Dit is het kanaal voor je VDK-meldingen en dagoverzichten.');
+          return json(res, 200, { ok: true, linked: true });
+        }
+        if (body.action === 'test') {
+          const ok = await tgSend('Testbericht van je VDK-paneel. Werkt!');
+          return ok ? json(res, 200, { ok: true }) : json(res, 400, { error: 'Versturen mislukt. Is de bot gekoppeld?' });
+        }
+        return json(res, 400, { error: 'Onbekende actie' });
+      }
+    } catch (e) {
+      console.error('telegram API error:', e.message);
+      return json(res, 500, { error: 'Telegram niet bereikbaar.' });
+    }
+  }
+
+  if (p === '/api/cron/daily') {
+    const secret = (process.env.CRON_SECRET || '').trim();
+    if (!secret || url.searchParams.get('key') !== secret) {
+      return json(res, 403, { error: 'Forbidden' });
+    }
+    try {
+      const text = await dailySummaryText();
+      const ok = await tgSend(text);
+      logEvent('dagoverzicht', ok ? 'verstuurd via Telegram' : 'Telegram niet gekoppeld');
+      return json(res, 200, { ok, summary: text });
+    } catch (e) {
+      console.error('cron error:', e.message);
+      return json(res, 500, { error: 'Samenvatting mislukt.' });
+    }
+  }
+
   if (p === '/api/settings') {
     const s = getSession(req);
     if (!s) return json(res, 401, { error: 'Not logged in' });
@@ -610,7 +762,11 @@ const server = http.createServer(async (req, res) => {
   }
 
   // --- Public pages (explicit whitelist only) ---
-  if (p === '/') return serveFile(res, path.join(__dirname, 'index.html'));
+  if (p === '/') {
+    bump('v');
+    bumpUniq(ip);
+    return serveFile(res, path.join(__dirname, 'index.html'));
+  }
   if (p === '/logo.png') return serveFile(res, path.join(__dirname, 'logo.png'));
   res.writeHead(404, { 'Content-Type': 'text/plain' });
   res.end('Not found');

@@ -168,6 +168,21 @@
     .sug-card .acts button:hover { background: #1c222b; }
     .sug-card .acts button.ok { border-color: #2ea36f; color: #3fc98b; font-weight: 700; }
     .sug-card .acts button.ok:hover { background: rgba(46,163,111,.14); }
+    .statgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
+    .stat {
+      background: #151a21; border: 1px solid #232a33; border-radius: 12px; padding: 16px 18px;
+    }
+    .stat .num { font-size: 24px; font-weight: 800; }
+    .stat .cap { font-size: 12.5px; color: #8b94a1; margin-top: 4px; }
+    .logtable { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+    .logtable th { text-align: left; color: #8b94a1; font-weight: 600; padding: 8px 10px; border-bottom: 1px solid #232a33; }
+    .logtable td { padding: 8px 10px; border-bottom: 1px solid #1c222b; }
+    .ev {
+      display: flex; gap: 12px; align-items: baseline; padding: 10px 2px;
+      border-bottom: 1px solid #1c222b; font-size: 13.5px;
+    }
+    .ev .tijd { color: #8b94a1; font-size: 12.5px; flex: 0 0 110px; }
+    .ev .type { font-weight: 700; flex: 0 0 150px; }
     .set-card {
       background: #151a21; border: 1px solid #232a33; border-radius: 12px;
       padding: 18px 20px; margin-bottom: 16px;
@@ -257,6 +272,7 @@
     <button onclick="showView('reminders')">Herinneringen</button>
     <button onclick="showView('sugs')">Suggesties</button>
     <button onclick="showView('ideas')">Ideeënbox</button>
+    <button onclick="showView('log')" id="logMenuBtn" style="display:none;">Logboek</button>
     <div class="lock" id="lockBox">
       <label class="switch">
         <input type="checkbox" id="lockToggle">
@@ -328,6 +344,18 @@
       <div id="ideaList"></div>
     </div>
 
+    <div id="view-log" style="display:none;">
+      <div class="section-head">
+        <h2>Logboek</h2>
+      </div>
+      <div class="section-sub">Wat er gebeurt op je site en in je paneel: bezoekers, logins en activiteit.</div>
+      <div class="statgrid" id="statGrid"></div>
+      <h3 style="font-size:15px; margin:26px 0 10px;">Afgelopen 7 dagen</h3>
+      <div id="statTable"></div>
+      <h3 style="font-size:15px; margin:26px 0 10px;">Gebeurtenissen</h3>
+      <div id="eventList"></div>
+    </div>
+
     <div id="view-settings" style="display:none;">
       <div class="section-head">
         <h2>Instellingen</h2>
@@ -358,6 +386,21 @@
         <div class="set-row">
           <div class="lbl">Idee-checks op het dashboard<div class="hint">Toon idee-checks op het dashboard.</div></div>
           <label class="switch"><input type="checkbox" id="setShowIdea"><span class="slider"></span></label>
+        </div>
+      </div>
+
+      <div class="set-card" id="tgCard" style="display:none;">
+        <h3>Telegram-meldingen</h3>
+        <div class="section-sub" style="margin:8px 0 4px;">Krijg een pushbericht bij logins en nieuwe accounts, en elke avond om 20:00 een dagoverzicht met je site-analytics.</div>
+        <div class="set-row">
+          <div class="lbl">Status<div class="hint" id="tgStatus">Controleren…</div></div>
+          <div style="display:flex; gap:8px;">
+            <button class="btn-primary" id="tgLinkBtn" style="padding:9px 14px;">Koppelen</button>
+            <button class="btn-ghost-border" id="tgTestBtn" style="cursor:pointer;">Testbericht</button>
+          </div>
+        </div>
+        <div class="hint" style="font-size:12.5px; color:#8b94a1; line-height:1.6; margin-top:6px;">
+          Eenmalig instellen: maak een bot via @BotFather in Telegram, zet het token in Render als TELEGRAM_BOT_TOKEN, stuur je bot een berichtje en klik hier op Koppelen.
         </div>
       </div>
 
@@ -826,10 +869,69 @@
     $('ideaTabBox').onclick = () => { ideaView = 'box'; $('ideaTabBox').classList.add('active'); $('ideaTabArch').classList.remove('active'); renderIdeas(); };
     $('ideaTabArch').onclick = () => { ideaView = 'arch'; $('ideaTabArch').classList.add('active'); $('ideaTabBox').classList.remove('active'); renderIdeas(); };
 
-    const views = { home: 'view-home', reminders: 'view-reminders', sugs: 'view-sugs', ideas: 'view-ideas', settings: 'view-settings' };
+    async function loadLog() {
+      try {
+        const d = await api('/api/log');
+        const today = d.days[0] || { v: 0, u: 0, l: 0, rd: 0 };
+        $('statGrid').innerHTML = `
+          <div class="stat"><div class="num">${today.v}</div><div class="cap">bezoeken vandaag</div></div>
+          <div class="stat"><div class="num">${today.u}</div><div class="cap">unieke bezoekers</div></div>
+          <div class="stat"><div class="num">${today.l}</div><div class="cap">logins vandaag</div></div>
+          <div class="stat"><div class="num">${today.rd}</div><div class="cap">reminders afgerond</div></div>`;
+        $('statTable').innerHTML = `
+          <table class="logtable">
+            <tr><th>Datum</th><th>Bezoeken</th><th>Uniek</th><th>Logins</th><th>Afgerond</th></tr>
+            ${d.days.map((x) => `<tr><td>${x.date}</td><td>${x.v}</td><td>${x.u}</td><td>${x.l}</td><td>${x.rd}</td></tr>`).join('')}
+          </table>`;
+        $('eventList').innerHTML = d.events.length
+          ? d.events.map((e) => `
+            <div class="ev">
+              <span class="tijd">${new Date(e.t).toLocaleString('nl-NL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+              <span class="type">${esc(e.type)}</span>
+              <span>${esc(e.msg || '')}</span>
+            </div>`).join('')
+          : '<div class="empty">Nog geen gebeurtenissen.</div>';
+      } catch (e) {
+        $('statGrid').innerHTML = `<div class="empty">${esc(e.message)}</div>`;
+      }
+    }
+
+    async function loadTg() {
+      try {
+        const d = await api('/api/telegram');
+        $('tgCard').style.display = 'block';
+        $('tgStatus').textContent = !d.configured
+          ? 'Nog geen bot-token ingesteld in Render.'
+          : d.linked ? 'Gekoppeld en actief.' : 'Token staat klaar; nog niet gekoppeld.';
+      } catch (e) { /* geen admin of geen opslag */ }
+    }
+
+    $('tgLinkBtn').onclick = async () => {
+      $('tgStatus').textContent = 'Koppelen…';
+      try {
+        await api('/api/telegram', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'link' }),
+        });
+        $('tgStatus').textContent = 'Gekoppeld en actief.';
+        flashSetMsg('Telegram gekoppeld. Check je app voor het bevestigingsbericht.');
+      } catch (e) { $('tgStatus').textContent = e.message; }
+    };
+    $('tgTestBtn').onclick = async () => {
+      try {
+        await api('/api/telegram', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'test' }),
+        });
+        flashSetMsg('Testbericht verstuurd.');
+      } catch (e) { flashSetMsg(e.message); }
+    };
+
+    const views = { home: 'view-home', reminders: 'view-reminders', sugs: 'view-sugs', ideas: 'view-ideas', settings: 'view-settings', log: 'view-log' };
     function closeDrawer() { $('drawer').classList.remove('open'); $('backdrop').classList.remove('show'); }
     window.showView = (v) => {
       for (const k in views) $(views[k]).style.display = k === v ? 'block' : 'none';
+      if (v === 'log') loadLog();
       const el = $(views[v]);
       el.classList.remove('view-anim');
       void el.offsetWidth;
@@ -892,6 +994,8 @@
         renderIdeas();
       } catch (e) { /* opslag nog niet gekoppeld */ }
       if (me.isAdmin) {
+        $('logMenuBtn').style.display = 'block';
+        loadTg();
         try {
           const st = await api('/api/settings');
           $('lockToggle').checked = st.lockedToAdmin !== false;
