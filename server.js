@@ -238,6 +238,28 @@ const rateLimit = new Map(); // ip -> { count, resetAt }
 
 const hashCode = (c) => crypto.createHash('sha256').update(c).digest('hex');
 
+// Login codes survive restarts by living in KV (10 min TTL); memory is the dev fallback.
+async function getLoginCode(email) {
+  if (KV_URL) {
+    try { const v = await kvCmd('GET', `code:${email}`); return v ? JSON.parse(v) : null; }
+    catch (e) { console.error('code get failed:', e.message); return null; }
+  }
+  const entry = codes.get(email);
+  if (!entry || Date.now() > entry.expires) { codes.delete(email); return null; }
+  return entry;
+}
+async function saveLoginCode(email, entry) {
+  if (KV_URL) {
+    try { await kvCmd('SET', `code:${email}`, JSON.stringify(entry), 'EX', '600'); return; }
+    catch (e) { console.error('code save failed:', e.message); }
+  }
+  codes.set(email, { ...entry, expires: Date.now() + CODE_TTL });
+}
+async function delLoginCode(email) {
+  if (KV_URL) { try { await kvCmd('DEL', `code:${email}`); } catch (e) { /* ignore */ } }
+  codes.delete(email);
+}
+
 function allowRate(ip) {
   const now = Date.now();
   const e = rateLimit.get(ip);
@@ -296,7 +318,7 @@ const server = http.createServer(async (req, res) => {
     if (!allowed) return json(res, 200, generic);
 
     const code = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
-    codes.set(email, { hash: hashCode(code), expires: Date.now() + CODE_TTL, attempts: 0 });
+    await saveLoginCode(email, { hash: hashCode(code), attempts: 0 });
 
     if (smtpConfigured()) {
       try {
@@ -320,23 +342,27 @@ const server = http.createServer(async (req, res) => {
     const body = await readBody(req);
     const email = String(body.email || '').trim().toLowerCase();
     const code = String(body.code || '').trim();
-    const entry = codes.get(email);
-    if (email !== ADMIN_EMAIL || !entry || Date.now() > entry.expires) {
-      return json(res, 401, { error: 'Invalid or expired code.' });
+    const entry = await getLoginCode(email);
+    if (!entry) {
+      return json(res, 401, { error: 'Code ongeldig of verlopen. Vraag een nieuwe aan.' });
     }
-    if (++entry.attempts > 5) {
-      codes.delete(email);
-      return json(res, 401, { error: 'Too many wrong codes. Request a new one.' });
+    entry.attempts = (entry.attempts || 0) + 1;
+    if (entry.attempts > 5) {
+      await delLoginCode(email);
+      return json(res, 401, { error: 'Te vaak fout. Vraag een nieuwe code aan.' });
     }
+    await saveLoginCode(email, entry);
     const ok = crypto.timingSafeEqual(Buffer.from(hashCode(code)), Buffer.from(entry.hash));
-    if (!ok) return json(res, 401, { error: 'Invalid or expired code.' });
-    codes.delete(email);
+    if (!ok) return json(res, 401, { error: 'Code klopt niet. Probeer opnieuw.' });
+    await delLoginCode(email);
     // First login of a non-admin: create the account (only while registration is open)
     if (email !== ADMIN_EMAIL && KV_URL) {
       try {
         if (!(await kvGetJson(`user:${email}`))) {
           const st = await kvGetJson('settings');
-          if (!st || st.lockedToAdmin !== false) return json(res, 401, { error: 'Invalid or expired code.' });
+          if (!st || st.lockedToAdmin !== false) {
+            return json(res, 403, { error: 'Dit e-mailadres heeft geen toegang tot dit paneel.' });
+          }
           await kvSetJson(`user:${email}`, { createdAt: Date.now() });
         }
       } catch (e) {
