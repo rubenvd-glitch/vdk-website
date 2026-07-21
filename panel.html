@@ -268,17 +268,17 @@
 
   <div class="backdrop" id="backdrop"></div>
   <nav class="drawer" id="drawer">
-    <button onclick="showView('home')">Dashboard</button>
-    <button onclick="showView('reminders')">Herinneringen</button>
-    <button onclick="showView('sugs')">Suggesties</button>
-    <button onclick="showView('ideas')">Ideeënbox</button>
-    <button onclick="showView('log')" id="logMenuBtn" style="display:none;">Logboek</button>
+    <button data-i18n="nav.home" onclick="showView('home')">Dashboard</button>
+    <button data-i18n="nav.rem" onclick="showView('reminders')">Herinneringen</button>
+    <button data-i18n="nav.sug" onclick="showView('sugs')">Suggesties</button>
+    <button data-i18n="nav.idea" onclick="showView('ideas')">Ideeënbox</button>
+    <button data-i18n="nav.log" onclick="showView('log')" id="logMenuBtn" style="display:none;">Logboek</button>
     <div class="lock" id="lockBox">
       <label class="switch">
         <input type="checkbox" id="lockToggle">
         <span class="slider"></span>
       </label>
-      <div class="txt" id="lockTxt">Alleen mijn e-mail kan inloggen</div>
+      <div class="txt" id="lockTxt"></div>
     </div>
   </nav>
 
@@ -288,35 +288,36 @@
       <div class="greeting-sub" id="today"></div>
 
       <div class="name-card" id="nameCard" style="display:none;">
-        <div class="txt">Hoe mag ik je noemen?</div>
+        <div class="txt" data-i18n="name.ask">Hoe mag ik je noemen?</div>
         <input type="text" id="nameInput" maxlength="60">
-        <button class="btn-primary" id="nameSaveBtn" style="padding:9px 14px;">Opslaan</button>
+        <button class="btn-primary" id="nameSaveBtn" data-i18n="save" style="padding:9px 14px;">Opslaan</button>
       </div>
 
       <div id="sugCards"></div>
       <div id="ideaCards"></div>
 
-      <h2 style="font-size:19px; margin:26px 0 4px;">Komende week</h2>
-      <div class="section-sub">Je herinneringen voor de komende 7 dagen.</div>
+      <h2 data-i18n="home.week" style="font-size:19px; margin:26px 0 4px;">Komende week</h2>
+      <div class="section-sub" data-i18n="home.weekSub">Je herinneringen voor de komende 7 dagen.</div>
       <div id="weekList"></div>
     </div>
 
     <div id="view-reminders" style="display:none;">
       <div class="section-head">
-        <h2>Herinneringen</h2>
-        <button class="btn-primary" id="newBtn">+ Nieuwe herinnering</button>
+        <h2 data-i18n="rem.title">Herinneringen</h2>
+        <button class="btn-primary" id="newBtn" data-i18n="rem.new">+ Nieuwe herinnering</button>
       </div>
-      <div class="section-sub">Plan hier taken met een datum, tijd en prioriteit. Alles wat binnen 7 dagen valt zie je ook op het dashboard.</div>
+      <div class="section-sub" data-i18n="rem.sub">Plan hier taken met een datum, tijd en prioriteit.</div>
 
       <div class="tabs">
-        <button id="tabActive" class="active">Actief</button>
-        <button id="tabDone">Afgerond</button>
+        <button id="tabActive" class="active"></button>
+        <button id="tabDone"></button>
         <select id="filterSel">
-          <option value="all">Alles</option>
-          <option value="today">Vandaag</option>
-          <option value="week">Komende week</option>
-          <option value="month">Komende 30 dagen</option>
-          <option value="late">Te laat</option>
+          <option value="all" data-i18n="f.all">Alles</option>
+          <option value="today" data-i18n="f.today">Vandaag</option>
+          <option value="week" data-i18n="f.week">Komende week</option>
+          <option value="month" data-i18n="f.month">Komende 30 dagen</option>
+          <option value="late" data-i18n="f.late">Te laat</option>
+          <option value="nodate" data-i18n="f.nodate">Geen datum</option>
         </select>
       </div>
       <div id="list"></div>
@@ -324,96 +325,101 @@
 
     <div id="view-sugs" style="display:none;">
       <div class="section-head">
-        <h2>Suggesties</h2>
-        <button class="btn-primary" id="newSugBtn">+ Nieuwe suggestie</button>
+        <h2 data-i18n="sug.title">Suggesties</h2>
+        <button class="btn-primary" id="newSugBtn" data-i18n="sug.new">+ Nieuwe suggestie</button>
       </div>
-      <div class="section-sub">Dingen die je regelmatig wilt blijven doen zoals wekelijks hardlopen. Op het ritme dat jij instelt verschijnen ze vanzelf op het dashboard.</div>
+      <div class="section-sub" data-i18n="sug.sub">Dingen die je regelmatig wilt blijven doen.</div>
       <div id="sugList"></div>
     </div>
 
     <div id="view-ideas" style="display:none;">
       <div class="section-head">
-        <h2>Ideeënbox</h2>
-        <button class="btn-primary" id="newIdeaBtn">+ Nieuw idee</button>
+        <h2 data-i18n="idea.title">Ideeënbox</h2>
+        <button class="btn-primary" id="newIdeaBtn" data-i18n="idea.new">+ Nieuw idee</button>
       </div>
-      <div class="section-sub">Parkeer hier elk idee dat langskomt, zodat het je focus niet steelt. De box vraagt er later nuchter naar: is dit je tijd en moeite waard? Houden, uitwerken of loslaten.</div>
+      <div class="section-sub" data-i18n="idea.sub">Parkeer hier elk idee.</div>
       <div class="tabs">
-        <button id="ideaTabBox" class="active">In de box</button>
-        <button id="ideaTabArch">Losgelaten</button>
+        <button id="ideaTabBox" class="active"></button>
+        <button id="ideaTabArch"></button>
       </div>
       <div id="ideaList"></div>
     </div>
 
     <div id="view-log" style="display:none;">
       <div class="section-head">
-        <h2>Logboek</h2>
+        <h2 data-i18n="log.title">Logboek</h2>
       </div>
-      <div class="section-sub">Wat er gebeurt op je site en in je paneel: bezoekers, logins en activiteit.</div>
+      <div class="section-sub" data-i18n="log.sub">Cijfers over je site en paneel.</div>
       <div class="statgrid" id="statGrid"></div>
-      <h3 style="font-size:15px; margin:26px 0 10px;">Afgelopen 7 dagen</h3>
+      <h3 data-i18n="log.last7" style="font-size:15px; margin:26px 0 10px;">Afgelopen 7 dagen</h3>
       <div id="statTable"></div>
-      <h3 style="font-size:15px; margin:26px 0 10px;">Gebeurtenissen</h3>
-      <div id="eventList"></div>
     </div>
 
     <div id="view-settings" style="display:none;">
       <div class="section-head">
-        <h2>Instellingen</h2>
+        <h2 data-i18n="set.title">Instellingen</h2>
       </div>
-      <div class="section-sub">Je account en de basisinstellingen van je tools.</div>
+      <div class="section-sub" data-i18n="set.sub">Je account en de basisinstellingen van je tools.</div>
 
       <div class="set-card">
-        <h3>Account</h3>
+        <h3 data-i18n="set.account">Account</h3>
         <div class="set-row">
-          <div class="lbl">Naam<div class="hint">Zo spreekt het paneel je aan.</div></div>
+          <div class="lbl"><span data-i18n="set.lang">Taal</span><div class="hint" data-i18n="set.langHint">De taal van het paneel.</div></div>
+          <select id="setLang" style="background:#10141a;color:#cfd6de;border:1px solid #2a323d;border-radius:8px;padding:9px 11px;font-size:14px;font-family:inherit;cursor:pointer;color-scheme:dark;">
+            <option value="en">English</option>
+            <option value="nl">Nederlands</option>
+          </select>
+        </div>
+        <div class="set-row">
+          <div class="lbl"><span data-i18n="set.name">Naam</span><div class="hint" data-i18n="set.nameHint">Zo spreekt het paneel je aan.</div></div>
           <div style="display:flex; gap:8px;">
             <input type="text" id="setName" maxlength="60" style="width:180px;">
-            <button class="btn-primary" id="saveNameBtn" style="padding:9px 14px;">Opslaan</button>
+            <button class="btn-primary" id="saveNameBtn" data-i18n="save" style="padding:9px 14px;">Opslaan</button>
           </div>
         </div>
       </div>
 
       <div class="set-card">
-        <h3>Suggesties</h3>
+        <h3 data-i18n="sug.title">Suggesties</h3>
         <div class="set-row">
-          <div class="lbl">Uitstel bij "Later"<div class="hint">Aantal dagen dat een suggestie wordt uitgesteld.</div></div>
+          <div class="lbl"><span data-i18n="set.snooze">Uitstel bij "Later"</span><div class="hint" data-i18n="set.snoozeHint">Aantal dagen dat een suggestie wordt uitgesteld.</div></div>
           <input type="text" id="setSnooze" inputmode="numeric" maxlength="2" style="width:70px; text-align:center;">
         </div>
         <div class="set-row">
-          <div class="lbl">Suggesties op het dashboard<div class="hint">Toon suggesties op het dashboard.</div></div>
+          <div class="lbl"><span data-i18n="set.showSug">Suggesties op het dashboard</span><div class="hint" data-i18n="set.showSugHint">Toon suggesties op het dashboard.</div></div>
           <label class="switch"><input type="checkbox" id="setShowSug"><span class="slider"></span></label>
         </div>
         <div class="set-row">
-          <div class="lbl">Idee-checks op het dashboard<div class="hint">Toon idee-checks op het dashboard.</div></div>
+          <div class="lbl"><span data-i18n="set.showIdea">Idee-checks op het dashboard</span><div class="hint" data-i18n="set.showIdeaHint">Toon idee-checks op het dashboard.</div></div>
           <label class="switch"><input type="checkbox" id="setShowIdea"><span class="slider"></span></label>
         </div>
       </div>
 
       <div class="set-card" id="tgCard" style="display:none;">
-        <h3>Telegram-meldingen</h3>
-        <div class="section-sub" style="margin:8px 0 4px;">Krijg een pushbericht bij logins en nieuwe accounts, en elke avond om 20:00 een dagoverzicht met je site-analytics.</div>
+        <h3 data-i18n="set.tg">Telegram-meldingen</h3>
+        <div class="section-sub" data-i18n="set.tgSub" style="margin:8px 0 4px;">Krijg pushberichten en een dagoverzicht.</div>
         <div class="set-row">
-          <div class="lbl">Status<div class="hint" id="tgStatus">Controleren…</div></div>
+          <div class="lbl"><span data-i18n="set.status">Status</span><div class="hint" id="tgStatus"></div></div>
           <div style="display:flex; gap:8px;">
-            <button class="btn-primary" id="tgLinkBtn" style="padding:9px 14px;">Koppelen</button>
-            <button class="btn-ghost-border" id="tgTestBtn" style="cursor:pointer;">Testbericht</button>
+            <button class="btn-primary" id="tgLinkBtn" data-i18n="set.link" style="padding:9px 14px;">Koppelen</button>
+            <button class="btn-ghost-border" id="tgTestBtn" data-i18n="set.test" style="cursor:pointer;">Testbericht</button>
           </div>
         </div>
         <div class="hint" style="font-size:12.5px; color:#8b94a1; line-height:1.6; margin-top:6px;">
-          Eenmalig instellen: maak een bot via @BotFather in Telegram, zet het token in Render als TELEGRAM_BOT_TOKEN, stuur je bot een berichtje en klik hier op Koppelen.
+          <span data-i18n="set.tgHelp">Eenmalig instellen via @BotFather.</span>
         </div>
       </div>
 
       <div class="set-card">
-        <h3>Agenda koppelen</h3>
-        <div class="section-sub" style="margin:8px 0 4px;">Zodra je agenda gekoppeld is kunnen suggesties rekening houden met je beschikbaarheid, bijvoorbeeld een date voorstellen op een rustige dag.</div>
+        <h3 data-i18n="set.cal">Agenda koppelen</h3>
+        <div class="section-sub" data-i18n="set.calSub" style="margin:8px 0 4px;">Zodra je agenda gekoppeld is.</div>
         <div class="set-row">
           <div class="lbl">Google Calendar</div>
-          <button class="btn-ghost-border" disabled>Binnenkort beschikbaar</button>
+          <button class="btn-ghost-border" data-i18n="set.soon" disabled>Binnenkort beschikbaar</button>
         </div>
         <div class="set-row">
           <div class="lbl">Apple Calendar</div>
-          <button class="btn-ghost-border" disabled>Binnenkort beschikbaar</button>
+          <button class="btn-ghost-border" data-i18n="set.soon" disabled>Binnenkort beschikbaar</button>
         </div>
       </div>
       <div class="empty" id="setMsg" style="padding:8px 0;"></div>
@@ -422,119 +428,259 @@
 
   <div class="overlay" id="overlay">
     <div class="modal">
-      <h3 id="modalTitle">Nieuwe herinnering</h3>
-      <div class="sub">Plan een taak met een optionele notitie, datum en prioriteit.</div>
+      <h3 id="modalTitle"></h3>
+      <div class="sub" data-i18n="rem.modalSub">Plan een taak.</div>
 
-      <label>Titel *</label>
+      <label data-i18n="l.title">Titel *</label>
       <input type="text" id="fTitle" maxlength="200">
 
-      <label>Notitie (optioneel)</label>
+      <label data-i18n="l.note">Notitie (optioneel)</label>
       <textarea id="fNote" maxlength="2000"></textarea>
 
-      <label>Wanneer?</label>
+      <label data-i18n="l.when">Wanneer?</label>
       <div class="chips" id="whenChips">
-        <button data-days="0">Nu</button>
-        <button data-days="1">Morgen</button>
-        <button data-days="7">7 dagen</button>
-        <button data-days="14">14 dagen</button>
-        <button data-days="30">30 dagen</button>
-        <button data-days="pick">Kies datum</button>
+        <button data-days="0" data-i18n="w.now">Nu</button>
+        <button data-days="1" data-i18n="w.tom">Morgen</button>
+        <button data-days="7" data-i18n="w.d7">7 dagen</button>
+        <button data-days="14" data-i18n="w.d14">14 dagen</button>
+        <button data-days="30" data-i18n="w.d30">30 dagen</button>
+        <button data-days="pick" data-i18n="w.pick">Kies datum</button>
+        <button data-days="none" data-i18n="w.none">Geen datum</button>
       </div>
       <input type="date" id="fDate" style="display:none; margin-top:10px;">
 
-      <label>Tijd (optioneel)</label>
+      <label data-i18n="l.time">Tijd (optioneel)</label>
       <input type="time" id="fTime">
       <div class="date-preview" id="datePreview"></div>
 
-      <label>Prioriteit</label>
+      <label data-i18n="l.prio">Prioriteit</label>
       <div class="chips" id="prioChips">
-        <button class="cp1" data-p="1">P1 — urgent</button>
-        <button class="cp2" data-p="2">P2 — hoog</button>
-        <button class="cp3" data-p="3">P3 — normaal</button>
-        <button class="cp4" data-p="4">P4 — laag</button>
+        <button class="cp1" data-p="1" data-i18n="p.1">P1</button>
+        <button class="cp2" data-p="2" data-i18n="p.2">P2</button>
+        <button class="cp3" data-p="3" data-i18n="p.3">P3</button>
+        <button class="cp4" data-p="4" data-i18n="p.4">P4</button>
       </div>
 
       <div class="err" id="modalErr"></div>
       <div class="modal-actions">
-        <button class="btn-ghost" id="cancelBtn">Annuleren</button>
-        <button class="btn-primary" id="saveBtn">Opslaan</button>
+        <button class="btn-ghost" id="cancelBtn" data-i18n="cancel">Annuleren</button>
+        <button class="btn-primary" id="saveBtn" data-i18n="save">Opslaan</button>
       </div>
     </div>
   </div>
 
   <div class="overlay" id="ideaOverlay">
     <div class="modal">
-      <h3 id="ideaModalTitle">Nieuw idee</h3>
-      <div class="sub">Drop het hier en ga verder met waar je mee bezig was. Over 2 weken vraagt de box er vanzelf naar.</div>
+      <h3 id="ideaModalTitle"></h3>
+      <div class="sub" data-i18n="idea.modalSub">Drop het hier.</div>
 
       <label>Titel *</label>
       <input type="text" id="iTitle" maxlength="200">
 
-      <label>Omschrijving (optioneel)</label>
+      <label data-i18n="l.desc">Omschrijving (optioneel)</label>
       <textarea id="iDesc" maxlength="3000" style="min-height:100px;"></textarea>
 
       <div class="err" id="ideaErr"></div>
       <div class="modal-actions">
-        <button class="btn-ghost" id="ideaCancelBtn">Annuleren</button>
-        <button class="btn-primary" id="ideaSaveBtn">Opslaan</button>
+        <button class="btn-ghost" id="ideaCancelBtn" data-i18n="cancel">Annuleren</button>
+        <button class="btn-primary" id="ideaSaveBtn" data-i18n="save">Opslaan</button>
       </div>
     </div>
   </div>
 
   <div class="overlay" id="sugOverlay">
     <div class="modal">
-      <h3 id="sugModalTitle">Nieuwe suggestie</h3>
-      <div class="sub">Een terugkerend idee dat vanzelf verschijnt wanneer het tijd is.</div>
+      <h3 id="sugModalTitle"></h3>
+      <div class="sub" data-i18n="sug.modalSub">Een terugkerend idee.</div>
 
-      <label>Suggestie *</label>
+      <label data-i18n="l.sug">Suggestie *</label>
       <input type="text" id="sText" maxlength="300">
 
-      <label>Hoe vaak?</label>
+      <label data-i18n="l.freq">Hoe vaak?</label>
       <div class="chips" id="sFreqChips">
-        <button data-f="w1">Elke week</button>
-        <button data-f="w2">Elke 2 weken</button>
-        <button data-f="m1">Elke maand</button>
-        <button data-f="custom">Om de … dagen</button>
+        <button data-f="w1" data-i18n="fq.w1">Elke week</button>
+        <button data-f="w2" data-i18n="fq.w2">Elke 2 weken</button>
+        <button data-f="m1" data-i18n="fq.m1">Elke maand</button>
+        <button data-f="custom" data-i18n="fq.custom">Om de … dagen</button>
       </div>
       <div id="sDayWrap" style="display:none; margin-top:10px;">
-        <label style="margin-top:0;">Op welke dag van de maand?</label>
+        <label data-i18n="l.dayOfMonth" style="margin-top:0;">Op welke dag van de maand?</label>
         <input type="date" id="sDayHelper" style="display:none;">
         <input type="text" id="sDay" inputmode="numeric" maxlength="2" style="width:90px;">
       </div>
       <div id="sNWrap" style="display:none; margin-top:10px;">
-        <label style="margin-top:0;">Aantal dagen</label>
+        <label data-i18n="l.numDays" style="margin-top:0;">Aantal dagen</label>
         <input type="text" id="sN" inputmode="numeric" maxlength="3" style="width:90px;">
       </div>
 
-      <label>Eerste keer op</label>
+      <label data-i18n="l.firstOn">Eerste keer op</label>
       <input type="date" id="sFirst">
 
       <div class="err" id="sugErr"></div>
       <div class="modal-actions">
-        <button class="btn-ghost" id="sugCancelBtn">Annuleren</button>
-        <button class="btn-primary" id="sugSaveBtn">Opslaan</button>
+        <button class="btn-ghost" id="sugCancelBtn" data-i18n="cancel">Annuleren</button>
+        <button class="btn-primary" id="sugSaveBtn" data-i18n="save">Opslaan</button>
       </div>
     </div>
   </div>
 
   <script>
+
+    const I18N = {
+      en: {
+        'nav.home':'Dashboard','nav.rem':'Reminders','nav.sug':'Suggestions','nav.idea':'Idea box','nav.log':'Log',
+        'save':'Save','cancel':'Cancel',
+        'name.ask':'What should I call you?',
+        'home.week':'This coming week','home.weekSub':'Your reminders for the next 7 days.',
+        'home.weekEmpty':'Nothing planned for the coming week.',
+        'rem.title':'Reminders','rem.new':'+ New reminder',
+        'rem.sub':'Plan tasks with a date, time and priority. Anything within 7 days also shows on your dashboard.',
+        'rem.modalSub':'Plan a task with an optional note, date and priority.',
+        'rem.modalNew':'New reminder','rem.modalEdit':'Edit reminder',
+        'tab.active':'Active','tab.done':'Done',
+        'f.all':'All','f.today':'Today','f.week':'This week','f.month':'Next 30 days','f.late':'Overdue','f.nodate':'No date',
+        'empty.active':'No active reminders. Nice and quiet!','empty.done':'Nothing completed yet.',
+        'l.title':'Title *','l.note':'Note (optional)','l.when':'When?','l.time':'Time (optional)','l.prio':'Priority',
+        'l.desc':'Description (optional)','l.sug':'Suggestion *','l.freq':'How often?',
+        'l.dayOfMonth':'On which day of the month?','l.numDays':'Number of days','l.firstOn':'First time on',
+        'w.now':'Now','w.tom':'Tomorrow','w.d7':'7 days','w.d14':'14 days','w.d30':'30 days','w.pick':'Pick a date','w.none':'No date',
+        'p.1':'P1 — urgent','p.2':'P2 — high','p.3':'P3 — normal','p.4':'P4 — low',
+        'prev.on':'Reminder on','prev.at':'at','prev.none':'Without a date, shows at the bottom of your list.',
+        'err.title':'Please enter a title.','err.sug':'Please enter a suggestion.',
+        'meta.nodate':'No date','confirm.rem':'Delete this reminder?','confirm.sug':'Delete this suggestion?','confirm.idea':'Delete this idea permanently?',
+        'ttl.done':'Done','ttl.edit':'Edit','ttl.del':'Delete','ttl.reopen':'Reopen','ttl.later':'Later','ttl.skip':'Skip this time','ttl.toRem':'Turn into a reminder',
+        'sug.title':'Suggestions','sug.new':'+ New suggestion',
+        'sug.sub':'Things you want to keep doing regularly, like a weekly run. They appear on your dashboard at the rhythm you set.',
+        'sug.modalSub':'A recurring idea that appears by itself when it is time.',
+        'sug.modalNew':'New suggestion','sug.modalEdit':'Edit suggestion',
+        'sug.empty':'No suggestions yet. Add one, for example: buy flowers, every month.',
+        'fq.w1':'Every week','fq.w2':'Every 2 weeks','fq.m1':'Every month','fq.custom':'Every … days',
+        'fq.lblWeek':'every week','fq.lblWeeks':'every {n} weeks','fq.lblMonth':'every month (day {d})','fq.lblMonths':'every {n} months (day {d})',
+        'fq.lblDay':'every day','fq.lblDays':'every {n} days','fq.next':'next',
+        'idea.title':'Idea box','idea.new':'+ New idea',
+        'idea.sub':'Park every idea that comes along, so it does not steal your focus. The box asks about it later: is this worth your time and effort? Work it out, postpone or let go.',
+        'idea.modalSub':'Drop it here and get back to what you were doing. In 2 weeks the box will ask about it.',
+        'idea.modalNew':'New idea','idea.modalEdit':'Edit idea',
+        'idea.tabBox':'In the box','idea.tabArch':'Let go',
+        'idea.emptyBox':'The box is empty. Drop your next spark here.','idea.emptyArch':'Nothing let go yet.',
+        'idea.check':'Idea check','idea.worth':'is this worth your time and effort?',
+        'idea.today':'dropped today','idea.day':'sitting here 1 day','idea.days':'sitting here {n} days','idea.weeks':'sitting here {n} weeks','idea.months':'sitting here {n} months',
+        'idea.reviewed':'{n} times reviewed','idea.checkOn':'check on','idea.released':'let go',
+        'idea.adviceNew':'This idea has been {age}. The first excitement has worn off — is it worth your time and effort?',
+        'idea.adviceOld':'You have looked at this idea {n} times without doing anything with it. Be honest: is it really worth your time and effort, or can it go?',
+        'idea.act.work':'Work it out','idea.act.keep':'Postpone','idea.act.let':'Let go','idea.act.restore':'Back in the box',
+        'log.title':'Log','log.sub':'Numbers about your site and panel: visitors, logins and activity. Counts only, never the content of your reminders or ideas.',
+        'log.last7':'Last 7 days','log.visits':'visits today','log.uniq':'unique visitors','log.logins':'logins today','log.done':'reminders completed',
+        'log.date':'Date','log.thVisits':'Visits','log.thUniq':'Unique','log.thLogins':'Logins','log.thDone':'Completed',
+        'set.title':'Settings','set.sub':'Your account and the basic settings of your tools.',
+        'set.account':'Account','set.name':'Name','set.nameHint':'How the panel addresses you.',
+        'set.lang':'Language','set.langHint':'The language of the panel.',
+        'set.snooze':'Postpone by','set.snoozeHint':'Number of days a suggestion is postponed.',
+        'set.showSug':'Suggestions on the dashboard','set.showSugHint':'Show suggestions on the dashboard.',
+        'set.showIdea':'Idea checks on the dashboard','set.showIdeaHint':'Show idea checks on the dashboard.',
+        'set.tg':'Telegram notifications','set.tgSub':'Get a push message on logins and new accounts, and a daily summary with your site analytics every evening at 20:00.',
+        'set.tgHelp':'One-time setup: create a bot via @BotFather in Telegram, put the token in Render as TELEGRAM_BOT_TOKEN, send your bot a message and click Link here.',
+        'set.status':'Status','set.link':'Link','set.test':'Test message','set.soon':'Coming soon',
+        'set.cal':'Connect calendar','set.calSub':'Once your calendar is connected, suggestions can take your availability into account, for example proposing a date on a quiet day.',
+        'set.saved':'Saved.','set.nameSaved':'Name saved.','set.tgSent':'Test message sent.','set.tgLinked':'Telegram linked. Check your app for the confirmation.',
+        'tg.none':'No bot token set in Render yet.','tg.ready':'Token is ready; not linked yet.','tg.linked':'Linked and active.','tg.linking':'Linking…','tg.checking':'Checking…',
+        'lock.on':'<strong>Locked:</strong> only your email can sign in','lock.off':'<strong>Open:</strong> others can create an account with their email',
+        'greet.night':'Good night','greet.morning':'Good morning','greet.afternoon':'Good afternoon','greet.evening':'Good evening',
+        'locale':'en-GB'
+      },
+      nl: {
+        'nav.home':'Dashboard','nav.rem':'Herinneringen','nav.sug':'Suggesties','nav.idea':'Ideeënbox','nav.log':'Logboek',
+        'save':'Opslaan','cancel':'Annuleren',
+        'name.ask':'Hoe mag ik je noemen?',
+        'home.week':'Komende week','home.weekSub':'Je herinneringen voor de komende 7 dagen.',
+        'home.weekEmpty':'Niets gepland voor de komende week.',
+        'rem.title':'Herinneringen','rem.new':'+ Nieuwe herinnering',
+        'rem.sub':'Plan hier taken met een datum, tijd en prioriteit. Alles wat binnen 7 dagen valt zie je ook op het dashboard.',
+        'rem.modalSub':'Plan een taak met een optionele notitie, datum en prioriteit.',
+        'rem.modalNew':'Nieuwe herinnering','rem.modalEdit':'Herinnering aanpassen',
+        'tab.active':'Actief','tab.done':'Afgerond',
+        'f.all':'Alles','f.today':'Vandaag','f.week':'Komende week','f.month':'Komende 30 dagen','f.late':'Te laat','f.nodate':'Geen datum',
+        'empty.active':'Geen actieve herinneringen. Lekker rustig!','empty.done':'Nog niets afgerond.',
+        'l.title':'Titel *','l.note':'Notitie (optioneel)','l.when':'Wanneer?','l.time':'Tijd (optioneel)','l.prio':'Prioriteit',
+        'l.desc':'Omschrijving (optioneel)','l.sug':'Suggestie *','l.freq':'Hoe vaak?',
+        'l.dayOfMonth':'Op welke dag van de maand?','l.numDays':'Aantal dagen','l.firstOn':'Eerste keer op',
+        'w.now':'Nu','w.tom':'Morgen','w.d7':'7 dagen','w.d14':'14 dagen','w.d30':'30 dagen','w.pick':'Kies datum','w.none':'Geen datum',
+        'p.1':'P1 — urgent','p.2':'P2 — hoog','p.3':'P3 — normaal','p.4':'P4 — laag',
+        'prev.on':'Herinnering op','prev.at':'om','prev.none':'Zonder datum, verschijnt onderaan je lijst.',
+        'err.title':'Vul een titel in.','err.sug':'Vul een suggestie in.',
+        'meta.nodate':'Geen datum','confirm.rem':'Deze herinnering verwijderen?','confirm.sug':'Deze suggestie verwijderen?','confirm.idea':'Dit idee definitief verwijderen?',
+        'ttl.done':'Afgerond','ttl.edit':'Bewerken','ttl.del':'Verwijderen','ttl.reopen':'Heropenen','ttl.later':'Later','ttl.skip':'Deze keer overslaan','ttl.toRem':'Maak er een reminder van',
+        'sug.title':'Suggesties','sug.new':'+ Nieuwe suggestie',
+        'sug.sub':'Dingen die je regelmatig wilt blijven doen zoals wekelijks hardlopen. Op het ritme dat jij instelt verschijnen ze vanzelf op het dashboard.',
+        'sug.modalSub':'Een terugkerend idee dat vanzelf verschijnt wanneer het tijd is.',
+        'sug.modalNew':'Nieuwe suggestie','sug.modalEdit':'Suggestie aanpassen',
+        'sug.empty':'Nog geen suggesties. Maak er een aan, bijvoorbeeld: bloemen kopen, elke maand.',
+        'fq.w1':'Elke week','fq.w2':'Elke 2 weken','fq.m1':'Elke maand','fq.custom':'Om de … dagen',
+        'fq.lblWeek':'elke week','fq.lblWeeks':'elke {n} weken','fq.lblMonth':'elke maand (dag {d})','fq.lblMonths':'elke {n} maanden (dag {d})',
+        'fq.lblDay':'elke dag','fq.lblDays':'om de {n} dagen','fq.next':'volgende',
+        'idea.title':'Ideeënbox','idea.new':'+ Nieuw idee',
+        'idea.sub':'Parkeer hier elk idee dat langskomt, zodat het je focus niet steelt. De box vraagt er later naar: is dit je tijd en moeite waard? Uitwerken, uitstellen of loslaten.',
+        'idea.modalSub':'Drop het hier en ga verder met waar je mee bezig was. Over 2 weken vraagt de box er vanzelf naar.',
+        'idea.modalNew':'Nieuw idee','idea.modalEdit':'Idee aanpassen',
+        'idea.tabBox':'In de box','idea.tabArch':'Losgelaten',
+        'idea.emptyBox':'De box is leeg. Drop je volgende ingeving hier.','idea.emptyArch':'Nog niets losgelaten.',
+        'idea.check':'Idee-check','idea.worth':'is dit je tijd en moeite waard?',
+        'idea.today':'vandaag gedropt','idea.day':'ligt er 1 dag','idea.days':'ligt er {n} dagen','idea.weeks':'ligt er {n} weken','idea.months':'ligt er {n} maanden',
+        'idea.reviewed':'{n} keer bekeken','idea.checkOn':'check op','idea.released':'losgelaten',
+        'idea.adviceNew':'Dit idee {age}. De eerste opwinding is eraf — is dit je tijd en moeite waard?',
+        'idea.adviceOld':'Je hebt dit idee nu {n} keer bekeken zonder er iets mee te doen. Eerlijk zijn: is dit je tijd en moeite echt waard, of mag het los?',
+        'idea.act.work':'Uitwerken','idea.act.keep':'Uitstellen','idea.act.let':'Loslaten','idea.act.restore':'Terug in de box',
+        'log.title':'Logboek','log.sub':'Cijfers over je site en paneel: bezoekers, logins en activiteit. Alleen aantallen, nooit de inhoud van je reminders of ideeën.',
+        'log.last7':'Afgelopen 7 dagen','log.visits':'bezoeken vandaag','log.uniq':'unieke bezoekers','log.logins':'logins vandaag','log.done':'reminders afgerond',
+        'log.date':'Datum','log.thVisits':'Bezoeken','log.thUniq':'Uniek','log.thLogins':'Logins','log.thDone':'Afgerond',
+        'set.title':'Instellingen','set.sub':'Je account en de basisinstellingen van je tools.',
+        'set.account':'Account','set.name':'Naam','set.nameHint':'Zo spreekt het paneel je aan.',
+        'set.lang':'Taal','set.langHint':'De taal van het paneel.',
+        'set.snooze':'Uitstel bij "Later"','set.snoozeHint':'Aantal dagen dat een suggestie wordt uitgesteld.',
+        'set.showSug':'Suggesties op het dashboard','set.showSugHint':'Toon suggesties op het dashboard.',
+        'set.showIdea':'Idee-checks op het dashboard','set.showIdeaHint':'Toon idee-checks op het dashboard.',
+        'set.tg':'Telegram-meldingen','set.tgSub':'Krijg een pushbericht bij logins en nieuwe accounts, en elke avond om 20:00 een dagoverzicht met je site-analytics.',
+        'set.tgHelp':'Eenmalig instellen: maak een bot via @BotFather in Telegram, zet het token in Render als TELEGRAM_BOT_TOKEN, stuur je bot een berichtje en klik hier op Koppelen.',
+        'set.status':'Status','set.link':'Koppelen','set.test':'Testbericht','set.soon':'Binnenkort beschikbaar',
+        'set.cal':'Agenda koppelen','set.calSub':'Zodra je agenda gekoppeld is kunnen suggesties rekening houden met je beschikbaarheid, bijvoorbeeld een date voorstellen op een rustige dag.',
+        'set.saved':'Opgeslagen.','set.nameSaved':'Naam opgeslagen.','set.tgSent':'Testbericht verstuurd.','set.tgLinked':'Telegram gekoppeld. Check je app voor het bevestigingsbericht.',
+        'tg.none':'Nog geen bot-token ingesteld in Render.','tg.ready':'Token staat klaar; nog niet gekoppeld.','tg.linked':'Gekoppeld en actief.','tg.linking':'Koppelen…','tg.checking':'Controleren…',
+        'lock.on':'<strong>Vergrendeld:</strong> alleen jouw e-mail kan inloggen','lock.off':'<strong>Open:</strong> anderen kunnen een account aanmaken met hun e-mail',
+        'greet.night':'Goedenacht','greet.morning':'Goedemorgen','greet.afternoon':'Goedemiddag','greet.evening':'Goedenavond',
+        'locale':'nl-NL'
+      }
+    };
+    let LANG = 'en';
+    function t(k, vars) {
+      let v = (I18N[LANG] && I18N[LANG][k]) || I18N.en[k] || k;
+      if (vars) for (const n in vars) v = v.replace('{' + n + '}', vars[n]);
+      return v;
+    }
+    function applyLang() {
+      document.documentElement.lang = LANG;
+      document.querySelectorAll('[data-i18n]').forEach((el) => {
+        el.textContent = t(el.dataset.i18n);
+      });
+      $('setLang').value = LANG;
+    }
+
     let me = null, reminders = [], suggestions = [], ideas = [], view = 'active', ideaView = 'box';
     let profile = { name: '', sugSnoozeDays: 3, showSugCards: true, showIdeaCards: true };
     let profileLoaded = false;
     let editing = null, sugEditing = null, ideaEditing = null, sugFreq = 'm1';
     let pendingConvert = null, pendingIdeaConvert = null;
-    let selDays = 0, selPrio = 4, pickedDate = null;
+    let selDays = 0, selPrio = 4, pickedDate = null, noDate = false;
 
     const $ = (id) => document.getElementById(id);
-    const fmt = (d) => d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' });
+    const fmt = (d) => d.toLocaleDateString(t('locale'), { day: 'numeric', month: 'long', year: 'numeric' });
     const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
     function greet() {
       const h = new Date().getHours();
-      const word = h < 6 ? 'Goedenacht' : h < 12 ? 'Goedemorgen' : h < 18 ? 'Goedemiddag' : 'Goedenavond';
+      const word = h < 6 ? t('greet.night') : h < 12 ? t('greet.morning') : h < 18 ? t('greet.afternoon') : t('greet.evening');
       const name = profile.name || (me.isAdmin ? 'Ruben' : me.email.split('@')[0]);
       $('greeting').textContent = `${word}, ${name.charAt(0).toUpperCase() + name.slice(1)}`;
-      $('today').textContent = new Date().toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+      $('today').textContent = new Date().toLocaleDateString(t('locale'), { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
     }
 
     function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
@@ -543,8 +689,8 @@
     }
 
     function dueInfo(r) {
-      if (!r.due) return '<span>Geen datum</span>';
-      const dateStr = fmt(new Date(r.due + 'T00:00:00')) + (r.time ? ` om ${r.time}` : '');
+      if (!r.due) return `<span>${t('meta.nodate')}</span>`;
+      const dateStr = fmt(new Date(r.due + 'T00:00:00')) + (r.time ? ` ${t('prev.at')} ${r.time}` : '');
       return `<span>${dateStr}</span>`;
     }
 
@@ -567,6 +713,7 @@
         .filter((r) => (view === 'active' ? !r.done : r.done))
         .filter((r) => {
           if (view !== 'active' || filter === 'all') return true;
+          if (filter === 'nodate') return !r.due;
           if (!r.due) return false;
           if (filter === 'today') return r.due <= todayISO;
           if (filter === 'week') return r.due <= plusDays(7);
@@ -575,10 +722,10 @@
           return true;
         })
         .sort((a, b) => a.prio - b.prio || (a.due || '9999').localeCompare(b.due || '9999'));
-      $('tabActive').textContent = `Actief (${reminders.filter((r) => !r.done).length})`;
-      $('tabDone').textContent = `Afgerond (${reminders.filter((r) => r.done).length})`;
+      $('tabActive').textContent = `${t('tab.active')} (${reminders.filter((r) => !r.done).length})`;
+      $('tabDone').textContent = `${t('tab.done')} (${reminders.filter((r) => r.done).length})`;
       if (!shown.length) {
-        $('list').innerHTML = `<div class="empty">${view === 'active' ? 'Geen actieve herinneringen. Lekker rustig!' : 'Nog niets afgerond.'}</div>`;
+        $('list').innerHTML = `<div class="empty">${view === 'active' ? t('empty.active') : t('empty.done')}</div>`;
         return;
       }
       $('list').innerHTML = shown.map((r) => `
@@ -591,18 +738,18 @@
           </div>
           <div class="rem-actions">
             ${r.done
-              ? `<button title="Heropenen" onclick="toggleDone('${r.id}', false)">${IC.undo}</button>`
-              : `<button class="ok" title="Afgerond" onclick="toggleDone('${r.id}', true)">${IC.check}</button>
-                 <button title="Bewerken" onclick="openModal('${r.id}')">${IC.pencil}</button>`}
-            <button class="danger" title="Verwijderen" onclick="removeRem('${r.id}')">${IC.trash}</button>
+              ? `<button title="${t('ttl.reopen')}" onclick="toggleDone('${r.id}', false)">${IC.undo}</button>`
+              : `<button class="ok" title="${t('ttl.done')}" onclick="toggleDone('${r.id}', true)">${IC.check}</button>
+                 <button title="${t('ttl.edit')}" onclick="openModal('${r.id}')">${IC.pencil}</button>`}
+            <button class="danger" title="${t('ttl.del')}" onclick="removeRem('${r.id}')">${IC.trash}</button>
           </div>
         </div>`).join('');
     }
 
     function freqLabel(r) {
-      if (r.ftype === 'months') return r.fn > 1 ? `elke ${r.fn} maanden (dag ${r.fday})` : `elke maand (dag ${r.fday})`;
-      if (r.ftype === 'weeks') return r.fn === 1 ? 'elke week' : `elke ${r.fn} weken`;
-      return r.fn === 1 ? 'elke dag' : `om de ${r.fn} dagen`;
+      if (r.ftype === 'months') return r.fn > 1 ? t('fq.lblMonths', { n: r.fn, d: r.fday }) : t('fq.lblMonth', { d: r.fday });
+      if (r.ftype === 'weeks') return r.fn === 1 ? t('fq.lblWeek') : t('fq.lblWeeks', { n: r.fn });
+      return r.fn === 1 ? t('fq.lblDay') : t('fq.lblDays', { n: r.fn });
     }
 
     function renderSug() {
@@ -618,19 +765,19 @@
           <div class="rem">
             <div class="rem-body">
               <div class="rem-title">${esc(r.text)}</div>
-              <div class="rem-meta">${freqLabel(r)} · volgende: ${fmt(new Date(r.nextDue + 'T00:00:00'))}</div>
+              <div class="rem-meta">${freqLabel(r)} · ${t('fq.next')}: ${fmt(new Date(r.nextDue + 'T00:00:00'))}</div>
             </div>
             <div class="rem-actions">
               ${r.nextDue <= todayISO ? `
-                <button class="ok" title="Gedaan" onclick="sugAct('${r.id}','done')">${IC.check}</button>
-                <button title="Later (${profile.sugSnoozeDays || 3} dagen)" onclick="sugAct('${r.id}','snooze')">${IC.clock}</button>
-                <button title="Deze keer overslaan" onclick="sugAct('${r.id}','skip')">${IC.skip}</button>` : ''}
-              <button title="Maak er een reminder van" onclick="convertSug('${r.id}')">${IC.calplus}</button>
-              <button title="Bewerken" onclick="openSugModal('${r.id}')">${IC.pencil}</button>
-              <button class="danger" title="Verwijderen" onclick="removeSug('${r.id}')">${IC.trash}</button>
+                <button class="ok" title="${t('ttl.done')}" onclick="sugAct('${r.id}','done')">${IC.check}</button>
+                <button title="${t('ttl.later')}" onclick="sugAct('${r.id}','snooze')">${IC.clock}</button>
+                <button title="${t('ttl.skip')}" onclick="sugAct('${r.id}','skip')">${IC.skip}</button>` : ''}
+              <button title="${t('ttl.toRem')}" onclick="convertSug('${r.id}')">${IC.calplus}</button>
+              <button title="${t('ttl.edit')}" onclick="openSugModal('${r.id}')">${IC.pencil}</button>
+              <button class="danger" title="${t('ttl.del')}" onclick="removeSug('${r.id}')">${IC.trash}</button>
             </div>
           </div>`).join('')
-        : '<div class="empty">Nog geen suggesties. Maak er een aan, bijvoorbeeld: bloemen kopen, elke maand.</div>';
+        : `<div class="empty">${t('sug.empty')}</div>`;
     }
 
 
@@ -657,6 +804,7 @@
     }
 
     function fillSettings() {
+      $('setLang').value = profile.lang || 'en';
       $('setName').value = profile.name || '';
       $('setSnooze').value = String(profile.sugSnoozeDays || 3);
       $('setShowSug').checked = profile.showSugCards !== false;
@@ -669,7 +817,7 @@
     }
 
     $('saveNameBtn').onclick = async () => {
-      try { await saveProfile({ name: $('setName').value }); flashSetMsg('Naam opgeslagen.'); }
+      try { await saveProfile({ name: $('setName').value }); flashSetMsg(t('set.nameSaved')); }
       catch (e) { flashSetMsg(e.message); }
     };
     $('nameSaveBtn').onclick = async () => {
@@ -682,16 +830,30 @@
       } catch (e) { alert(e.message); }
     };
     $('nameInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('nameSaveBtn').click(); });
+    $('setLang').onchange = async () => {
+      const prev = LANG;
+      try {
+        await saveProfile({ lang: $('setLang').value });
+        LANG = profile.lang || 'en';
+        applyLang();
+        greet();
+        render(); renderSug(); renderIdeas();
+        if ($('view-log').style.display === 'block') loadLog();
+        loadTg();
+        updateLockTxt();
+        flashSetMsg(t('set.saved'));
+      } catch (e) { LANG = prev; $('setLang').value = prev; flashSetMsg(e.message); }
+    };
     $('setSnooze').onchange = async () => {
-      try { await saveProfile({ sugSnoozeDays: Number($('setSnooze').value) || 3 }); fillSettings(); flashSetMsg('Opgeslagen.'); }
+      try { await saveProfile({ sugSnoozeDays: Number($('setSnooze').value) || 3 }); fillSettings(); flashSetMsg(t('set.saved')); }
       catch (e) { flashSetMsg(e.message); }
     };
     $('setShowSug').onchange = async () => {
-      try { await saveProfile({ showSugCards: $('setShowSug').checked }); flashSetMsg('Opgeslagen.'); }
+      try { await saveProfile({ showSugCards: $('setShowSug').checked }); flashSetMsg(t('set.saved')); }
       catch (e) { flashSetMsg(e.message); }
     };
     $('setShowIdea').onchange = async () => {
-      try { await saveProfile({ showIdeaCards: $('setShowIdea').checked }); flashSetMsg('Opgeslagen.'); }
+      try { await saveProfile({ showIdeaCards: $('setShowIdea').checked }); flashSetMsg(t('set.saved')); }
       catch (e) { flashSetMsg(e.message); }
     };
 
@@ -704,14 +866,14 @@
     };
 
     window.removeSug = async (id) => {
-      if (!confirm('Deze suggestie verwijderen?')) return;
+      if (!confirm(t('confirm.sug'))) return;
       await sugAct(id, 'delete');
     };
 
     window.openSugModal = (id) => {
       sugEditing = id || null;
       const r = id ? suggestions.find((x) => x.id === id) : null;
-      $('sugModalTitle').textContent = r ? 'Suggestie aanpassen' : 'Nieuwe suggestie';
+      $('sugModalTitle').textContent = r ? t('sug.modalEdit') : t('sug.modalNew');
       $('sText').value = r ? r.text : '';
       sugFreq = r ? (r.ftype === 'months' ? 'm1' : r.ftype === 'weeks' ? (r.fn === 2 ? 'w2' : 'w1') : 'custom') : 'm1';
       $('sDay').value = r ? String(r.fday) : String(new Date().getDate());
@@ -740,7 +902,7 @@
 
     $('sugSaveBtn').onclick = async () => {
       const text = $('sText').value.trim();
-      if (!text) { $('sugErr').textContent = 'Vul een suggestie in.'; return; }
+      if (!text) { $('sugErr').textContent = t('err.sug'); return; }
       const payload = {
         action: sugEditing ? 'update' : 'create',
         id: sugEditing || undefined,
@@ -765,54 +927,52 @@
 
     function ideaAge(ts) {
       const days = Math.floor((Date.now() - ts) / 86400000);
-      if (days < 1) return 'vandaag gedropt';
-      if (days === 1) return 'ligt er 1 dag';
-      if (days < 14) return `ligt er ${days} dagen`;
-      if (days < 60) return `ligt er ${Math.floor(days / 7)} weken`;
-      return `ligt er ${Math.floor(days / 30)} maanden`;
+      if (days < 1) return t('idea.today');
+      if (days === 1) return t('idea.day');
+      if (days < 14) return t('idea.days', { n: days });
+      if (days < 60) return t('idea.weeks', { n: Math.floor(days / 7) });
+      return t('idea.months', { n: Math.floor(days / 30) });
     }
 
     function ideaAdvice(r) {
-      if ((r.reviews || 0) >= 3) {
-        return `Je hebt dit idee nu ${r.reviews} keer bekeken zonder er iets mee te doen. Eerlijk zijn: is dit je tijd en moeite echt waard, of mag het los?`;
-      }
-      return `Dit idee ${ideaAge(r.createdAt)}. De eerste opwinding is eraf — is dit je tijd en moeite waard?`;
+      if ((r.reviews || 0) >= 3) return t('idea.adviceOld', { n: r.reviews });
+      return t('idea.adviceNew', { age: ideaAge(r.createdAt) });
     }
 
     function renderIdeas() {
       const todayISO = iso(new Date());
       const due = ideas.filter((r) => !r.archived && r.nextReview <= todayISO);
       $('ideaCards').innerHTML = profile.showIdeaCards === false ? '' : due.map((r) => `
-        <div class="idea-card" onclick="showView('ideas')">Idee-check: “${esc(r.title)}” — is dit je tijd en moeite waard?</div>`).join('');
+        <div class="idea-card" onclick="showView('ideas')">${t('idea.check')}: “${esc(r.title)}” — ${t('idea.worth')}</div>`).join('');
 
       const shown = ideas.filter((r) => (ideaView === 'box' ? !r.archived : r.archived));
-      $('ideaTabBox').textContent = `In de box (${ideas.filter((r) => !r.archived).length})`;
-      $('ideaTabArch').textContent = `Losgelaten (${ideas.filter((r) => r.archived).length})`;
+      $('ideaTabBox').textContent = `${t('idea.tabBox')} (${ideas.filter((r) => !r.archived).length})`;
+      $('ideaTabArch').textContent = `${t('idea.tabArch')} (${ideas.filter((r) => r.archived).length})`;
       $('ideaList').innerHTML = shown.length
         ? shown.slice().sort((a, b) => b.createdAt - a.createdAt).map((r) => `
           <div class="rem">
             <div class="rem-body">
               <div class="rem-title">${esc(r.title)}</div>
               ${r.desc ? `<div class="rem-note">${linkify(r.desc)}</div>` : ''}
-              <div class="rem-meta">${ideaAge(r.createdAt)}${r.archived ? ' · losgelaten' : ` · ${r.reviews || 0} keer bekeken · check op ${fmt(new Date(r.nextReview + 'T00:00:00'))}`}</div>
+              <div class="rem-meta">${ideaAge(r.createdAt)}${r.archived ? ` · ${t('idea.released')}` : ` · ${t('idea.reviewed', { n: r.reviews || 0 })} · ${t('idea.checkOn')} ${fmt(new Date(r.nextReview + 'T00:00:00'))}`}</div>
               ${!r.archived && r.nextReview <= todayISO ? `
                 <div class="advice">
                   <div class="q">${ideaAdvice(r)}</div>
                   <div class="acts">
-                    <button onclick="ideaAct('${r.id}','keep')">Houden</button>
-                    <button class="ok" onclick="convertIdea('${r.id}')">Uitwerken</button>
-                    <button class="warn" onclick="ideaAct('${r.id}','archive')">Loslaten</button>
+                    <button class="ok" onclick="convertIdea('${r.id}')">${t('idea.act.work')}</button>
+                    <button onclick="ideaAct('${r.id}','keep')">${t('idea.act.keep')}</button>
+                    <button class="warn" onclick="ideaAct('${r.id}','archive')">${t('idea.act.let')}</button>
                   </div>
                 </div>` : ''}
             </div>
             <div class="rem-actions">
               ${r.archived
-                ? `<button title="Terug in de box" onclick="ideaAct('${r.id}','restore')">${IC.undo}</button>`
-                : `<button title="Bewerken" onclick="openIdeaModal('${r.id}')">${IC.pencil}</button>`}
-              <button class="danger" title="Definitief verwijderen" onclick="removeIdea('${r.id}')">${IC.trash}</button>
+                ? `<button title="${t('idea.act.restore')}" onclick="ideaAct('${r.id}','restore')">${IC.undo}</button>`
+                : `<button title="${t('ttl.edit')}" onclick="openIdeaModal('${r.id}')">${IC.pencil}</button>`}
+              <button class="danger" title="${t('ttl.del')}" onclick="removeIdea('${r.id}')">${IC.trash}</button>
             </div>
           </div>`).join('')
-        : `<div class="empty">${ideaView === 'box' ? 'De box is leeg. Drop je volgende ingeving hier.' : 'Nog niets losgelaten.'}</div>`;
+        : `<div class="empty">${ideaView === 'box' ? t('idea.emptyBox') : t('idea.emptyArch')}</div>`;
     }
 
     window.ideaAct = async (id, action) => {
@@ -835,14 +995,14 @@
     };
 
     window.removeIdea = async (id) => {
-      if (!confirm('Dit idee definitief verwijderen?')) return;
+      if (!confirm(t('confirm.idea'))) return;
       await ideaAct(id, 'delete');
     };
 
     window.openIdeaModal = (id) => {
       ideaEditing = id || null;
       const r = id ? ideas.find((x) => x.id === id) : null;
-      $('ideaModalTitle').textContent = r ? 'Idee aanpassen' : 'Nieuw idee';
+      $('ideaModalTitle').textContent = r ? t('idea.modalEdit') : t('idea.modalNew');
       $('iTitle').value = r ? r.title : '';
       $('iDesc').value = r ? r.desc : '';
       $('ideaErr').textContent = '';
@@ -854,7 +1014,7 @@
     $('ideaOverlay').onclick = (e) => { if (e.target === $('ideaOverlay')) $('ideaOverlay').classList.remove('open'); };
     $('ideaSaveBtn').onclick = async () => {
       const title = $('iTitle').value.trim();
-      if (!title) { $('ideaErr').textContent = 'Vul een titel in.'; return; }
+      if (!title) { $('ideaErr').textContent = t('err.title'); return; }
       try {
         const d = await api('/api/ideas', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -874,23 +1034,15 @@
         const d = await api('/api/log');
         const today = d.days[0] || { v: 0, u: 0, l: 0, rd: 0 };
         $('statGrid').innerHTML = `
-          <div class="stat"><div class="num">${today.v}</div><div class="cap">bezoeken vandaag</div></div>
-          <div class="stat"><div class="num">${today.u}</div><div class="cap">unieke bezoekers</div></div>
-          <div class="stat"><div class="num">${today.l}</div><div class="cap">logins vandaag</div></div>
-          <div class="stat"><div class="num">${today.rd}</div><div class="cap">reminders afgerond</div></div>`;
+          <div class="stat"><div class="num">${today.v}</div><div class="cap">${t('log.visits')}</div></div>
+          <div class="stat"><div class="num">${today.u}</div><div class="cap">${t('log.uniq')}</div></div>
+          <div class="stat"><div class="num">${today.l}</div><div class="cap">${t('log.logins')}</div></div>
+          <div class="stat"><div class="num">${today.rd}</div><div class="cap">${t('log.done')}</div></div>`;
         $('statTable').innerHTML = `
           <table class="logtable">
-            <tr><th>Datum</th><th>Bezoeken</th><th>Uniek</th><th>Logins</th><th>Afgerond</th></tr>
+            <tr><th>${t('log.date')}</th><th>${t('log.thVisits')}</th><th>${t('log.thUniq')}</th><th>${t('log.thLogins')}</th><th>${t('log.thDone')}</th></tr>
             ${d.days.map((x) => `<tr><td>${x.date}</td><td>${x.v}</td><td>${x.u}</td><td>${x.l}</td><td>${x.rd}</td></tr>`).join('')}
           </table>`;
-        $('eventList').innerHTML = d.events.length
-          ? d.events.map((e) => `
-            <div class="ev">
-              <span class="tijd">${new Date(e.t).toLocaleString('nl-NL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
-              <span class="type">${esc(e.type)}</span>
-              <span>${esc(e.msg || '')}</span>
-            </div>`).join('')
-          : '<div class="empty">Nog geen gebeurtenissen.</div>';
       } catch (e) {
         $('statGrid').innerHTML = `<div class="empty">${esc(e.message)}</div>`;
       }
@@ -900,21 +1052,19 @@
       try {
         const d = await api('/api/telegram');
         $('tgCard').style.display = 'block';
-        $('tgStatus').textContent = !d.configured
-          ? 'Nog geen bot-token ingesteld in Render.'
-          : d.linked ? 'Gekoppeld en actief.' : 'Token staat klaar; nog niet gekoppeld.';
+        $('tgStatus').textContent = !d.configured ? t('tg.none') : d.linked ? t('tg.linked') : t('tg.ready');
       } catch (e) { /* geen admin of geen opslag */ }
     }
 
     $('tgLinkBtn').onclick = async () => {
-      $('tgStatus').textContent = 'Koppelen…';
+      $('tgStatus').textContent = t('tg.linking');
       try {
         await api('/api/telegram', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'link' }),
         });
-        $('tgStatus').textContent = 'Gekoppeld en actief.';
-        flashSetMsg('Telegram gekoppeld. Check je app voor het bevestigingsbericht.');
+        $('tgStatus').textContent = t('tg.linked');
+        flashSetMsg(t('set.tgLinked'));
       } catch (e) { $('tgStatus').textContent = e.message; }
     };
     $('tgTestBtn').onclick = async () => {
@@ -923,13 +1073,14 @@
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'test' }),
         });
-        flashSetMsg('Testbericht verstuurd.');
+        flashSetMsg(t('set.tgSent'));
       } catch (e) { flashSetMsg(e.message); }
     };
 
     const views = { home: 'view-home', reminders: 'view-reminders', sugs: 'view-sugs', ideas: 'view-ideas', settings: 'view-settings', log: 'view-log' };
     function closeDrawer() { $('drawer').classList.remove('open'); $('backdrop').classList.remove('show'); }
     window.showView = (v) => {
+      if (v === 'log' && !(me && me.isAdmin)) v = 'home';
       for (const k in views) $(views[k]).style.display = k === v ? 'block' : 'none';
       if (v === 'log') loadLog();
       const el = $(views[v]);
@@ -959,7 +1110,7 @@
               <div class="rem-meta">${dueInfo(r)}</div>
             </div>
           </div>`).join('')
-        : '<div class="empty">Niets gepland voor de komende week.</div>';
+        : `<div class="empty">${t('home.weekEmpty')}</div>`;
     }
 
     async function api(path, opts) {
@@ -975,8 +1126,11 @@
       try {
         profile = await api('/api/profile');
         profileLoaded = true;
+        LANG = profile.lang || 'en';
+        applyLang();
         greet();
         fillSettings();
+        render(); renderSug(); renderIdeas();
         if (!profile.name) $('nameCard').style.display = 'flex';
       } catch (e) { /* opslag nog niet gekoppeld */ }
       try {
@@ -1006,9 +1160,7 @@
     }
 
     function updateLockTxt() {
-      $('lockTxt').innerHTML = $('lockToggle').checked
-        ? '<strong>Vergrendeld:</strong> alleen jouw e-mail kan inloggen'
-        : '<strong>Open:</strong> anderen kunnen een account aanmaken met hun e-mail';
+      $('lockTxt').innerHTML = $('lockToggle').checked ? t('lock.on') : t('lock.off');
     }
 
     $('lockToggle').onchange = async () => {
@@ -1024,11 +1176,12 @@
     window.openModal = (id) => {
       editing = id || null;
       const r = id ? reminders.find((x) => x.id === id) : null;
-      $('modalTitle').textContent = r ? 'Herinnering aanpassen' : 'Nieuwe herinnering';
+      $('modalTitle').textContent = r ? t('rem.modalEdit') : t('rem.modalNew');
       $('fTitle').value = r ? r.title : '';
       $('fNote').value = r ? r.note : '';
       selPrio = r ? r.prio : 4;
       selDays = 0;
+      noDate = r ? !r.due : false;
       pickedDate = r && r.due ? r.due : null;
       $('fDate').style.display = pickedDate ? 'block' : 'none';
       $('fDate').value = pickedDate || '';
@@ -1041,17 +1194,23 @@
 
     function paintChips() {
       document.querySelectorAll('#whenChips button').forEach((b) => {
-        b.classList.toggle('sel', pickedDate ? b.dataset.days === 'pick' : Number(b.dataset.days) === selDays);
+        const isSel = noDate ? b.dataset.days === 'none'
+          : pickedDate ? b.dataset.days === 'pick'
+          : Number(b.dataset.days) === selDays;
+        b.classList.toggle('sel', isSel);
       });
       document.querySelectorAll('#prioChips button').forEach((b) => {
         b.classList.toggle('sel', Number(b.dataset.p) === selPrio);
       });
       const d = targetDate();
-      const t = $('fTime').value;
-      $('datePreview').textContent = d ? `Herinnering op ${fmt(new Date(d + 'T00:00:00'))}${t ? ` om ${t}` : ''}` : '';
+      const tv = $('fTime').value;
+      $('datePreview').textContent = d
+        ? `${t('prev.on')} ${fmt(new Date(d + 'T00:00:00'))}${tv ? ` ${t('prev.at')} ${tv}` : ''}`
+        : t('prev.none');
     }
 
     function targetDate() {
+      if (noDate) return '';
       if (pickedDate) return pickedDate;
       const d = new Date(); d.setDate(d.getDate() + selDays);
       return iso(d);
@@ -1060,11 +1219,15 @@
     $('whenChips').onclick = (e) => {
       const b = e.target.closest('button'); if (!b) return;
       if (b.dataset.days === 'pick') {
-        pickedDate = $('fDate').value || targetDate();
+        noDate = false;
+        pickedDate = $('fDate').value || iso(new Date());
         $('fDate').value = pickedDate;
         $('fDate').style.display = 'block';
+      } else if (b.dataset.days === 'none') {
+        noDate = true; pickedDate = null;
+        $('fDate').style.display = 'none';
       } else {
-        pickedDate = null; selDays = Number(b.dataset.days);
+        noDate = false; pickedDate = null; selDays = Number(b.dataset.days);
         $('fDate').style.display = 'none';
       }
       paintChips();
@@ -1089,7 +1252,7 @@
         time: $('fTime').value || '',
         prio: selPrio,
       };
-      if (!payload.title.trim()) { $('modalErr').textContent = 'Vul een titel in.'; return; }
+      if (!payload.title.trim()) { $('modalErr').textContent = t('err.title'); return; }
       try {
         const d = await api('/api/reminders', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -1120,7 +1283,7 @@
     };
 
     window.removeRem = async (id) => {
-      if (!confirm('Deze herinnering verwijderen?')) return;
+      if (!confirm(t('confirm.rem'))) return;
       try {
         const d = await api('/api/reminders', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -1136,6 +1299,7 @@
     $('tabDone').onclick = () => { view = 'done'; $('tabDone').classList.add('active'); $('tabActive').classList.remove('active'); render(); };
     $('logoutBtn').onclick = async () => { await fetch('/admin/logout', { method: 'POST' }); location.href = '/'; };
 
+    applyLang();
     load();
   </script>
 </body>

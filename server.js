@@ -481,7 +481,6 @@ const server = http.createServer(async (req, res) => {
             createdAt: Date.now(),
           });
           bump('rc');
-          logEvent('reminder aangemaakt', title);
         } else if (body.action === 'update') {
           const r = list.find((x) => x.id === body.id);
           if (!r) return json(res, 404, { error: 'Niet gevonden' });
@@ -491,7 +490,7 @@ const server = http.createServer(async (req, res) => {
           if (body.time !== undefined) r.time = /^\d{2}:\d{2}$/.test(String(body.time)) ? String(body.time) : '';
           if (body.prio !== undefined) r.prio = Math.min(4, Math.max(1, Number(body.prio) || 4));
           if (body.done !== undefined) {
-            if (body.done && !r.done) { bump('rd'); logEvent('reminder afgerond', r.title); }
+            if (body.done && !r.done) bump('rd');
             r.done = !!body.done;
           }
         } else if (body.action === 'delete') {
@@ -601,7 +600,6 @@ const server = http.createServer(async (req, res) => {
             archived: false,
           });
           bump('id');
-          logEvent('idee gedropt', title);
         } else {
           const r = list.find((x) => x.id === body.id);
           if (!r) return json(res, 404, { error: 'Niet gevonden' });
@@ -636,7 +634,7 @@ const server = http.createServer(async (req, res) => {
     const s = getSession(req);
     if (!s) return json(res, 401, { error: 'Not logged in' });
     const key = `pref:${s.email}`;
-    const defaults = { name: '', sugSnoozeDays: 3, showSugCards: true, showIdeaCards: true };
+    const defaults = { name: '', lang: 'en', sugSnoozeDays: 3, showSugCards: true, showIdeaCards: true };
     try {
       if (req.method === 'GET') {
         const pr = (await kvGetJson(key)) || {};
@@ -646,6 +644,7 @@ const server = http.createServer(async (req, res) => {
         const body = await readBody(req);
         const pr = { ...defaults, ...((await kvGetJson(key)) || {}) };
         if (body.name !== undefined) pr.name = String(body.name).trim().slice(0, 60);
+        if (body.lang !== undefined) pr.lang = ['en', 'nl'].includes(body.lang) ? body.lang : 'en';
         if (body.sugSnoozeDays !== undefined) pr.sugSnoozeDays = Math.min(30, Math.max(1, Number(body.sugSnoozeDays) || 3));
         if (body.showSugCards !== undefined) pr.showSugCards = !!body.showSugCards;
         if (body.showIdeaCards !== undefined) pr.showIdeaCards = !!body.showIdeaCards;
@@ -663,8 +662,6 @@ const server = http.createServer(async (req, res) => {
     if (!s) return json(res, 401, { error: 'Not logged in' });
     if (s.email !== ADMIN_EMAIL) return json(res, 403, { error: 'Geen toegang' });
     try {
-      const raw = (await kvCmd('LRANGE', 'log', '0', '99')) || [];
-      const events = raw.map((x) => { try { return JSON.parse(x); } catch { return null; } }).filter(Boolean);
       const days = [];
       for (let i = 0; i < 7; i++) {
         const dt = new Date(); dt.setUTCDate(dt.getUTCDate() - i);
@@ -673,7 +670,7 @@ const server = http.createServer(async (req, res) => {
         const uniq = Number(await kvCmd('PFCOUNT', `st:${d}:u`).catch(() => 0)) || 0;
         days.push({ date: d, v: await get('v'), u: uniq, l: await get('l'), rd: await get('rd') });
       }
-      return json(res, 200, { events, days });
+      return json(res, 200, { days });
     } catch (e) {
       console.error('log API error:', e.message);
       return json(res, 500, { error: 'Opslag niet bereikbaar. Is Upstash gekoppeld?' });
