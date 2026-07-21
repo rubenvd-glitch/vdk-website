@@ -33,6 +33,12 @@
       width: 100%; aspect-ratio: 4/5; max-width: 52px; text-align: center;
       font-size: 24px; font-weight: 700; border: 1px solid #c5c9c6; border-radius: 10px;
     }
+    .backlink {
+      background: none; border: none; color: #666; font-size: 13px;
+      display: flex; align-items: center; gap: 6px; cursor: pointer;
+      margin-bottom: 16px; font-family: inherit; padding: 0;
+    }
+    .backlink:hover { color: #22251f; }
     .resend {
       display: block; width: 100%; text-align: center; background: none; border: none;
       color: #666; font-size: 13px; margin-top: 16px; cursor: pointer; font-family: inherit;
@@ -57,6 +63,10 @@
     </div>
 
     <div id="step2">
+      <button class="backlink" id="backBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+        Ander e-mailadres
+      </button>
       <label>Vul de 6-cijferige code in</label>
       <div class="codes" id="codes">
         <input type="text" inputmode="numeric" maxlength="1" autocomplete="one-time-code">
@@ -124,6 +134,17 @@
         show(err.message, 'err');
         e.target.disabled = false;
       }
+    };
+
+    $('backBtn').onclick = () => {
+      clearInterval(timer);
+      boxes.forEach((b) => (b.value = ''));
+      $('step2').style.display = 'none';
+      $('step1').style.display = 'block';
+      $('sendBtn').disabled = false;
+      $('subTxt').textContent = 'Log in met je e-mailadres';
+      show('');
+      $('email').focus();
     };
 
     $('resendBtn').onclick = async () => {
