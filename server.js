@@ -732,11 +732,16 @@ const server = http.createServer(async (req, res) => {
         let list = (await kvGetJson(key)) || [];
         if (body.action === 'create') {
           const companyId = String(body.companyId || '').trim();
-          if (!companyId) return json(res, 400, { error: 'Bedrijf is verplicht' });
+          const title = String(body.title || '').trim().slice(0, 200);
+          const note = String(body.note || '').trim().slice(0, 2000);
+          // Two kinds of entry: a company-linked reminder (needs a company) or a
+          // standalone to-do (needs its own title).
+          if (!companyId && !title) return json(res, 400, { error: 'Vul een bedrijf of een titel in.' });
           list.push({
             id: crypto.randomUUID(),
             companyId,
-            note: String(body.note || '').trim().slice(0, 2000),
+            title,
+            note,
             due: String(body.due || '').slice(0, 10),
             time: /^\d{2}:\d{2}$/.test(String(body.time || '')) ? String(body.time) : '',
             prio: Math.min(4, Math.max(1, Number(body.prio) || 4)),
@@ -746,7 +751,8 @@ const server = http.createServer(async (req, res) => {
         } else if (body.action === 'update') {
           const a = list.find((x) => x.id === body.id);
           if (!a) return json(res, 404, { error: 'Niet gevonden' });
-          if (body.companyId !== undefined) a.companyId = String(body.companyId).trim() || a.companyId;
+          if (body.companyId !== undefined) a.companyId = String(body.companyId).trim();
+          if (body.title !== undefined) a.title = String(body.title).trim().slice(0, 200);
           if (body.note !== undefined) a.note = String(body.note).trim().slice(0, 2000);
           if (body.due !== undefined) a.due = String(body.due).slice(0, 10);
           if (body.time !== undefined) a.time = /^\d{2}:\d{2}$/.test(String(body.time)) ? String(body.time) : '';
@@ -961,6 +967,32 @@ const server = http.createServer(async (req, res) => {
       }
     } catch (e) {
       console.error('profile API error:', e.message);
+      return json(res, 500, { error: 'Opslag niet bereikbaar. Is Upstash gekoppeld?' });
+    }
+  }
+
+  // CRM's own lightweight profile (name + language) — mirrors /api/profile but
+  // scoped to the crm realm/session, so Base and CRM preferences stay separate.
+  if (p === '/api/crm/profile') {
+    const s = await getSession(req, 'crm');
+    if (!s) return json(res, 401, { error: 'Not logged in' });
+    const key = `crmpref:${s.email}`;
+    const defaults = { name: '', lang: 'en' };
+    try {
+      if (req.method === 'GET') {
+        const pr = (await kvGetJson(key)) || {};
+        return json(res, 200, { ...defaults, ...pr });
+      }
+      if (req.method === 'POST') {
+        const body = await readBody(req);
+        const pr = { ...defaults, ...((await kvGetJson(key)) || {}) };
+        if (body.name !== undefined) pr.name = String(body.name).trim().slice(0, 60);
+        if (body.lang !== undefined) pr.lang = ['en', 'nl'].includes(body.lang) ? body.lang : 'en';
+        await kvSetJson(key, pr);
+        return json(res, 200, pr);
+      }
+    } catch (e) {
+      console.error('crm profile API error:', e.message);
       return json(res, 500, { error: 'Opslag niet bereikbaar. Is Upstash gekoppeld?' });
     }
   }

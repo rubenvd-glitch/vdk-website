@@ -17,6 +17,24 @@
     position: sticky; top: 0; z-index: 10; gap: 16px; flex-wrap: wrap;
   }
   header h1 { font-size: 16px; letter-spacing: 2px; font-weight: 700; }
+  .greeting { font-size: 26px; font-weight: 700; margin-bottom: 4px; }
+  .greeting-sub { color: #8b94a1; font-size: 14px; margin-bottom: 8px; }
+  .set-card {
+    background: #151a21; border: 1px solid #232a33; border-radius: 12px;
+    padding: 18px 20px; margin-bottom: 16px;
+  }
+  .set-card h3 { font-size: 15px; margin-bottom: 6px; }
+  .set-row {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 14px; padding: 11px 0; border-top: 1px solid #1c222b;
+  }
+  .set-row:first-of-type { border-top: none; }
+  .set-row .lbl { font-size: 14px; font-weight: 600; }
+  .set-row .hint { font-size: 12.5px; color: #8b94a1; font-weight: 400; margin-top: 3px; }
+  .set-card input[type=text] {
+    background: #0e1116; color: #e6e9ed; border: 1px solid #2a323d;
+    border-radius: 8px; padding: 9px 11px; font-size: 14px; font-family: inherit;
+  }
   .icon-btn-header {
     background: none; border: none; color: #e6e9ed; cursor: pointer;
     padding: 7px; border-radius: 8px; display: flex; align-items: center;
@@ -152,7 +170,14 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:20px;height:20px;"><path d="M3 6h18"/><path d="M3 12h18"/><path d="M3 18h18"/></svg>
     </button>
     <h1>VDK CRM</h1>
-    <button class="logoutBtn" id="logoutBtn">Uitloggen</button>
+    <div style="display:flex; gap:6px; align-items:center;">
+      <button class="icon-btn-header" id="settingsBtn" title="Instellingen" onclick="showView('settings')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:19px;height:19px;"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </button>
+      <button class="icon-btn-header" id="logoutBtn" title="Uitloggen">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:19px;height:19px;"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+      </button>
+    </div>
   </header>
 
   <div class="backdrop" id="backdrop"></div>
@@ -168,10 +193,9 @@
   <main>
     <!-- DASHBOARD -->
     <div class="view active" id="view-dashboard">
-      <div class="section-head">
-        <h2>Dashboard</h2>
-      </div>
-      <div class="section-sub">Herinneringen voor de komende 7 dagen. Eerst op dag, dan op prioriteit.</div>
+      <div class="greeting" id="crmGreeting">…</div>
+      <div class="greeting-sub" id="crmToday"></div>
+      <h2 data-i18n="home.week" style="font-size:19px; margin:22px 0 14px;">Deze week</h2>
       <div id="dashList"></div>
     </div>
 
@@ -300,16 +324,53 @@
       </div>
       <div id="ideaList"></div>
     </div>
+
+    <!-- SETTINGS -->
+    <div class="view" id="view-settings">
+      <div class="section-head">
+        <h2 data-i18n="set.title">Instellingen</h2>
+      </div>
+      <div class="section-sub" data-i18n="set.sub">Je account en de basisinstellingen van het CRM.</div>
+
+      <div class="set-card">
+        <h3 data-i18n="set.account">Account</h3>
+        <div class="set-row">
+          <div class="lbl"><span data-i18n="set.lang">Taal</span><div class="hint" data-i18n="set.langHint">De taal van het CRM.</div></div>
+          <select id="crmSetLang" style="background:#0e1116;color:#cfd6de;border:1px solid #2a323d;border-radius:8px;padding:9px 11px;font-size:14px;font-family:inherit;cursor:pointer;color-scheme:dark;">
+            <option value="en">English</option>
+            <option value="nl">Nederlands</option>
+          </select>
+        </div>
+        <div class="set-row">
+          <div class="lbl"><span data-i18n="set.name">Naam</span><div class="hint" data-i18n="set.nameHint">Zo spreekt het CRM je aan.</div></div>
+          <div style="display:flex; gap:8px;">
+            <input type="text" id="crmSetName" maxlength="60" style="width:180px;">
+            <button class="btn-primary" id="crmSaveNameBtn" data-i18n="save" style="padding:9px 14px;">Opslaan</button>
+          </div>
+        </div>
+      </div>
+      <div class="empty" id="crmSetMsg" style="padding:8px 0;"></div>
+    </div>
   </main>
 
   <!-- Modal: actie -->
   <div class="overlay" id="actOverlay">
     <div class="modal">
       <h3 id="actModalTitle">Nieuwe actie</h3>
-      <label>Bedrijfsnaam</label>
-      <input id="fCo" list="coNames" autocomplete="off">
-      <datalist id="coNames"></datalist>
-      <label>Notitie</label>
+      <div class="tabs2" id="entryTypeTabs" style="margin-top:4px;">
+        <button type="button" id="typeBedrijfBtn" class="active">Herinnering (bedrijf)</button>
+        <button type="button" id="typeTodoBtn">To-do</button>
+      </div>
+      <div id="bedrijfFieldWrap">
+        <label>Bedrijfsnaam</label>
+        <input id="fCo" list="coNames" autocomplete="off">
+        <datalist id="coNames"></datalist>
+      </div>
+      <div id="todoFieldWrap" style="display:none;">
+        <label>Titel</label>
+        <input id="fTitle" autocomplete="off" maxlength="200">
+      </div>
+      <label>Notitie (optioneel)</label>
       <textarea id="fNote"></textarea>
       <div class="field-row">
         <div class="field"><label>Datum</label><input id="fDue" type="date"></div>
@@ -414,6 +475,60 @@
 <script>
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+  // ---- Minimal i18n: covers the greeting, dashboard heading and settings page
+  // (the rest of the CRM stays Dutch, matching how it's always been). ----
+  const I18N = {
+    en: {
+      'home.week': 'This coming week',
+      'set.title': 'Settings', 'set.sub': 'Your account and the CRM\'s basic settings.',
+      'set.account': 'Account', 'set.lang': 'Language', 'set.langHint': 'The CRM\'s language.',
+      'set.name': 'Name', 'set.nameHint': 'How the CRM addresses you.',
+      'save': 'Save', 'set.saved': 'Saved.', 'set.nameSaved': 'Name saved.',
+      'greet.night': 'Good night', 'greet.morning': 'Good morning', 'greet.afternoon': 'Good afternoon', 'greet.evening': 'Good evening',
+      'locale': 'en-US',
+    },
+    nl: {
+      'home.week': 'Deze week',
+      'set.title': 'Instellingen', 'set.sub': 'Je account en de basisinstellingen van het CRM.',
+      'set.account': 'Account', 'set.lang': 'Taal', 'set.langHint': 'De taal van het CRM.',
+      'set.name': 'Naam', 'set.nameHint': 'Zo spreekt het CRM je aan.',
+      'save': 'Opslaan', 'set.saved': 'Opgeslagen.', 'set.nameSaved': 'Naam opgeslagen.',
+      'greet.night': 'Goedenacht', 'greet.morning': 'Goedemorgen', 'greet.afternoon': 'Goedemiddag', 'greet.evening': 'Goedenavond',
+      'locale': 'nl-NL',
+    },
+  };
+  let LANG = 'en';
+  function t(k) { return (I18N[LANG] && I18N[LANG][k]) || I18N.en[k] || k; }
+  function applyLang() {
+    document.documentElement.lang = LANG;
+    document.querySelectorAll('[data-i18n]').forEach((el) => { el.textContent = t(el.dataset.i18n); });
+    $('crmSetLang').value = LANG;
+  }
+
+  let me = null;
+  let profile = { name: '', lang: 'en' };
+  function greet() {
+    const h = new Date().getHours();
+    const word = h < 6 ? t('greet.night') : h < 12 ? t('greet.morning') : h < 18 ? t('greet.afternoon') : t('greet.evening');
+    const name = profile.name || (me && me.isAdmin ? 'Ruben' : (me ? me.email.split('@')[0] : ''));
+    $('crmGreeting').textContent = name ? `${word}, ${name.charAt(0).toUpperCase() + name.slice(1)}` : word;
+    $('crmToday').textContent = new Date().toLocaleDateString(t('locale'), { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  }
+  async function saveProfile(partial) {
+    const d = await api('/api/crm/profile', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(partial) });
+    profile = d;
+    greet();
+    return d;
+  }
+  function fillSettings() {
+    $('crmSetLang').value = profile.lang || 'en';
+    $('crmSetName').value = profile.name || '';
+  }
+  function flashSetMsg(msg) {
+    $('crmSetMsg').textContent = msg;
+    setTimeout(() => { if ($('crmSetMsg').textContent === msg) $('crmSetMsg').textContent = ''; }, 2500);
+  }
   const STATUS_LABEL = { lead: 'Lead', prospect: 'Prospect', klant: 'Klant', inactief: 'Inactief' };
   const SECTORS = [
     'Horeca', 'Sport & Fitness', 'Financien & Verzekeringen', 'Vastgoed & Makelaardij',
@@ -446,7 +561,7 @@
   function showView(v) {
     document.querySelectorAll('.view').forEach((el) => el.classList.remove('active'));
     document.querySelectorAll('nav.drawer button[data-view]').forEach((b) => b.classList.toggle('active', b.dataset.view === v));
-    const map = { dashboard: 'view-dashboard', herinneringen: 'view-herinneringen', acties: 'view-acties', bedrijven: 'view-bedrijven', ideas: 'view-ideas', codetail: 'view-co-detail' };
+    const map = { dashboard: 'view-dashboard', herinneringen: 'view-herinneringen', acties: 'view-acties', bedrijven: 'view-bedrijven', ideas: 'view-ideas', codetail: 'view-co-detail', settings: 'view-settings' };
     $(map[v]).classList.add('active');
   }
   document.querySelectorAll('nav.drawer button[data-view]').forEach((b) => {
@@ -501,7 +616,7 @@
       <div class="act">
         <span class="prio p${a.prio}">P${a.prio}</span>
         <div class="act-body">
-          <div class="act-co">${esc(coName(a.companyId))}</div>
+          <div class="act-co">${a.companyId ? esc(coName(a.companyId)) : (a.title ? esc(a.title) : '<span style="opacity:.7;font-style:italic;">Losse to-do</span>')}</div>
           ${a.note ? `<div class="act-note">${esc(a.note)}</div>` : ''}
           <div class="act-meta">${esc(opts.showRelative ? relativeDue(a) : dueInfo(a))}</div>
         </div>
@@ -555,6 +670,22 @@
   }
 
   let modalKind = 'herinnering';
+  // Two kinds of entry share this one modal: a "bedrijf" entry is a next-action
+  // reminder tied to a company (uses the company-name field), a "todo" entry is
+  // a standalone to-do with its own title and no company.
+  let entryType = 'bedrijf';
+  function setEntryType(type) {
+    entryType = type;
+    $('typeBedrijfBtn').classList.toggle('active', type === 'bedrijf');
+    $('typeTodoBtn').classList.toggle('active', type === 'todo');
+    $('bedrijfFieldWrap').style.display = type === 'bedrijf' ? 'block' : 'none';
+    $('todoFieldWrap').style.display = type === 'todo' ? 'block' : 'none';
+    if (type === 'todo') $('newCoContactWrap').style.display = 'none';
+    else toggleNewCoContact();
+  }
+  $('typeBedrijfBtn').onclick = () => setEntryType('bedrijf');
+  $('typeTodoBtn').onclick = () => setEntryType('todo');
+
   function openActModal(a, presetCoId, kind) {
     editingActId = a ? a.id : null;
     modalKind = a ? (a.done ? 'actie' : 'herinnering') : (kind || 'herinnering');
@@ -563,7 +694,9 @@
       ? (modalKind === 'actie' ? 'Nieuwe actie' : 'Nieuwe herinnering')
       : (modalKind === 'actie' ? 'Actie bewerken' : 'Herinnering bewerken');
     fillCoDatalist();
-    $('fCo').value = a ? coName(a.companyId) : (presetCoId ? coName(presetCoId) : '');
+    setEntryType(a ? (a.companyId ? 'bedrijf' : 'todo') : 'bedrijf');
+    $('fCo').value = a ? (a.companyId ? coName(a.companyId) : '') : (presetCoId ? coName(presetCoId) : '');
+    $('fTitle').value = a ? (a.title || '') : '';
     $('fNote').value = a ? (a.note || '') : '';
     $('fDue').value = a ? (a.due || '') : '';
     $('fTime').value = a ? (a.time || '') : '';
@@ -572,9 +705,10 @@
     $('actModalErr').textContent = '';
     $('actOverlay').classList.add('open');
     toggleNewCoContact();
-    $('fCo').focus();
+    (entryType === 'todo' ? $('fTitle') : $('fCo')).focus();
   }
   function toggleNewCoContact() {
+    if (entryType !== 'bedrijf') { $('newCoContactWrap').style.display = 'none'; return; }
     const name = $('fCo').value.trim();
     const exists = !!companies.find((c) => c.name.toLowerCase() === name.toLowerCase());
     $('newCoContactWrap').style.display = (name && !exists) ? 'block' : 'none';
@@ -585,25 +719,34 @@
   $('actCancelBtn').onclick = () => $('actOverlay').classList.remove('open');
 
   $('actSaveBtn').onclick = async () => {
-    const name = $('fCo').value.trim();
-    if (!name) { $('actModalErr').textContent = 'Vul een bedrijfsnaam in.'; return; }
-    let co = companies.find((c) => c.name.toLowerCase() === name.toLowerCase());
+    let companyId = '';
+    let title = '';
     try {
-      if (!co) {
-        const contactName = $('fContactName').value.trim();
-        const createBody = { action: 'create', name, status: 'lead' };
-        if (contactName) {
-          createBody.contact = { name: contactName, email: $('fContactEmail').value.trim(), phone: $('fContactPhone').value.trim() };
+      if (entryType === 'bedrijf') {
+        const name = $('fCo').value.trim();
+        if (!name) { $('actModalErr').textContent = 'Vul een bedrijfsnaam in.'; return; }
+        let co = companies.find((c) => c.name.toLowerCase() === name.toLowerCase());
+        if (!co) {
+          const contactName = $('fContactName').value.trim();
+          const createBody = { action: 'create', name, status: 'lead' };
+          if (contactName) {
+            createBody.contact = { name: contactName, email: $('fContactEmail').value.trim(), phone: $('fContactPhone').value.trim() };
+          }
+          const dco = await api('/api/crm/companies', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(createBody) });
+          companies = dco.companies;
+          co = dco.company || companies.find((c) => c.name.toLowerCase() === name.toLowerCase());
         }
-        const dco = await api('/api/crm/companies', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(createBody) });
-        companies = dco.companies;
-        co = dco.company || companies.find((c) => c.name.toLowerCase() === name.toLowerCase());
+        companyId = co.id;
+      } else {
+        title = $('fTitle').value.trim();
+        if (!title) { $('actModalErr').textContent = 'Vul een titel in.'; return; }
       }
       const payload = {
         action: editingActId ? 'update' : 'create',
         id: editingActId || undefined,
-        companyId: co.id,
+        companyId,
+        title,
         note: $('fNote').value,
         due: $('fDue').value,
         time: $('fTime').value,
@@ -830,9 +973,30 @@
   };
 
   // --- Boot ---
+  $('crmSetLang').onchange = async () => {
+    const prev = LANG;
+    try {
+      await saveProfile({ lang: $('crmSetLang').value });
+      LANG = profile.lang || 'en';
+      applyLang();
+      greet();
+      renderDashboard();
+      flashSetMsg(t('set.saved'));
+    } catch (e) { LANG = prev; $('crmSetLang').value = prev; flashSetMsg(e.message); }
+  };
+  $('crmSaveNameBtn').onclick = async () => {
+    try { await saveProfile({ name: $('crmSetName').value }); flashSetMsg(t('set.nameSaved')); }
+    catch (e) { flashSetMsg(e.message); }
+  };
+
   async function load() {
     fillSectorSelects();
-    try { await api('/api/crm/me'); } catch { location.href = '/crm'; return; }
+    try { me = await api('/api/crm/me'); } catch { location.href = '/crm'; return; }
+    try { profile = await api('/api/crm/profile'); } catch (e) { /* opslag nog niet gekoppeld */ }
+    LANG = profile.lang || 'en';
+    applyLang();
+    fillSettings();
+    greet();
     try { companies = await api('/api/crm/companies'); } catch (e) { /* opslag nog niet gekoppeld */ }
     try { actions = await api('/api/crm/actions'); } catch (e) { /* opslag nog niet gekoppeld */ }
     try { ideas = await api('/api/crm/ideas'); } catch (e) { /* opslag nog niet gekoppeld */ }

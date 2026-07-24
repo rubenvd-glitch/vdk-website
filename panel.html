@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Base panel — VDK Business Services</title>
+<title>VDK Base</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 @keyframes fadeUp {
@@ -61,20 +61,16 @@ padding: 16px 18px; margin-bottom: 12px; display: flex; gap: 14px; align-items: 
 }
 .prio {
 flex: 0 0 auto; font-size: 12px; font-weight: 800; padding: 4px 9px;
-border-radius: 6px; margin-top: 2px; color: #14181e;
+border-radius: 6px; margin-top: 2px;
 }
-.p1 { background: #e5484d; color: #fff; } .p2 { background: #f0883e; }
-.p3 { background: #eac54f; } .p4 { background: #2ea36f; color: #fff; }
+.p1 { background: #3a1418; color: #f28b8b; } .p2 { background: #3a2a14; color: #f0b45c; }
+.p3 { background: #3a3814; color: #e8e05c; } .p4 { background: #17321c; color: #7fd68f; }
 .rem-body { flex: 1; min-width: 0; }
 .rem-title { font-size: 15px; font-weight: 700; }
 .rem-title.done { text-decoration: line-through; color: #8b94a1; }
 .rem-note { font-size: 13px; color: #aeb6c0; margin-top: 4px; word-break: break-word; }
 .rem-meta { font-size: 12.5px; color: #8b94a1; margin-top: 7px; }
 .late { color: #e5484d; font-weight: 700; }
-.due-badge { font-size: 12.5px; font-weight: 700; margin-top: 4px; display: block; }
-.due-badge.overdue { color: #e5484d; }
-.due-badge.today { color: #f0883e; }
-.due-badge.soon { color: #8b94a1; font-weight: 600; }
 .rem-actions { display: flex; flex-direction: row; gap: 8px; align-items: center; }
 .rem-actions button {
 background: transparent; border: 1px solid #39424e; color: #aeb6c0;
@@ -260,6 +256,7 @@ background: #fff; top: 3px; left: 3px; transition: .15s;
 <button id="menuBtn" class="icon-btn" title="Menu">
 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:20px;height:20px;"><path d="M3 6h18"/><path d="M3 12h18"/><path d="M3 18h18"/></svg>
 </button>
+<h1>VDK Base</h1>
 <div style="display:flex; gap:6px;">
 <button class="icon-btn" title="Instellingen" onclick="showView('settings')">
 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:19px;height:19px;"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -308,8 +305,7 @@ background: #fff; top: 3px; left: 3px; transition: .15s;
 <div id="sugCards"></div>
 <div id="ideaCards"></div>
 
-<h2 data-i18n="home.week" style="font-size:19px; margin:26px 0 4px;">Komende week</h2>
-<div class="section-sub" data-i18n="home.weekSub">Je herinneringen voor de komende 7 dagen.</div>
+<h2 data-i18n="home.week" style="font-size:19px; margin:26px 0 14px;">Komende week</h2>
 <div id="weekList"></div>
 </div>
 
@@ -599,8 +595,6 @@ en: {
 'lock.on':'<strong>Locked:</strong> only your email can sign in','lock.off':'<strong>Open:</strong> others can create an account with their email',
 'lockCrm.on':'<strong>CRM locked:</strong> only your email can access the CRM','lockCrm.off':'<strong>CRM open:</strong> others can log in to the CRM with their email',
 'greet.night':'Good night','greet.morning':'Good morning','greet.afternoon':'Good afternoon','greet.evening':'Good evening',
-'due.today':'Due today','due.tomorrow':'Due tomorrow','due.inDays':'Due on {day} in {n} days',
-'due.overdueDay':'1 day overdue','due.overdueDays':'{n} days overdue',
 'locale':'en-GB'
 },
 nl: {
@@ -663,8 +657,6 @@ nl: {
 'lock.on':'<strong>Vergrendeld:</strong> alleen jouw e-mail kan inloggen','lock.off':'<strong>Open:</strong> anderen kunnen een account aanmaken met hun e-mail',
 'lockCrm.on':'<strong>CRM vergrendeld:</strong> alleen jouw e-mail heeft toegang tot het CRM','lockCrm.off':'<strong>CRM open:</strong> anderen kunnen met hun e-mail inloggen op het CRM',
 'greet.night':'Goedenacht','greet.morning':'Goedemorgen','greet.afternoon':'Goedemiddag','greet.evening':'Goedenavond',
-'due.today':'Vandaag','due.tomorrow':'Morgen','due.inDays':'Op {day} over {n} dagen',
-'due.overdueDay':'1 dag te laat','due.overdueDays':'{n} dagen te laat',
 'locale':'nl-NL'
 }
 };
@@ -710,17 +702,6 @@ function dueInfo(r) {
 if (!r.due) return `<span>${t('meta.nodate')}</span>`;
 const dateStr = fmt(new Date(r.due + 'T00:00:00')) + (r.time ? ` ${t('prev.at')} ${r.time}` : '');
 return `<span>${dateStr}</span>`;
-}
-
-function relDue(due) {
-const d = new Date(due + 'T00:00:00');
-const today = new Date(); today.setHours(0, 0, 0, 0);
-const diff = Math.round((d - today) / 86400000);
-if (diff < 0) return { text: diff === -1 ? t('due.overdueDay') : t('due.overdueDays', { n: Math.abs(diff) }), cls: 'overdue' };
-if (diff === 0) return { text: t('due.today'), cls: 'today' };
-if (diff === 1) return { text: t('due.tomorrow'), cls: 'soon' };
-const day = d.toLocaleDateString(t('locale'), { weekday: 'long' });
-return { text: t('due.inDays', { day, n: diff }), cls: 'soon' };
 }
 
 const IC = {
@@ -1130,18 +1111,14 @@ const items = reminders
 .filter((r) => !r.done && r.due && r.due <= plus7)
 .sort((a, b) => a.prio - b.prio || a.due.localeCompare(b.due));
 $('weekList').innerHTML = items.length
-? items.map((r) => {
-const rel = relDue(r.due);
-return `
+? items.map((r) => `
 <div class="rem" style="cursor:pointer;" onclick="showView('reminders')">
 <span class="prio p${r.prio}">P${r.prio}</span>
 <div class="rem-body">
 <div class="rem-title">${esc(r.title)}</div>
 <div class="rem-meta">${dueInfo(r)}</div>
-<div class="due-badge ${rel.cls}">${rel.text}</div>
 </div>
-</div>`;
-}).join('')
+</div>`).join('')
 : `<div class="empty">${t('home.weekEmpty')}</div>`;
 }
 
