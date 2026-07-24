@@ -71,6 +71,10 @@ border-radius: 6px; margin-top: 2px;
 .rem-note { font-size: 13px; color: #aeb6c0; margin-top: 4px; word-break: break-word; }
 .rem-meta { font-size: 12.5px; color: #8b94a1; margin-top: 7px; }
 .late { color: #e5484d; font-weight: 700; }
+.due-badge { font-size: 12.5px; font-weight: 700; margin-top: 4px; display: block; }
+.due-badge.overdue { color: #e5484d; }
+.due-badge.today { color: #f0883e; }
+.due-badge.soon { color: #8b94a1; font-weight: 600; }
 .rem-actions { display: flex; flex-direction: row; gap: 8px; align-items: center; }
 .rem-actions button {
 background: transparent; border: 1px solid #39424e; color: #aeb6c0;
@@ -595,6 +599,8 @@ en: {
 'lock.on':'<strong>Locked:</strong> only your email can sign in','lock.off':'<strong>Open:</strong> others can create an account with their email',
 'lockCrm.on':'<strong>CRM locked:</strong> only your email can access the CRM','lockCrm.off':'<strong>CRM open:</strong> others can log in to the CRM with their email',
 'greet.night':'Good night','greet.morning':'Good morning','greet.afternoon':'Good afternoon','greet.evening':'Good evening',
+'due.today':'Due today','due.tomorrow':'Due tomorrow','due.inDays':'Due on {day} in {n} days',
+'due.overdueDay':'1 day overdue','due.overdueDays':'{n} days overdue',
 'locale':'en-GB'
 },
 nl: {
@@ -657,6 +663,8 @@ nl: {
 'lock.on':'<strong>Vergrendeld:</strong> alleen jouw e-mail kan inloggen','lock.off':'<strong>Open:</strong> anderen kunnen een account aanmaken met hun e-mail',
 'lockCrm.on':'<strong>CRM vergrendeld:</strong> alleen jouw e-mail heeft toegang tot het CRM','lockCrm.off':'<strong>CRM open:</strong> anderen kunnen met hun e-mail inloggen op het CRM',
 'greet.night':'Goedenacht','greet.morning':'Goedemorgen','greet.afternoon':'Goedemiddag','greet.evening':'Goedenavond',
+'due.today':'Vandaag','due.tomorrow':'Morgen','due.inDays':'Op {day} over {n} dagen',
+'due.overdueDay':'1 dag te laat','due.overdueDays':'{n} dagen te laat',
 'locale':'nl-NL'
 }
 };
@@ -702,6 +710,17 @@ function dueInfo(r) {
 if (!r.due) return `<span>${t('meta.nodate')}</span>`;
 const dateStr = fmt(new Date(r.due + 'T00:00:00')) + (r.time ? ` ${t('prev.at')} ${r.time}` : '');
 return `<span>${dateStr}</span>`;
+}
+
+function relDue(due) {
+const d = new Date(due + 'T00:00:00');
+const today = new Date(); today.setHours(0, 0, 0, 0);
+const diff = Math.round((d - today) / 86400000);
+if (diff < 0) return { text: diff === -1 ? t('due.overdueDay') : t('due.overdueDays', { n: Math.abs(diff) }), cls: 'overdue' };
+if (diff === 0) return { text: t('due.today'), cls: 'today' };
+if (diff === 1) return { text: t('due.tomorrow'), cls: 'soon' };
+const day = d.toLocaleDateString(t('locale'), { weekday: 'long' });
+return { text: t('due.inDays', { day, n: diff }), cls: 'soon' };
 }
 
 const IC = {
@@ -1111,14 +1130,18 @@ const items = reminders
 .filter((r) => !r.done && r.due && r.due <= plus7)
 .sort((a, b) => a.prio - b.prio || a.due.localeCompare(b.due));
 $('weekList').innerHTML = items.length
-? items.map((r) => `
+? items.map((r) => {
+const rel = relDue(r.due);
+return `
 <div class="rem" style="cursor:pointer;" onclick="showView('reminders')">
 <span class="prio p${r.prio}">P${r.prio}</span>
 <div class="rem-body">
 <div class="rem-title">${esc(r.title)}</div>
 <div class="rem-meta">${dueInfo(r)}</div>
+<div class="due-badge ${rel.cls}">${rel.text}</div>
 </div>
-</div>`).join('')
+</div>`;
+}).join('')
 : `<div class="empty">${t('home.weekEmpty')}</div>`;
 }
 
