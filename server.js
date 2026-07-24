@@ -226,6 +226,34 @@ async function tgSend(text) {
   }
 }
 
+async function weeklySummaryText() {
+  const get = async (d, k) => Number(await kvCmd('GET', `st:${d}:${k}`).catch(() => 0)) || 0;
+  const getUniq = async (d) => Number(await kvCmd('PFCOUNT', `st:${d}:u`).catch(() => 0)) || 0;
+  let totalV = 0, totalU = 0, totalL = 0, totalRc = 0, totalRd = 0, totalId = 0;
+  const days = [];
+  for (let i = 6; i >= 0; i--) {
+    const dt = new Date(); dt.setUTCDate(dt.getUTCDate() - i);
+    const d = dt.toISOString().slice(0, 10);
+    const [v, u, l, rc, rd, id] = await Promise.all([get(d, 'v'), getUniq(d), get(d, 'l'), get(d, 'rc'), get(d, 'rd'), get(d, 'id')]);
+    totalV += v; totalU += u; totalL += l; totalRc += rc; totalRd += rd; totalId += id;
+    days.push(`${d}: ${v} bezoeken, ${u} uniek, ${l} logins`);
+  }
+  const first = new Date(); first.setUTCDate(first.getUTCDate() - 6);
+  const range = `${first.toISOString().slice(0, 10)} t/m ${new Date().toISOString().slice(0, 10)}`;
+  const lines = [
+    `Weekoverzicht (${range})`,
+    ``,
+    `Website: ${totalV} bezoeken, ${totalU} unieke bezoekers (som per dag)`,
+    `Logins: ${totalL}`,
+    `Reminders: ${totalRc} aangemaakt, ${totalRd} afgerond`,
+    `Ideeën gedropt: ${totalId}`,
+    ``,
+    `Per dag:`,
+    ...days,
+  ];
+  return lines.join('\n');
+}
+
 async function dailySummaryText() {
   const d = statDay();
   const get = async (k) => Number(await kvCmd('GET', `st:${d}:${k}`).catch(() => 0)) || 0;
@@ -719,7 +747,8 @@ const server = http.createServer(async (req, res) => {
       return json(res, 403, { error: 'Forbidden' });
     }
     try {
-      const text = await dailySummaryText();
+      const range = url.searchParams.get('range');
+      const text = range === 'week' ? await weeklySummaryText() : await dailySummaryText();
       const ok = await tgSend(text);
       logEvent('dagoverzicht', ok ? 'verstuurd via Telegram' : 'Telegram niet gekoppeld');
       return json(res, 200, { ok, summary: text });
