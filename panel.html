@@ -71,10 +71,6 @@ border-radius: 6px; margin-top: 2px; color: #14181e;
 .rem-note { font-size: 13px; color: #aeb6c0; margin-top: 4px; word-break: break-word; }
 .rem-meta { font-size: 12.5px; color: #8b94a1; margin-top: 7px; }
 .late { color: #e5484d; font-weight: 700; }
-.due-badge { font-size: 12.5px; font-weight: 700; margin-top: 4px; display: block; }
-.due-badge.overdue { color: #e5484d; }
-.due-badge.today { color: #f0883e; }
-.due-badge.soon { color: #8b94a1; font-weight: 600; }
 .rem-actions { display: flex; flex-direction: row; gap: 8px; align-items: center; }
 .rem-actions button {
 background: transparent; border: 1px solid #39424e; color: #aeb6c0;
@@ -277,12 +273,20 @@ background: #fff; top: 3px; left: 3px; transition: .15s;
 <button data-i18n="nav.sug" onclick="showView('sugs')">Suggesties</button>
 <button data-i18n="nav.idea" onclick="showView('ideas')">Ideeënbox</button>
 <button data-i18n="nav.log" onclick="showView('log')" id="logMenuBtn" style="display:none;">Logboek</button>
+<a href="/crm" style="display:block; width:100%; box-sizing:border-box; text-align:left; background:none; border:none; color:#e6e9ed; font-size:15px; padding:12px 14px; border-radius:9px; font-family:inherit; text-decoration:none;" onmouseover="this.style.background='#1c222b'" onmouseout="this.style.background='none'">→ Naar CRM</a>
 <div class="lock" id="lockBox">
 <label class="switch">
 <input type="checkbox" id="lockToggle">
 <span class="slider"></span>
 </label>
 <div class="txt" id="lockTxt"></div>
+</div>
+<div class="lock" id="lockCrmBox">
+<label class="switch">
+<input type="checkbox" id="lockCrmToggle">
+<span class="slider"></span>
+</label>
+<div class="txt" id="lockCrmTxt"></div>
 </div>
 </nav>
 
@@ -589,9 +593,8 @@ en: {
 'set.saved':'Saved.','set.nameSaved':'Name saved.','set.tgSent':'Test message sent.','set.tgLinked':'Telegram linked. Check your app for the confirmation.',
 'tg.none':'No bot token set in Render yet.','tg.ready':'Token is ready; not linked yet.','tg.linked':'Linked and active.','tg.linking':'Linking…','tg.checking':'Checking…',
 'lock.on':'<strong>Locked:</strong> only your email can sign in','lock.off':'<strong>Open:</strong> others can create an account with their email',
+'lockCrm.on':'<strong>CRM locked:</strong> only your email can access the CRM','lockCrm.off':'<strong>CRM open:</strong> others can log in to the CRM with their email',
 'greet.night':'Good night','greet.morning':'Good morning','greet.afternoon':'Good afternoon','greet.evening':'Good evening',
-'due.today':'Due today','due.tomorrow':'Due tomorrow','due.inDays':'Due on {day} in {n} days',
-'due.overdueDay':'1 day overdue','due.overdueDays':'{n} days overdue',
 'locale':'en-GB'
 },
 nl: {
@@ -652,9 +655,8 @@ nl: {
 'set.saved':'Opgeslagen.','set.nameSaved':'Naam opgeslagen.','set.tgSent':'Testbericht verstuurd.','set.tgLinked':'Telegram gekoppeld. Check je app voor het bevestigingsbericht.',
 'tg.none':'Nog geen bot-token ingesteld in Render.','tg.ready':'Token staat klaar; nog niet gekoppeld.','tg.linked':'Gekoppeld en actief.','tg.linking':'Koppelen…','tg.checking':'Controleren…',
 'lock.on':'<strong>Vergrendeld:</strong> alleen jouw e-mail kan inloggen','lock.off':'<strong>Open:</strong> anderen kunnen een account aanmaken met hun e-mail',
+'lockCrm.on':'<strong>CRM vergrendeld:</strong> alleen jouw e-mail heeft toegang tot het CRM','lockCrm.off':'<strong>CRM open:</strong> anderen kunnen met hun e-mail inloggen op het CRM',
 'greet.night':'Goedenacht','greet.morning':'Goedemorgen','greet.afternoon':'Goedemiddag','greet.evening':'Goedenavond',
-'due.today':'Vandaag','due.tomorrow':'Morgen','due.inDays':'Op {day} over {n} dagen',
-'due.overdueDay':'1 dag te laat','due.overdueDays':'{n} dagen te laat',
 'locale':'nl-NL'
 }
 };
@@ -700,17 +702,6 @@ function dueInfo(r) {
 if (!r.due) return `<span>${t('meta.nodate')}</span>`;
 const dateStr = fmt(new Date(r.due + 'T00:00:00')) + (r.time ? ` ${t('prev.at')} ${r.time}` : '');
 return `<span>${dateStr}</span>`;
-}
-
-function relDue(due) {
-const d = new Date(due + 'T00:00:00');
-const today = new Date(); today.setHours(0, 0, 0, 0);
-const diff = Math.round((d - today) / 86400000);
-if (diff < 0) return { text: diff === -1 ? t('due.overdueDay') : t('due.overdueDays', { n: Math.abs(diff) }), cls: 'overdue' };
-if (diff === 0) return { text: t('due.today'), cls: 'today' };
-if (diff === 1) return { text: t('due.tomorrow'), cls: 'soon' };
-const day = d.toLocaleDateString(t('locale'), { weekday: 'long' });
-return { text: t('due.inDays', { day, n: diff }), cls: 'soon' };
 }
 
 const IC = {
@@ -961,7 +952,7 @@ function renderIdeas() {
 const todayISO = iso(new Date());
 const due = ideas.filter((r) => !r.archived && r.nextReview <= todayISO);
 $('ideaCards').innerHTML = profile.showIdeaCards === false ? '' : due.map((r) => `
-<div class="idea-card" onclick="showView('ideas')">${t('idea.check')}: "${esc(r.title)}" — ${t('idea.worth')}</div>`).join('');
+<div class="idea-card" onclick="showView('ideas')">${t('idea.check')}: “${esc(r.title)}” — ${t('idea.worth')}</div>`).join('');
 
 const shown = ideas.filter((r) => (ideaView === 'box' ? !r.archived : r.archived));
 $('ideaTabBox').textContent = `${t('idea.tabBox')} (${ideas.filter((r) => !r.archived).length})`;
@@ -1120,18 +1111,14 @@ const items = reminders
 .filter((r) => !r.done && r.due && r.due <= plus7)
 .sort((a, b) => a.prio - b.prio || a.due.localeCompare(b.due));
 $('weekList').innerHTML = items.length
-? items.map((r) => {
-const rel = relDue(r.due);
-return `
+? items.map((r) => `
 <div class="rem" style="cursor:pointer;" onclick="showView('reminders')">
 <span class="prio p${r.prio}">P${r.prio}</span>
 <div class="rem-body">
 <div class="rem-title">${esc(r.title)}</div>
 <div class="rem-meta">${dueInfo(r)}</div>
-<div class="due-badge ${rel.cls}">${rel.text}</div>
 </div>
-</div>`;
-}).join('')
+</div>`).join('')
 : `<div class="empty">${t('home.weekEmpty')}</div>`;
 }
 
@@ -1177,12 +1164,19 @@ const st = await api('/api/settings');
 $('lockToggle').checked = st.lockedToAdmin !== false;
 updateLockTxt();
 $('lockBox').classList.add('show');
+$('lockCrmToggle').checked = st.lockedCrmToAdmin !== false;
+updateLockCrmTxt();
+$('lockCrmBox').classList.add('show');
 } catch (e) { /* opslag nog niet gekoppeld */ }
 }
 }
 
 function updateLockTxt() {
 $('lockTxt').innerHTML = $('lockToggle').checked ? t('lock.on') : t('lock.off');
+}
+
+function updateLockCrmTxt() {
+$('lockCrmTxt').innerHTML = $('lockCrmToggle').checked ? t('lockCrm.on') : t('lockCrm.off');
 }
 
 $('lockToggle').onchange = async () => {
@@ -1193,6 +1187,16 @@ body: JSON.stringify({ lockedToAdmin: $('lockToggle').checked }),
 });
 } catch (e) { $('lockToggle').checked = !$('lockToggle').checked; alert(e.message); }
 updateLockTxt();
+};
+
+$('lockCrmToggle').onchange = async () => {
+try {
+await api('/api/settings', {
+method: 'POST', headers: { 'Content-Type': 'application/json' },
+body: JSON.stringify({ lockedCrmToAdmin: $('lockCrmToggle').checked }),
+});
+} catch (e) { $('lockCrmToggle').checked = !$('lockCrmToggle').checked; alert(e.message); }
+updateLockCrmTxt();
 };
 
 window.openModal = (id) => {

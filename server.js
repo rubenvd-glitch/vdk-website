@@ -24,7 +24,7 @@ const PORT = Number(process.env.PORT || 3000);
 const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || 'info@vdkbusiness-services.nl').toLowerCase();
 const IS_PROD = process.env.NODE_ENV === 'production';
 const SESSION_SECRET = process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex');
-const SESSION_TTL = 24 * 60 * 60 * 1000; // 24 hours — log in once per day
+const SESSION_TTL = 30 * 24 * 60 * 60 * 1000; // 30 days — stay logged in on trusted devices
 const CODE_TTL = 10 * 60 * 1000; // 10 minutes
 
 // CRM: fixed sector list for company categorization.
@@ -298,13 +298,25 @@ function sign(value) {
   return crypto.createHmac('sha256', SESSION_SECRET).update(value).digest('base64url');
 }
 
-function createSession(realm, email) {
+// Sessions live in KV (so a Render restart/redeploy never logs you out) with
+// the in-memory Map as a fast local cache / dev fallback when KV isn't set up.
+async function createSession(realm, email) {
   const id = crypto.randomBytes(24).toString('base64url');
-  sessionStores[realm].set(id, { email, expires: Date.now() + SESSION_TTL });
+  const entry = { email, expires: Date.now() + SESSION_TTL };
+  sessionStores[realm].set(id, entry);
+  if (KV_URL) {
+    try { await kvCmd('SET', `sess:${realm}:${id}`, JSON.stringify(entry), 'EX', String(Math.ceil(SESSION_TTL / 1000))); }
+    catch (e) { console.error('session save failed:', e.message); }
+  }
   return `${id}.${sign(id)}`;
 }
 
-function getSession(req, realm) {
+async function destroySession(realm, id) {
+  sessionStores[realm].delete(id);
+  if (KV_URL) { try { await kvCmd('DEL', `sess:${realm}:${id}`); } catch (e) { /* ignore */ } }
+}
+
+async function getSession(req, realm) {
   const cookieName = REALM_COOKIE[realm];
   const cookies = Object.fromEntries(
     (req.headers.cookie || '').split(';').map((c) => {
@@ -322,7 +334,13 @@ function getSession(req, realm) {
   if (sig.length !== expected.length ||
       !crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return null;
   const store = sessionStores[realm];
-  const s = store.get(id);
+  let s = store.get(id);
+  if (!s && KV_URL) {
+    try {
+      const v = await kvCmd('GET', `sess:${realm}:${id}`);
+      if (v) { s = JSON.parse(v); store.set(id, s); }
+    } catch (e) { console.error('session load failed:', e.message); }
+  }
   if (!s || Date.now() > s.expires) { store.delete(id); return null; }
   return { id, ...s };
 }
@@ -510,8 +528,16 @@ async function handleVerify(req, res, realm) {
     logEvent('login', email);
     if (email !== ADMIN_EMAIL) tgSend(`Login op je VDK-paneel: ${email}`).catch(() => {});
   }
-  const cookie = createSession(realm, email);
-  return json(res, 200, { ok: true }, { 'Set-Cookie': sessionCookie(realm, cookie, SESSION_TTL) });
+  const cookie = await createSession(realm, email);
+  const setCookies = [sessionCookie(realm, cookie, SESSION_TTL)];
+  // Base and CRM are the same person's tools now — logging into either one as
+  // the admin also opens the other, so switching never asks for a second 2FA.
+  if (email === ADMIN_EMAIL) {
+    const otherRealm = realm === 'admin' ? 'crm' : 'admin';
+    const otherCookie = await createSession(otherRealm, email);
+    setCookies.push(sessionCookie(otherRealm, otherCookie, SESSION_TTL));
+  }
+  return json(res, 200, { ok: true }, { 'Set-Cookie': setCookies });
 }
 
 // ---------- Server ----------
@@ -525,8 +551,8 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'POST' && p === '/base/request-code') return handleRequestCode(req, res, 'admin');
   if (req.method === 'POST' && p === '/base/verify') return handleVerify(req, res, 'admin');
   if (req.method === 'POST' && p === '/base/logout') {
-    const s = getSession(req, 'admin');
-    if (s) sessionStores.admin.delete(s.id);
+    const s = await getSession(req, 'admin');
+    if (s) await destroySession('admin', s.id);
     return json(res, 200, { ok: true }, { 'Set-Cookie': sessionCookie('admin', '', 0) });
   }
 
@@ -534,27 +560,27 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'POST' && p === '/crm/request-code') return handleRequestCode(req, res, 'crm');
   if (req.method === 'POST' && p === '/crm/verify') return handleVerify(req, res, 'crm');
   if (req.method === 'POST' && p === '/crm/logout') {
-    const s = getSession(req, 'crm');
-    if (s) sessionStores.crm.delete(s.id);
+    const s = await getSession(req, 'crm');
+    if (s) await destroySession('crm', s.id);
     return json(res, 200, { ok: true }, { 'Set-Cookie': sessionCookie('crm', '', 0) });
   }
 
   // --- Panel API (Base) ---
   if (p === '/api/me') {
-    const s = getSession(req, 'admin');
+    const s = await getSession(req, 'admin');
     if (!s) return json(res, 401, { error: 'Not logged in' });
     return json(res, 200, { email: s.email, isAdmin: s.email === ADMIN_EMAIL });
   }
 
   // --- CRM API ---
   if (p === '/api/crm/me') {
-    const s = getSession(req, 'crm');
+    const s = await getSession(req, 'crm');
     if (!s) return json(res, 401, { error: 'Not logged in' });
     return json(res, 200, { email: s.email, isAdmin: s.email === ADMIN_EMAIL });
   }
 
   if (p === '/api/crm/companies') {
-    const s = getSession(req, 'crm');
+    const s = await getSession(req, 'crm');
     if (!s) return json(res, 401, { error: 'Not logged in' });
     const key = `crmco:${s.email}`;
     try {
@@ -639,7 +665,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (p === '/api/crm/ideas') {
-    const s = getSession(req, 'crm');
+    const s = await getSession(req, 'crm');
     if (!s) return json(res, 401, { error: 'Not logged in' });
     const key = `crmidea:${s.email}`;
     try {
@@ -696,7 +722,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (p === '/api/crm/actions') {
-    const s = getSession(req, 'crm');
+    const s = await getSession(req, 'crm');
     if (!s) return json(res, 401, { error: 'Not logged in' });
     const key = `crmact:${s.email}`;
     try {
@@ -741,7 +767,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (p === '/api/reminders') {
-    const s = getSession(req, 'admin');
+    const s = await getSession(req, 'admin');
     if (!s) return json(res, 401, { error: 'Not logged in' });
     const key = `rem:${s.email}`;
     try {
@@ -790,7 +816,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (p === '/api/suggestions') {
-    const s = getSession(req, 'admin');
+    const s = await getSession(req, 'admin');
     if (!s) return json(res, 401, { error: 'Not logged in' });
     const key = `sug:${s.email}`;
     try {
@@ -855,7 +881,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (p === '/api/ideas') {
-    const s = getSession(req, 'admin');
+    const s = await getSession(req, 'admin');
     if (!s) return json(res, 401, { error: 'Not logged in' });
     const key = `idea:${s.email}`;
     try {
@@ -913,7 +939,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (p === '/api/profile') {
-    const s = getSession(req, 'admin');
+    const s = await getSession(req, 'admin');
     if (!s) return json(res, 401, { error: 'Not logged in' });
     const key = `pref:${s.email}`;
     const defaults = { name: '', lang: 'en', sugSnoozeDays: 3, showSugCards: true, showIdeaCards: true };
@@ -940,7 +966,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (p === '/api/log') {
-    const s = getSession(req, 'admin');
+    const s = await getSession(req, 'admin');
     if (!s) return json(res, 401, { error: 'Not logged in' });
     if (s.email !== ADMIN_EMAIL) return json(res, 403, { error: 'Geen toegang' });
     try {
@@ -960,7 +986,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (p === '/api/telegram') {
-    const s = getSession(req, 'admin');
+    const s = await getSession(req, 'admin');
     if (!s) return json(res, 401, { error: 'Not logged in' });
     if (s.email !== ADMIN_EMAIL) return json(res, 403, { error: 'Geen toegang' });
     const token = (process.env.TELEGRAM_BOT_TOKEN || '').trim();
@@ -1013,7 +1039,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (p === '/api/settings') {
-    const s = getSession(req, 'admin');
+    const s = await getSession(req, 'admin');
     if (!s) return json(res, 401, { error: 'Not logged in' });
     if (s.email !== ADMIN_EMAIL) return json(res, 403, { error: 'Geen toegang' });
     try {
@@ -1036,18 +1062,18 @@ const server = http.createServer(async (req, res) => {
 
   // --- Base pages ---
   if (p === '/base' || p === '/base/') {
-    const s = getSession(req, 'admin');
+    const s = await getSession(req, 'admin');
     return serveFile(res, path.join(__dirname, s ? 'panel.html' : 'login.html'));
   }
   if (p === '/base/me') {
-    const s = getSession(req, 'admin');
+    const s = await getSession(req, 'admin');
     if (!s) return json(res, 401, { error: 'Not logged in' });
     return json(res, 200, { email: s.email });
   }
 
   // --- CRM pages (separate service: own login, own session, own page) ---
   if (p === '/crm' || p === '/crm/') {
-    const s = getSession(req, 'crm');
+    const s = await getSession(req, 'crm');
     return serveFile(res, path.join(__dirname, s ? 'crm.html' : 'crm-login.html'));
   }
 
