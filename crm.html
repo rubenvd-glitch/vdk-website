@@ -157,15 +157,25 @@
 
   <div class="backdrop" id="backdrop"></div>
   <nav class="drawer" id="drawer">
-    <button data-view="herinneringen" class="active">Herinneringen</button>
+    <button data-view="dashboard" class="active">Dashboard</button>
+    <button data-view="herinneringen">Herinneringen</button>
     <button data-view="acties">Acties</button>
     <button data-view="bedrijven">Bedrijven</button>
     <button data-view="ideas">Ideeënbox</button>
   </nav>
 
   <main>
+    <!-- DASHBOARD -->
+    <div class="view active" id="view-dashboard">
+      <div class="section-head">
+        <h2>Dashboard</h2>
+      </div>
+      <div class="section-sub">Herinneringen voor de komende 7 dagen. Eerst op dag, dan op prioriteit.</div>
+      <div id="dashList"></div>
+    </div>
+
     <!-- HERINNERINGEN -->
-    <div class="view active" id="view-herinneringen">
+    <div class="view" id="view-herinneringen">
       <div class="section-head">
         <h2>Herinneringen</h2>
         <button class="btn-primary" id="newRemBtn">+ Nieuwe herinnering</button>
@@ -435,7 +445,7 @@
   function showView(v) {
     document.querySelectorAll('.view').forEach((el) => el.classList.remove('active'));
     document.querySelectorAll('nav.drawer button[data-view]').forEach((b) => b.classList.toggle('active', b.dataset.view === v));
-    const map = { herinneringen: 'view-herinneringen', acties: 'view-acties', bedrijven: 'view-bedrijven', ideas: 'view-ideas', codetail: 'view-co-detail' };
+    const map = { dashboard: 'view-dashboard', herinneringen: 'view-herinneringen', acties: 'view-acties', bedrijven: 'view-bedrijven', ideas: 'view-ideas', codetail: 'view-co-detail' };
     $(map[v]).classList.add('active');
   }
   document.querySelectorAll('nav.drawer button[data-view]').forEach((b) => {
@@ -459,18 +469,40 @@
     return parts.join(' ');
   }
 
+  const DAY_NAMES = ['zondag', 'maandag', 'dinsdag', 'woensdag', 'donderdag', 'vrijdag', 'zaterdag'];
+  function relativeDue(a) {
+    if (!a.due) return 'Geen datum';
+    const due = new Date(a.due + 'T00:00:00');
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const diffDays = Math.round((due - today) / 86400000);
+    const dayName = DAY_NAMES[due.getDay()];
+    const dayLabel = dayName.charAt(0).toUpperCase() + dayName.slice(1);
+    let rel;
+    if (diffDays === 0) rel = 'vandaag';
+    else if (diffDays === 1) rel = 'morgen';
+    else if (diffDays > 1) rel = `over ${diffDays} dagen`;
+    else if (diffDays === -1) rel = 'gisteren';
+    else rel = `${Math.abs(diffDays)} dagen geleden`;
+    let text = `${dayLabel}, ${rel}`;
+    if (a.time) text += ` om ${a.time}`;
+    return text;
+  }
+
   function renderActList(list, targetId, opts) {
     opts = opts || {};
     const el = $(targetId);
     if (!list.length) { el.innerHTML = `<div class="empty">${opts.emptyText || 'Niets hier.'}</div>`; return; }
-    const sorted = [...list].sort((a, b) => a.prio - b.prio || (a.due || '9999').localeCompare(b.due || '9999'));
+    const sorted = [...list].sort(opts.sortByDate
+      ? (a, b) => (a.due || '9999').localeCompare(b.due || '9999') || a.prio - b.prio
+      : (a, b) => a.prio - b.prio || (a.due || '9999').localeCompare(b.due || '9999'));
     el.innerHTML = sorted.map((a) => `
       <div class="act">
         <span class="prio p${a.prio}">P${a.prio}</span>
         <div class="act-body">
           <div class="act-co">${esc(coName(a.companyId))}</div>
           ${a.note ? `<div class="act-note">${esc(a.note)}</div>` : ''}
-          <div class="act-meta">${esc(dueInfo(a))}</div>
+          <div class="act-meta">${esc(opts.showRelative ? relativeDue(a) : dueInfo(a))}</div>
         </div>
         <div class="act-actions">
           ${opts.showComplete ? `<button class="icon-btn" onclick="completeRem('${a.id}')" title="Afronden (wordt een actie)">
@@ -489,11 +521,22 @@
   function renderActs() { renderActList(actions.filter((a) => a.done), 'actList', { emptyText: 'Geen acties.' }); }
   function renderReminders() { renderActList(actions.filter((a) => !a.done), 'remList', { emptyText: 'Geen open herinneringen.', showComplete: true }); }
 
+  function isoPlusDays(n) {
+    const d = new Date();
+    d.setDate(d.getDate() + n);
+    return d.toISOString().slice(0, 10);
+  }
+  function renderDashboard() {
+    const plus7 = isoPlusDays(7);
+    const list = actions.filter((a) => !a.done && a.due && a.due <= plus7);
+    renderActList(list, 'dashList', { emptyText: 'Niets gepland voor de komende 7 dagen.', showComplete: true, sortByDate: true, showRelative: true });
+  }
+
   window.removeAct = async (id) => {
     if (!confirm('Verwijderen?')) return;
     const d = await api('/api/crm/actions', { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'delete', id }) });
-    actions = d.actions; renderActs(); renderReminders(); if (activeCoId) renderCoDetail();
+    actions = d.actions; renderActs(); renderReminders(); renderDashboard(); if (activeCoId) renderCoDetail();
   };
   window.editAct = (id) => {
     const a = actions.find((x) => x.id === id);
@@ -503,7 +546,7 @@
   window.completeRem = async (id) => {
     const d = await api('/api/crm/actions', { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'update', id, done: true }) });
-    actions = d.actions; renderActs(); renderReminders(); if (activeCoId) renderCoDetail();
+    actions = d.actions; renderActs(); renderReminders(); renderDashboard(); if (activeCoId) renderCoDetail();
   };
 
   function fillCoDatalist() {
@@ -571,6 +614,7 @@
       actions = d.actions;
       renderActs();
       renderReminders();
+      renderDashboard();
       if (activeCoId) renderCoDetail();
       $('actOverlay').classList.remove('open');
     } catch (e) { $('actModalErr').textContent = e.message; }
@@ -706,7 +750,7 @@
     const da = await api('/api/crm/actions');
     actions = da;
     activeCoId = null;
-    renderActs(); renderReminders(); renderCoList();
+    renderActs(); renderReminders(); renderDashboard(); renderCoList();
     showView('bedrijven');
   };
 
@@ -791,7 +835,7 @@
     try { companies = await api('/api/crm/companies'); } catch (e) { /* opslag nog niet gekoppeld */ }
     try { actions = await api('/api/crm/actions'); } catch (e) { /* opslag nog niet gekoppeld */ }
     try { ideas = await api('/api/crm/ideas'); } catch (e) { /* opslag nog niet gekoppeld */ }
-    renderActs(); renderReminders(); renderCoList(); renderIdeas();
+    renderActs(); renderReminders(); renderDashboard(); renderCoList(); renderIdeas();
   }
   $('logoutBtn').onclick = async () => { await fetch('/crm/logout', { method: 'POST' }); location.href = '/crm'; };
 
