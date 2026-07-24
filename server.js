@@ -411,6 +411,15 @@ async function handleRequestCode(req, res, realm) {
       }
     } catch (e) { console.error('KV check failed:', e.message); }
   }
+  if (realm === 'crm' && !allowed && email.includes('@') && KV_URL) {
+    try {
+      if (await kvGetJson(`crmuser:${email}`)) allowed = true;
+      else {
+        const st = await kvGetJson('settings');
+        if (st && st.lockedCrmToAdmin === false) allowed = true;
+      }
+    } catch (e) { console.error('KV check failed:', e.message); }
+  }
   if (!allowed) return json(res, 200, generic);
 
   const code = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
@@ -467,6 +476,23 @@ async function handleVerify(req, res, realm) {
       }
     } catch (e) {
       console.error('KV user create failed:', e.message);
+      return json(res, 500, { error: 'Storage unavailable.' });
+    }
+  }
+  if (realm === 'crm' && email !== ADMIN_EMAIL && KV_URL) {
+    try {
+      if (!(await kvGetJson(`crmuser:${email}`))) {
+        const st = await kvGetJson('settings');
+        if (!st || st.lockedCrmToAdmin !== false) {
+          logEvent('geweigerd (crm)', email);
+          return json(res, 403, { error: 'Dit e-mailadres heeft geen toegang tot het CRM.' });
+        }
+        await kvSetJson(`crmuser:${email}`, { createdAt: Date.now() });
+        logEvent('nieuw crm account', email);
+        tgSend(`Nieuw CRM-account aangemaakt: ${email}`).catch(() => {});
+      }
+    } catch (e) {
+      console.error('KV crm user create failed:', e.message);
       return json(res, 500, { error: 'Storage unavailable.' });
     }
   }
@@ -980,10 +1006,14 @@ const server = http.createServer(async (req, res) => {
     if (!s) return json(res, 401, { error: 'Not logged in' });
     if (s.email !== ADMIN_EMAIL) return json(res, 403, { error: 'Geen toegang' });
     try {
-      if (req.method === 'GET') return json(res, 200, (await kvGetJson('settings')) || { lockedToAdmin: true });
+      if (req.method === 'GET') return json(res, 200, (await kvGetJson('settings')) || { lockedToAdmin: true, lockedCrmToAdmin: true });
       if (req.method === 'POST') {
         const body = await readBody(req);
-        const st = { lockedToAdmin: body.lockedToAdmin !== false };
+        const prev = (await kvGetJson('settings')) || {};
+        const st = {
+          lockedToAdmin: body.lockedToAdmin !== undefined ? body.lockedToAdmin !== false : (prev.lockedToAdmin !== false),
+          lockedCrmToAdmin: body.lockedCrmToAdmin !== undefined ? body.lockedCrmToAdmin !== false : (prev.lockedCrmToAdmin !== false),
+        };
         await kvSetJson('settings', st);
         return json(res, 200, st);
       }
