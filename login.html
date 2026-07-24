@@ -188,7 +188,8 @@
         });
         const d = await r.json();
         if (!r.ok) throw new Error(d.error || 'Inloggen mislukt');
-        window.location.href = '/admin';
+        const next = new URLSearchParams(window.location.search).get('next');
+        window.location.href = (next && next.startsWith('/')) ? next : '/admin';
       } catch (err) {
         show(err.message, 'err');
         $('verifyBtn').disabled = false;

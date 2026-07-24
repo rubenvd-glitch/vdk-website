@@ -16,6 +16,18 @@
     }
     .logo-wrap { text-align: center; padding: 24px; }
     .logo-wrap img, .logo-wrap svg { max-width: min(420px, 80vw); height: auto; }
+    .panel-links {
+      display: flex; gap: 14px; justify-content: center; flex-wrap: wrap;
+      margin-top: 32px;
+    }
+    .panel-links a {
+      display: inline-block; padding: 12px 26px; border-radius: 9px;
+      background: #22251f; color: #fff; text-decoration: none;
+      font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 14px; font-weight: 700;
+      letter-spacing: 1px; box-shadow: 0 4px 14px rgba(0,0,0,.12);
+      transition: transform .15s ease, opacity .15s ease;
+    }
+    .panel-links a:hover { transform: translateY(-1px); opacity: .92; }
   </style>
 </head>
 <body>
@@ -40,6 +52,10 @@
       <line x1="52" y1="203" x2="100" y2="203" stroke="#22251f" stroke-width="3"/>
       <line x1="400" y1="203" x2="448" y2="203" stroke="#22251f" stroke-width="3"/>
     </svg>
+    <div class="panel-links">
+      <a href="/crm">VDK CRM</a>
+      <a href="/admin">VDK Base</a>
+    </div>
   </div>
 </body>
 </html>

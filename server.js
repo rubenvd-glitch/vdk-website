@@ -781,6 +781,14 @@ const server = http.createServer(async (req, res) => {
     const s = getSession(req);
     return serveFile(res, path.join(__dirname, s ? 'panel.html' : 'login.html'));
   }
+  if (p === '/crm' || p === '/crm/') {
+    const s = getSession(req);
+    if (!s) {
+      res.writeHead(302, { Location: '/admin?next=/crm' });
+      return res.end();
+    }
+    return serveFile(res, path.join(__dirname, 'panel.html'));
+  }
   if (p === '/admin/me') {
     const s = getSession(req);
     if (!s) return json(res, 401, { error: 'Not logged in' });
