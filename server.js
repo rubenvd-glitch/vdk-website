@@ -1,4 +1,4 @@
-// VDK Business Services — website + 2FA admin panel
+// VDK Business Services — website + 2FA admin panel + separate CRM service
 // Zero dependencies: runs with plain Node.js (v18+). Start with: node server.js
 'use strict';
 
@@ -280,26 +280,30 @@ async function dailySummaryText() {
 }
 
 // ---------- Sessions (HMAC-signed cookie, in-memory store) ----------
-const sessions = new Map(); // id -> { email, expires }
+// Two independent realms: "admin" (Base panel) and "crm" (CRM, fully separate
+// login/session — logging into one does NOT log you into the other).
+const sessionStores = { admin: new Map(), crm: new Map() };
+const REALM_COOKIE = { admin: 'vdk_sid', crm: 'vdk_crm_sid' };
 
 function sign(value) {
   return crypto.createHmac('sha256', SESSION_SECRET).update(value).digest('base64url');
 }
 
-function createSession(email) {
+function createSession(realm, email) {
   const id = crypto.randomBytes(24).toString('base64url');
-  sessions.set(id, { email, expires: Date.now() + SESSION_TTL });
+  sessionStores[realm].set(id, { email, expires: Date.now() + SESSION_TTL });
   return `${id}.${sign(id)}`;
 }
 
-function getSession(req) {
+function getSession(req, realm) {
+  const cookieName = REALM_COOKIE[realm];
   const cookies = Object.fromEntries(
     (req.headers.cookie || '').split(';').map((c) => {
       const i = c.indexOf('=');
       return [c.slice(0, i).trim(), c.slice(i + 1).trim()];
     })
   );
-  const raw = cookies['vdk_sid'];
+  const raw = cookies[cookieName];
   if (!raw) return null;
   const dot = raw.lastIndexOf('.');
   if (dot === -1) return null;
@@ -308,14 +312,15 @@ function getSession(req) {
   const expected = sign(id);
   if (sig.length !== expected.length ||
       !crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return null;
-  const s = sessions.get(id);
-  if (!s || Date.now() > s.expires) { sessions.delete(id); return null; }
+  const store = sessionStores[realm];
+  const s = store.get(id);
+  if (!s || Date.now() > s.expires) { store.delete(id); return null; }
   return { id, ...s };
 }
 
-function sessionCookie(value, maxAgeMs) {
+function sessionCookie(realm, value, maxAgeMs) {
   const parts = [
-    `vdk_sid=${value}`,
+    `${REALM_COOKIE[realm]}=${value}`,
     'Path=/',
     'HttpOnly',
     'SameSite=Lax',
@@ -326,31 +331,35 @@ function sessionCookie(value, maxAgeMs) {
 }
 
 // ---------- 2FA codes + rate limiting (in-memory) ----------
-const codes = new Map(); // email -> { hash, expires, attempts }
+// Namespaced per realm so an admin-panel code and a CRM code never collide.
+const codes = new Map(); // "realm:email" -> { hash, expires, attempts }
 const rateLimit = new Map(); // ip -> { count, resetAt }
 
 const hashCode = (c) => crypto.createHash('sha256').update(c).digest('hex');
 
 // Login codes survive restarts by living in KV (10 min TTL); memory is the dev fallback.
-async function getLoginCode(email) {
+async function getLoginCode(realm, email) {
+  const key = `${realm}:${email}`;
   if (KV_URL) {
-    try { const v = await kvCmd('GET', `code:${email}`); return v ? JSON.parse(v) : null; }
+    try { const v = await kvCmd('GET', `code:${key}`); return v ? JSON.parse(v) : null; }
     catch (e) { console.error('code get failed:', e.message); return null; }
   }
-  const entry = codes.get(email);
-  if (!entry || Date.now() > entry.expires) { codes.delete(email); return null; }
+  const entry = codes.get(key);
+  if (!entry || Date.now() > entry.expires) { codes.delete(key); return null; }
   return entry;
 }
-async function saveLoginCode(email, entry) {
+async function saveLoginCode(realm, email, entry) {
+  const key = `${realm}:${email}`;
   if (KV_URL) {
-    try { await kvCmd('SET', `code:${email}`, JSON.stringify(entry), 'EX', '600'); return; }
+    try { await kvCmd('SET', `code:${key}`, JSON.stringify(entry), 'EX', '600'); return; }
     catch (e) { console.error('code save failed:', e.message); }
   }
-  codes.set(email, { ...entry, expires: Date.now() + CODE_TTL });
+  codes.set(key, { ...entry, expires: Date.now() + CODE_TTL });
 }
-async function delLoginCode(email) {
-  if (KV_URL) { try { await kvCmd('DEL', `code:${email}`); } catch (e) { /* ignore */ } }
-  codes.delete(email);
+async function delLoginCode(realm, email) {
+  const key = `${realm}:${email}`;
+  if (KV_URL) { try { await kvCmd('DEL', `code:${key}`); } catch (e) { /* ignore */ } }
+  codes.delete(key);
 }
 
 function allowRate(ip) {
@@ -385,6 +394,91 @@ function readBody(req) {
   });
 }
 
+// Shared 2FA request/verify handlers, parameterized by realm so the Base
+// panel and the CRM never share a login state.
+async function handleRequestCode(req, res, realm) {
+  if (!allowRate(req.socket.remoteAddress)) return json(res, 429, { error: 'Too many attempts. Try again later.' });
+  const body = await readBody(req);
+  const email = String(body.email || '').trim().toLowerCase();
+  const generic = { ok: true, message: 'If this email is authorized, a code has been sent.' };
+  let allowed = email === ADMIN_EMAIL && email.includes('@');
+  if (realm === 'admin' && !allowed && email.includes('@') && KV_URL) {
+    try {
+      if (await kvGetJson(`user:${email}`)) allowed = true;
+      else {
+        const st = await kvGetJson('settings');
+        if (st && st.lockedToAdmin === false) allowed = true;
+      }
+    } catch (e) { console.error('KV check failed:', e.message); }
+  }
+  if (!allowed) return json(res, 200, generic);
+
+  const code = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
+  await saveLoginCode(realm, email, { hash: hashCode(code), attempts: 0 });
+
+  const subjectApp = realm === 'crm' ? 'VDK CRM' : 'VDK admin';
+  if (smtpConfigured()) {
+    try {
+      await sendMail({
+        to: email,
+        subject: `Your ${subjectApp} login code: ${code}`,
+        text: `Your login code for ${subjectApp} is: ${code}\n\nIt expires in 10 minutes. If you did not request this, ignore this email.`,
+      });
+    } catch (err) {
+      console.error('SMTP send failed:', (err && (err.stack || err.message)) || String(err));
+      return json(res, 500, { error: 'Could not send email. Check SMTP settings.' });
+    }
+  } else {
+    console.log(`[DEV] No SMTP configured. Login code for ${realm}:${email}: ${code}`);
+  }
+  return json(res, 200, generic);
+}
+
+async function handleVerify(req, res, realm) {
+  if (!allowRate(req.socket.remoteAddress)) return json(res, 429, { error: 'Too many attempts. Try again later.' });
+  const body = await readBody(req);
+  const email = String(body.email || '').trim().toLowerCase();
+  const code = String(body.code || '').trim();
+  const entry = await getLoginCode(realm, email);
+  if (!entry) {
+    return json(res, 401, { error: 'Code ongeldig of verlopen. Vraag een nieuwe aan.' });
+  }
+  entry.attempts = (entry.attempts || 0) + 1;
+  if (entry.attempts > 5) {
+    await delLoginCode(realm, email);
+    return json(res, 401, { error: 'Te vaak fout. Vraag een nieuwe code aan.' });
+  }
+  await saveLoginCode(realm, email, entry);
+  const ok = crypto.timingSafeEqual(Buffer.from(hashCode(code)), Buffer.from(entry.hash));
+  if (!ok) return json(res, 401, { error: 'Code klopt niet. Probeer opnieuw.' });
+  await delLoginCode(realm, email);
+
+  if (realm === 'admin' && email !== ADMIN_EMAIL && KV_URL) {
+    try {
+      if (!(await kvGetJson(`user:${email}`))) {
+        const st = await kvGetJson('settings');
+        if (!st || st.lockedToAdmin !== false) {
+          logEvent('geweigerd', email);
+          return json(res, 403, { error: 'Dit e-mailadres heeft geen toegang tot dit paneel.' });
+        }
+        await kvSetJson(`user:${email}`, { createdAt: Date.now() });
+        logEvent('nieuw account', email);
+        tgSend(`Nieuw account aangemaakt in je VDK-paneel: ${email}`).catch(() => {});
+      }
+    } catch (e) {
+      console.error('KV user create failed:', e.message);
+      return json(res, 500, { error: 'Storage unavailable.' });
+    }
+  }
+  if (realm === 'admin') {
+    bump('l');
+    logEvent('login', email);
+    if (email !== ADMIN_EMAIL) tgSend(`Login op je VDK-paneel: ${email}`).catch(() => {});
+  }
+  const cookie = createSession(realm, email);
+  return json(res, 200, { ok: true }, { 'Set-Cookie': sessionCookie(realm, cookie, SESSION_TTL) });
+}
+
 // ---------- Server ----------
 
 const server = http.createServer(async (req, res) => {
@@ -392,102 +486,40 @@ const server = http.createServer(async (req, res) => {
   const p = url.pathname;
   const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress;
 
-  // --- Auth API ---
-  if (req.method === 'POST' && p === '/admin/request-code') {
-    if (!allowRate(ip)) return json(res, 429, { error: 'Too many attempts. Try again later.' });
-    const body = await readBody(req);
-    const email = String(body.email || '').trim().toLowerCase();
-    const generic = { ok: true, message: 'If this email is authorized, a code has been sent.' };
-    let allowed = email === ADMIN_EMAIL && email.includes('@');
-    if (!allowed && email.includes('@') && KV_URL) {
-      try {
-        if (await kvGetJson(`user:${email}`)) allowed = true;
-        else {
-          const st = await kvGetJson('settings');
-          if (st && st.lockedToAdmin === false) allowed = true;
-        }
-      } catch (e) { console.error('KV check failed:', e.message); }
-    }
-    if (!allowed) return json(res, 200, generic);
-
-    const code = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
-    await saveLoginCode(email, { hash: hashCode(code), attempts: 0 });
-
-    if (smtpConfigured()) {
-      try {
-        await sendMail({
-          to: email,
-          subject: `Your VDK admin login code: ${code}`,
-          text: `Your login code for the VDK Business Services admin panel is: ${code}\n\nIt expires in 10 minutes. If you did not request this, ignore this email.`,
-        });
-      } catch (err) {
-        console.error('SMTP send failed:', (err && (err.stack || err.message)) || String(err));
-        return json(res, 500, { error: 'Could not send email. Check SMTP settings.' });
-      }
-    } else {
-      console.log(`[DEV] No SMTP configured. Login code for ${email}: ${code}`);
-    }
-    return json(res, 200, generic);
-  }
-
-  if (req.method === 'POST' && p === '/admin/verify') {
-    if (!allowRate(ip)) return json(res, 429, { error: 'Too many attempts. Try again later.' });
-    const body = await readBody(req);
-    const email = String(body.email || '').trim().toLowerCase();
-    const code = String(body.code || '').trim();
-    const entry = await getLoginCode(email);
-    if (!entry) {
-      return json(res, 401, { error: 'Code ongeldig of verlopen. Vraag een nieuwe aan.' });
-    }
-    entry.attempts = (entry.attempts || 0) + 1;
-    if (entry.attempts > 5) {
-      await delLoginCode(email);
-      return json(res, 401, { error: 'Te vaak fout. Vraag een nieuwe code aan.' });
-    }
-    await saveLoginCode(email, entry);
-    const ok = crypto.timingSafeEqual(Buffer.from(hashCode(code)), Buffer.from(entry.hash));
-    if (!ok) return json(res, 401, { error: 'Code klopt niet. Probeer opnieuw.' });
-    await delLoginCode(email);
-    // First login of a non-admin: create the account (only while registration is open)
-    if (email !== ADMIN_EMAIL && KV_URL) {
-      try {
-        if (!(await kvGetJson(`user:${email}`))) {
-          const st = await kvGetJson('settings');
-          if (!st || st.lockedToAdmin !== false) {
-            logEvent('geweigerd', email);
-            return json(res, 403, { error: 'Dit e-mailadres heeft geen toegang tot dit paneel.' });
-          }
-          await kvSetJson(`user:${email}`, { createdAt: Date.now() });
-          logEvent('nieuw account', email);
-          tgSend(`Nieuw account aangemaakt in je VDK-paneel: ${email}`).catch(() => {});
-        }
-      } catch (e) {
-        console.error('KV user create failed:', e.message);
-        return json(res, 500, { error: 'Storage unavailable.' });
-      }
-    }
-    bump('l');
-    logEvent('login', email);
-    if (email !== ADMIN_EMAIL) tgSend(`Login op je VDK-paneel: ${email}`).catch(() => {});
-    const cookie = createSession(email);
-    return json(res, 200, { ok: true }, { 'Set-Cookie': sessionCookie(cookie, SESSION_TTL) });
-  }
-
+  // --- Admin (Base) auth API ---
+  if (req.method === 'POST' && p === '/admin/request-code') return handleRequestCode(req, res, 'admin');
+  if (req.method === 'POST' && p === '/admin/verify') return handleVerify(req, res, 'admin');
   if (req.method === 'POST' && p === '/admin/logout') {
-    const s = getSession(req);
-    if (s) sessions.delete(s.id);
-    return json(res, 200, { ok: true }, { 'Set-Cookie': sessionCookie('', 0) });
+    const s = getSession(req, 'admin');
+    if (s) sessionStores.admin.delete(s.id);
+    return json(res, 200, { ok: true }, { 'Set-Cookie': sessionCookie('admin', '', 0) });
   }
 
-  // --- Panel API ---
+  // --- CRM auth API (fully separate from Base) ---
+  if (req.method === 'POST' && p === '/crm/request-code') return handleRequestCode(req, res, 'crm');
+  if (req.method === 'POST' && p === '/crm/verify') return handleVerify(req, res, 'crm');
+  if (req.method === 'POST' && p === '/crm/logout') {
+    const s = getSession(req, 'crm');
+    if (s) sessionStores.crm.delete(s.id);
+    return json(res, 200, { ok: true }, { 'Set-Cookie': sessionCookie('crm', '', 0) });
+  }
+
+  // --- Panel API (Base) ---
   if (p === '/api/me') {
-    const s = getSession(req);
+    const s = getSession(req, 'admin');
+    if (!s) return json(res, 401, { error: 'Not logged in' });
+    return json(res, 200, { email: s.email, isAdmin: s.email === ADMIN_EMAIL });
+  }
+
+  // --- CRM API ---
+  if (p === '/api/crm/me') {
+    const s = getSession(req, 'crm');
     if (!s) return json(res, 401, { error: 'Not logged in' });
     return json(res, 200, { email: s.email, isAdmin: s.email === ADMIN_EMAIL });
   }
 
   if (p === '/api/reminders') {
-    const s = getSession(req);
+    const s = getSession(req, 'admin');
     if (!s) return json(res, 401, { error: 'Not logged in' });
     const key = `rem:${s.email}`;
     try {
@@ -536,7 +568,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (p === '/api/suggestions') {
-    const s = getSession(req);
+    const s = getSession(req, 'admin');
     if (!s) return json(res, 401, { error: 'Not logged in' });
     const key = `sug:${s.email}`;
     try {
@@ -601,7 +633,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (p === '/api/ideas') {
-    const s = getSession(req);
+    const s = getSession(req, 'admin');
     if (!s) return json(res, 401, { error: 'Not logged in' });
     const key = `idea:${s.email}`;
     try {
@@ -659,7 +691,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (p === '/api/profile') {
-    const s = getSession(req);
+    const s = getSession(req, 'admin');
     if (!s) return json(res, 401, { error: 'Not logged in' });
     const key = `pref:${s.email}`;
     const defaults = { name: '', lang: 'en', sugSnoozeDays: 3, showSugCards: true, showIdeaCards: true };
@@ -686,7 +718,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (p === '/api/log') {
-    const s = getSession(req);
+    const s = getSession(req, 'admin');
     if (!s) return json(res, 401, { error: 'Not logged in' });
     if (s.email !== ADMIN_EMAIL) return json(res, 403, { error: 'Geen toegang' });
     try {
@@ -706,7 +738,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (p === '/api/telegram') {
-    const s = getSession(req);
+    const s = getSession(req, 'admin');
     if (!s) return json(res, 401, { error: 'Not logged in' });
     if (s.email !== ADMIN_EMAIL) return json(res, 403, { error: 'Geen toegang' });
     const token = (process.env.TELEGRAM_BOT_TOKEN || '').trim();
@@ -759,7 +791,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (p === '/api/settings') {
-    const s = getSession(req);
+    const s = getSession(req, 'admin');
     if (!s) return json(res, 401, { error: 'Not logged in' });
     if (s.email !== ADMIN_EMAIL) return json(res, 403, { error: 'Geen toegang' });
     try {
@@ -776,23 +808,21 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
-  // --- Admin pages ---
+  // --- Admin (Base) pages ---
   if (p === '/admin' || p === '/admin/') {
-    const s = getSession(req);
+    const s = getSession(req, 'admin');
     return serveFile(res, path.join(__dirname, s ? 'panel.html' : 'login.html'));
   }
-  if (p === '/crm' || p === '/crm/') {
-    const s = getSession(req);
-    if (!s) {
-      res.writeHead(302, { Location: '/admin?next=/crm' });
-      return res.end();
-    }
-    return serveFile(res, path.join(__dirname, 'panel.html'));
-  }
   if (p === '/admin/me') {
-    const s = getSession(req);
+    const s = getSession(req, 'admin');
     if (!s) return json(res, 401, { error: 'Not logged in' });
     return json(res, 200, { email: s.email });
+  }
+
+  // --- CRM pages (separate service: own login, own session, own page) ---
+  if (p === '/crm' || p === '/crm/') {
+    const s = getSession(req, 'crm');
+    return serveFile(res, path.join(__dirname, s ? 'crm.html' : 'crm-login.html'));
   }
 
   // --- Public pages (explicit whitelist only) ---
@@ -809,7 +839,9 @@ const server = http.createServer(async (req, res) => {
 // Cleanup expired sessions/codes hourly
 setInterval(() => {
   const now = Date.now();
-  for (const [k, v] of sessions) if (now > v.expires) sessions.delete(k);
+  for (const realm of Object.keys(sessionStores)) {
+    for (const [k, v] of sessionStores[realm]) if (now > v.expires) sessionStores[realm].delete(k);
+  }
   for (const [k, v] of codes) if (now > v.expires) codes.delete(k);
 }, 60 * 60 * 1000).unref();
 

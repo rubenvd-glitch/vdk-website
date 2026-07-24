@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VDK CRM</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      min-height: 100vh; background: #0e1116; color: #e6e9ed;
+      font-family: 'Helvetica Neue', Arial, sans-serif;
+    }
+    header {
+      background: #12161d; border-bottom: 1px solid #232a33; padding: 14px 28px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    header h1 { font-size: 16px; letter-spacing: 2px; font-weight: 700; }
+    header button {
+      background: none; border: 1px solid #39424e; color: #8b94a1;
+      padding: 8px 14px; border-radius: 8px; font-size: 13px; cursor: pointer; font-family: inherit;
+    }
+    header button:hover { border-color: #7fb4f0; color: #e6e9ed; }
+    main { max-width: 640px; margin: 0 auto; padding: 60px 24px; text-align: center; }
+    main h2 { font-size: 22px; margin-bottom: 12px; }
+    main p { color: #8b94a1; font-size: 15px; line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>VDK CRM</h1>
+    <button id="logoutBtn">Uitloggen</button>
+  </header>
+  <main>
+    <h2>Welkom<span id="who"></span></h2>
+    <p>De CRM wordt nog gebouwd — contacten en deals komen hier binnenkort. Dit is een volledig losse service van VDK Base, met een eigen inlog.</p>
+  </main>
+  <script>
+    (async () => {
+      try {
+        const r = await fetch('/api/crm/me');
+        if (!r.ok) throw new Error();
+        const me = await r.json();
+        document.getElementById('who').textContent = ', ' + me.email;
+      } catch {
+        location.href = '/crm';
+      }
+    })();
+    document.getElementById('logoutBtn').onclick = async () => {
+      await fetch('/crm/logout', { method: 'POST' });
+      location.href = '/crm';
+    };
+  </script>
+</body>
+</html>
