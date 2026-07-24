@@ -24,7 +24,7 @@ const PORT = Number(process.env.PORT || 3000);
 const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || 'info@vdkbusiness-services.nl').toLowerCase();
 const IS_PROD = process.env.NODE_ENV === 'production';
 const SESSION_SECRET = process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex');
-const SESSION_TTL = 8 * 60 * 60 * 1000; // 8 hours
+const SESSION_TTL = 24 * 60 * 60 * 1000; // 24 hours — log in once per day
 const CODE_TTL = 10 * 60 * 1000; // 10 minutes
 
 // ---------- Minimal SMTP client (STARTTLS on 587 or implicit TLS on 465) ----------
