@@ -17,18 +17,30 @@
     position: sticky; top: 0; z-index: 10; gap: 16px; flex-wrap: wrap;
   }
   header h1 { font-size: 16px; letter-spacing: 2px; font-weight: 700; }
-  nav.tabs { display: flex; gap: 6px; }
-  nav.tabs button {
-    background: none; border: 1px solid transparent; color: #8b94a1;
-    padding: 8px 14px; border-radius: 8px; font-size: 13px; cursor: pointer; font-family: inherit; font-weight: 600;
+  .icon-btn-header {
+    background: none; border: none; color: #e6e9ed; cursor: pointer;
+    padding: 7px; border-radius: 8px; display: flex; align-items: center;
   }
-  nav.tabs button.active { background: #1c222b; color: #e6e9ed; border-color: #2e3844; }
-  nav.tabs button:hover { color: #e6e9ed; }
-  header .logoutBtn {
-    background: none; border: 1px solid #39424e; color: #8b94a1;
-    padding: 8px 14px; border-radius: 8px; font-size: 13px; cursor: pointer; font-family: inherit;
+  .icon-btn-header:hover { background: #1c222b; }
+  .backdrop {
+    position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 150;
+    opacity: 0; pointer-events: none; transition: opacity .22s ease;
   }
-  header .logoutBtn:hover { border-color: #7fb4f0; color: #e6e9ed; }
+  .backdrop.show { opacity: 1; pointer-events: auto; }
+  .drawer {
+    position: fixed; top: 0; left: 0; bottom: 0; width: 220px; z-index: 200;
+    background: #12161d; border-right: 1px solid #232a33;
+    padding: 22px 12px; display: flex; flex-direction: column; gap: 4px;
+    transform: translateX(-100%); transition: transform .22s ease;
+  }
+  .drawer.open { transform: translateX(0); }
+  .drawer button {
+    display: block; width: 100%; text-align: left; background: none; border: none;
+    color: #e6e9ed; font-size: 15px; padding: 12px 14px; border-radius: 9px;
+    cursor: pointer; font-family: inherit;
+  }
+  .drawer button.active { background: #1c222b; }
+  .drawer button:hover { background: #1c222b; }
   main { max-width: 760px; margin: 0 auto; padding: 28px 20px; }
   .view { display: none; }
   .view.active { display: block; }
@@ -61,8 +73,6 @@
   .act-co { font-size: 14.5px; font-weight: 700; }
   .act-note { font-size: 13px; color: #a7afba; margin-top: 3px; white-space: pre-wrap; }
   .act-meta { font-size: 12px; color: #5a6472; margin-top: 6px; }
-  .act.done { opacity: .5; }
-  .act.done .act-co { text-decoration: line-through; }
   .act-actions { display: flex; gap: 6px; flex-shrink: 0; }
   .icon-btn { background: none; border: none; color: #5a6472; cursor: pointer; padding: 4px; border-radius: 6px; }
   .icon-btn:hover { color: #e6e9ed; background: #1c222b; }
@@ -72,14 +82,23 @@
     border-radius: 9px; background: #151a21; color: #e6e9ed; margin-bottom: 16px; }
   .searchbar:focus { outline: none; border-color: #7fb4f0; }
 
-  .co-row { cursor: pointer; justify-content: space-between; align-items: center; }
+  .co-row { cursor: pointer; justify-content: space-between; align-items: center; flex-wrap: wrap; }
   .co-name { font-size: 14.5px; font-weight: 700; }
+  .co-left { display: flex; align-items: center; flex-wrap: wrap; gap: 0; }
+  .co-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
   .co-badge { font-size: 11px; font-weight: 700; border-radius: 999px; padding: 3px 10px; margin-left: 10px; }
   .st-lead { background: #22283a; color: #93a4f5; }
   .st-prospect { background: #3a2a14; color: #f0b45c; }
   .st-klant { background: #17321c; color: #7fd68f; }
   .st-inactief { background: #232a33; color: #8b94a1; }
-  .co-ltv { color: #8b94a1; font-size: 13px; }
+  .ap-yes { background: #17321c; color: #7fd68f; }
+  .ap-no { background: #232a33; color: #8b94a1; }
+  .co-sector { font-size: 11.5px; color: #5a6472; }
+  .co-filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+  .co-filters select {
+    background: #151a21; color: #cfd6de; border: 1px solid #2e3844; border-radius: 8px;
+    padding: 8px 10px; font-size: 12.5px; font-family: inherit; cursor: pointer; color-scheme: dark;
+  }
 
   .detail-card { background: #151a21; border: 1px solid #232a33; border-radius: 12px; padding: 20px; margin-bottom: 20px; }
   .detail-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; gap: 10px; }
@@ -129,23 +148,39 @@
 </head>
 <body>
   <header>
+    <button id="menuBtn" class="icon-btn-header" title="Menu">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:20px;height:20px;"><path d="M3 6h18"/><path d="M3 12h18"/><path d="M3 18h18"/></svg>
+    </button>
     <h1>VDK CRM</h1>
-    <nav class="tabs">
-      <button data-view="acties" class="active">Acties</button>
-      <button data-view="bedrijven">Bedrijven</button>
-      <button data-view="ideas">Ideeënbox</button>
-    </nav>
     <button class="logoutBtn" id="logoutBtn">Uitloggen</button>
   </header>
 
+  <div class="backdrop" id="backdrop"></div>
+  <nav class="drawer" id="drawer">
+    <button data-view="herinneringen" class="active">Herinneringen</button>
+    <button data-view="acties">Acties</button>
+    <button data-view="bedrijven">Bedrijven</button>
+    <button data-view="ideas">Ideeënbox</button>
+  </nav>
+
   <main>
+    <!-- HERINNERINGEN -->
+    <div class="view active" id="view-herinneringen">
+      <div class="section-head">
+        <h2>Herinneringen</h2>
+        <button class="btn-primary" id="newRemBtn">+ Nieuwe herinnering</button>
+      </div>
+      <div class="section-sub">Open taken per bedrijf, met notitie, datum en prioriteit. Rond je 'm af, dan wordt het een actie.</div>
+      <div id="remList"></div>
+    </div>
+
     <!-- ACTIES -->
-    <div class="view active" id="view-acties">
+    <div class="view" id="view-acties">
       <div class="section-head">
         <h2>Acties</h2>
         <button class="btn-primary" id="newActBtn">+ Nieuwe actie</button>
       </div>
-      <div class="section-sub">Taken per bedrijf, met notitie, datum en prioriteit.</div>
+      <div class="section-sub">Afgeronde/historische acties per bedrijf.</div>
       <div id="actList"></div>
     </div>
 
@@ -155,8 +190,25 @@
         <h2>Bedrijven</h2>
         <button class="btn-primary" id="newCoBtn">+ Nieuw bedrijf</button>
       </div>
-      <div class="section-sub">Zoek een bedrijf om de status, LTV en acties te zien.</div>
+      <div class="section-sub">Naam, benaderd-status en sales status in één oogopslag. Klik voor details.</div>
       <input class="searchbar" id="coSearch" placeholder="Zoek op bedrijfsnaam…">
+      <div class="co-filters">
+        <select id="coFilterStatus">
+          <option value="">Alle sales statussen</option>
+          <option value="lead">Lead</option>
+          <option value="prospect">Prospect</option>
+          <option value="klant">Klant</option>
+          <option value="inactief">Inactief</option>
+        </select>
+        <select id="coFilterApproached">
+          <option value="">Benaderd + niet benaderd</option>
+          <option value="yes">Benaderd</option>
+          <option value="no">Niet benaderd</option>
+        </select>
+        <select id="coFilterSector">
+          <option value="">Alle sectoren</option>
+        </select>
+      </div>
       <div id="coList"></div>
     </div>
 
@@ -190,8 +242,17 @@
             </select>
           </div>
           <div class="field">
-            <label>LTV (€)</label>
-            <input id="coEditLtv" type="number" min="0" step="1">
+            <label>Benaderd</label>
+            <select id="coEditApproached">
+              <option value="no">Niet benaderd</option>
+              <option value="yes">Benaderd</option>
+            </select>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label>Sector</label>
+            <select id="coEditSector"></select>
           </div>
         </div>
       </div>
@@ -201,6 +262,12 @@
         <button class="btn-ghost" id="coNewContactBtn">+ Contact</button>
       </div>
       <div id="coContactList" style="margin-bottom:24px;"></div>
+
+      <div class="section-head">
+        <h2 style="font-size:16px;">Herinneringen voor dit bedrijf</h2>
+        <button class="btn-ghost" id="coNewRemBtn">+ Herinnering</button>
+      </div>
+      <div id="coRemList" style="margin-bottom:24px;"></div>
 
       <div class="section-head">
         <h2 style="font-size:16px;">Acties voor dit bedrijf</h2>
@@ -277,7 +344,19 @@
             <option value="inactief">Inactief</option>
           </select>
         </div>
-        <div class="field"><label>LTV (€)</label><input id="fCoLtv" type="number" min="0" step="1" value="0"></div>
+        <div class="field">
+          <label>Benaderd</label>
+          <select id="fCoApproached">
+            <option value="no">Niet benaderd</option>
+            <option value="yes">Benaderd</option>
+          </select>
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Sector</label>
+          <select id="fCoSector"></select>
+        </div>
       </div>
       <div class="modal-err" id="coModalErr"></div>
       <div class="modal-actions">
@@ -325,6 +404,19 @@
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const STATUS_LABEL = { lead: 'Lead', prospect: 'Prospect', klant: 'Klant', inactief: 'Inactief' };
+  const SECTORS = [
+    'Horeca', 'Sport & Fitness', 'Financien & Verzekeringen', 'Vastgoed & Makelaardij',
+    'Bouw & Techniek', 'Detailhandel & Retail', 'Zorg & Welzijn', 'Onderwijs',
+    'Automotive & Transport', 'Media & Marketing', 'ICT & Technologie',
+    'Zakelijke Dienstverlening', 'Overheid & Non-profit', 'Evenementen & Cultuur',
+    'Voeding & Drank', 'Reizen & Vrije Tijd', 'Overig',
+  ];
+  function fillSectorSelects() {
+    const opts = '<option value="">Geen sector</option>' + SECTORS.map((s) => `<option value="${esc(s)}">${esc(s)}</option>`).join('');
+    $('coEditSector').innerHTML = opts;
+    $('fCoSector').innerHTML = opts;
+    $('coFilterSector').innerHTML = '<option value="">Alle sectoren</option>' + SECTORS.map((s) => `<option value="${esc(s)}">${esc(s)}</option>`).join('');
+  }
 
   let companies = [], actions = [], ideas = [];
   let ideaView = 'box';
@@ -338,15 +430,22 @@
     return d;
   }
 
+  function closeDrawer() { $('drawer').classList.remove('open'); $('backdrop').classList.remove('show'); }
+
   function showView(v) {
     document.querySelectorAll('.view').forEach((el) => el.classList.remove('active'));
-    document.querySelectorAll('nav.tabs button').forEach((b) => b.classList.toggle('active', b.dataset.view === v));
-    const map = { acties: 'view-acties', bedrijven: 'view-bedrijven', ideas: 'view-ideas', codetail: 'view-co-detail' };
+    document.querySelectorAll('nav.drawer button[data-view]').forEach((b) => b.classList.toggle('active', b.dataset.view === v));
+    const map = { herinneringen: 'view-herinneringen', acties: 'view-acties', bedrijven: 'view-bedrijven', ideas: 'view-ideas', codetail: 'view-co-detail' };
     $(map[v]).classList.add('active');
   }
-  document.querySelectorAll('nav.tabs button').forEach((b) => {
-    b.onclick = () => showView(b.dataset.view);
+  document.querySelectorAll('nav.drawer button[data-view]').forEach((b) => {
+    b.onclick = () => { showView(b.dataset.view); closeDrawer(); };
   });
+  $('menuBtn').onclick = () => {
+    $('drawer').classList.toggle('open');
+    $('backdrop').classList.toggle('show');
+  };
+  $('backdrop').onclick = closeDrawer;
 
   function coName(id) {
     const co = companies.find((c) => c.id === id);
@@ -360,12 +459,13 @@
     return parts.join(' ');
   }
 
-  function renderActList(list, targetId) {
+  function renderActList(list, targetId, opts) {
+    opts = opts || {};
     const el = $(targetId);
-    if (!list.length) { el.innerHTML = '<div class="empty">Geen acties.</div>'; return; }
-    const sorted = [...list].sort((a, b) => (a.done - b.done) || a.prio - b.prio || (a.due || '9999').localeCompare(b.due || '9999'));
+    if (!list.length) { el.innerHTML = `<div class="empty">${opts.emptyText || 'Niets hier.'}</div>`; return; }
+    const sorted = [...list].sort((a, b) => a.prio - b.prio || (a.due || '9999').localeCompare(b.due || '9999'));
     el.innerHTML = sorted.map((a) => `
-      <div class="act ${a.done ? 'done' : ''}">
+      <div class="act">
         <span class="prio p${a.prio}">P${a.prio}</span>
         <div class="act-body">
           <div class="act-co">${esc(coName(a.companyId))}</div>
@@ -373,9 +473,9 @@
           <div class="act-meta">${esc(dueInfo(a))}</div>
         </div>
         <div class="act-actions">
-          <button class="icon-btn" onclick="toggleAct('${a.id}', ${!a.done})" title="Afronden">
+          ${opts.showComplete ? `<button class="icon-btn" onclick="completeRem('${a.id}')" title="Afronden (wordt een actie)">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
-          </button>
+          </button>` : ''}
           <button class="icon-btn" onclick="editAct('${a.id}')" title="Bewerken">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
           </button>
@@ -386,32 +486,38 @@
       </div>`).join('');
   }
 
-  function renderActs() { renderActList(actions, 'actList'); }
+  function renderActs() { renderActList(actions.filter((a) => a.done), 'actList', { emptyText: 'Geen acties.' }); }
+  function renderReminders() { renderActList(actions.filter((a) => !a.done), 'remList', { emptyText: 'Geen open herinneringen.', showComplete: true }); }
 
-  window.toggleAct = async (id, done) => {
-    const d = await api('/api/crm/actions', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'update', id, done }) });
-    actions = d.actions; renderActs(); if (activeCoId) renderCoDetail();
-  };
   window.removeAct = async (id) => {
-    if (!confirm('Deze actie verwijderen?')) return;
+    if (!confirm('Verwijderen?')) return;
     const d = await api('/api/crm/actions', { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'delete', id }) });
-    actions = d.actions; renderActs(); if (activeCoId) renderCoDetail();
+    actions = d.actions; renderActs(); renderReminders(); if (activeCoId) renderCoDetail();
   };
   window.editAct = (id) => {
     const a = actions.find((x) => x.id === id);
     if (!a) return;
     openActModal(a);
   };
+  window.completeRem = async (id) => {
+    const d = await api('/api/crm/actions', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'update', id, done: true }) });
+    actions = d.actions; renderActs(); renderReminders(); if (activeCoId) renderCoDetail();
+  };
 
   function fillCoDatalist() {
     $('coNames').innerHTML = companies.map((c) => `<option value="${esc(c.name)}">`).join('');
   }
 
-  function openActModal(a, presetCoId) {
+  let modalKind = 'herinnering';
+  function openActModal(a, presetCoId, kind) {
     editingActId = a ? a.id : null;
-    $('actModalTitle').textContent = a ? 'Actie bewerken' : 'Nieuwe actie';
+    modalKind = a ? (a.done ? 'actie' : 'herinnering') : (kind || 'herinnering');
+    const isNieuw = !a;
+    $('actModalTitle').textContent = isNieuw
+      ? (modalKind === 'actie' ? 'Nieuwe actie' : 'Nieuwe herinnering')
+      : (modalKind === 'actie' ? 'Actie bewerken' : 'Herinnering bewerken');
     fillCoDatalist();
     $('fCo').value = a ? coName(a.companyId) : (presetCoId ? coName(presetCoId) : '');
     $('fNote').value = a ? (a.note || '') : '';
@@ -430,7 +536,8 @@
     $('newCoContactWrap').style.display = (name && !exists) ? 'block' : 'none';
   }
   $('fCo').addEventListener('input', toggleNewCoContact);
-  $('newActBtn').onclick = () => openActModal(null);
+  $('newRemBtn').onclick = () => openActModal(null, null, 'herinnering');
+  $('newActBtn').onclick = () => openActModal(null, null, 'actie');
   $('actCancelBtn').onclick = () => $('actOverlay').classList.remove('open');
 
   $('actSaveBtn').onclick = async () => {
@@ -440,7 +547,7 @@
     try {
       if (!co) {
         const contactName = $('fContactName').value.trim();
-        const createBody = { action: 'create', name, status: 'lead', ltv: 0 };
+        const createBody = { action: 'create', name, status: 'lead' };
         if (contactName) {
           createBody.contact = { name: contactName, email: $('fContactEmail').value.trim(), phone: $('fContactPhone').value.trim() };
         }
@@ -458,10 +565,12 @@
         time: $('fTime').value,
         prio: $('fPrio').value,
       };
+      if (!editingActId) payload.done = modalKind === 'actie';
       const d = await api('/api/crm/actions', { method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload) });
       actions = d.actions;
       renderActs();
+      renderReminders();
       if (activeCoId) renderCoDetail();
       $('actOverlay').classList.remove('open');
     } catch (e) { $('actModalErr').textContent = e.message; }
@@ -470,20 +579,32 @@
   // --- Bedrijven ---
   function renderCoList() {
     const q = $('coSearch').value.trim().toLowerCase();
+    const fStatus = $('coFilterStatus').value;
+    const fApproached = $('coFilterApproached').value;
+    const fSector = $('coFilterSector').value;
     const list = companies.filter((c) => c.name.toLowerCase().includes(q))
+      .filter((c) => !fStatus || c.status === fStatus)
+      .filter((c) => !fApproached || (fApproached === 'yes' ? c.approached : !c.approached))
+      .filter((c) => !fSector || c.sector === fSector)
       .sort((a, b) => a.name.localeCompare(b.name));
     const el = $('coList');
     if (!list.length) { el.innerHTML = '<div class="empty">Geen bedrijven gevonden.</div>'; return; }
     el.innerHTML = list.map((c) => `
       <div class="co-row" onclick="openCo('${c.id}')">
-        <div>
+        <div class="co-left">
           <span class="co-name">${esc(c.name)}</span>
+          <span class="co-badge ${c.approached ? 'ap-yes' : 'ap-no'}">${c.approached ? 'Benaderd' : 'Niet benaderd'}</span>
           <span class="co-badge st-${c.status}">${esc(STATUS_LABEL[c.status] || c.status)}</span>
         </div>
-        <div class="co-ltv">LTV € ${Number(c.ltv || 0).toLocaleString('nl-NL')}</div>
+        <div class="co-right">
+          ${c.sector ? `<span class="co-sector">${esc(c.sector)}</span>` : ''}
+        </div>
       </div>`).join('');
   }
   $('coSearch').oninput = renderCoList;
+  $('coFilterStatus').onchange = renderCoList;
+  $('coFilterApproached').onchange = renderCoList;
+  $('coFilterSector').onchange = renderCoList;
 
   window.openCo = (id) => {
     activeCoId = id;
@@ -498,8 +619,10 @@
     $('coDetailName').textContent = co.name;
     $('coEditName').value = co.name;
     $('coEditStatus').value = co.status;
-    $('coEditLtv').value = co.ltv;
-    renderActList(actions.filter((a) => a.companyId === activeCoId), 'coActList');
+    $('coEditApproached').value = co.approached ? 'yes' : 'no';
+    $('coEditSector').value = co.sector || '';
+    renderActList(actions.filter((a) => a.companyId === activeCoId && !a.done), 'coRemList', { emptyText: 'Geen open herinneringen.', showComplete: true });
+    renderActList(actions.filter((a) => a.companyId === activeCoId && a.done), 'coActList', { emptyText: 'Geen acties.' });
     renderCoContacts(co);
   }
 
@@ -572,24 +695,26 @@
   }
   $('coEditName').addEventListener('change', () => { saveCoField({ name: $('coEditName').value }).then(() => { $('coDetailName').textContent = $('coEditName').value; }); });
   $('coEditStatus').addEventListener('change', () => saveCoField({ status: $('coEditStatus').value }));
-  $('coEditLtv').addEventListener('change', () => saveCoField({ ltv: $('coEditLtv').value }));
+  $('coEditApproached').addEventListener('change', () => saveCoField({ approached: $('coEditApproached').value === 'yes' }));
+  $('coEditSector').addEventListener('change', () => saveCoField({ sector: $('coEditSector').value }));
 
   $('coDeleteBtn').onclick = async () => {
-    if (!confirm('Dit bedrijf en de bijbehorende acties verwijderen?')) return;
+    if (!confirm('Dit bedrijf en de bijbehorende acties/herinneringen verwijderen?')) return;
     const d = await api('/api/crm/companies', { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'delete', id: activeCoId }) });
     companies = d.companies;
     const da = await api('/api/crm/actions');
     actions = da;
     activeCoId = null;
-    renderActs(); renderCoList();
+    renderActs(); renderReminders(); renderCoList();
     showView('bedrijven');
   };
 
-  $('coNewActBtn').onclick = () => openActModal(null, activeCoId);
+  $('coNewRemBtn').onclick = () => openActModal(null, activeCoId, 'herinnering');
+  $('coNewActBtn').onclick = () => openActModal(null, activeCoId, 'actie');
 
   $('newCoBtn').onclick = () => {
-    $('fCoName').value = ''; $('fCoStatus').value = 'lead'; $('fCoLtv').value = 0;
+    $('fCoName').value = ''; $('fCoStatus').value = 'lead'; $('fCoApproached').value = 'no'; $('fCoSector').value = '';
     $('coModalErr').textContent = '';
     $('coOverlay').classList.add('open');
     $('fCoName').focus();
@@ -600,7 +725,7 @@
     if (!name) { $('coModalErr').textContent = 'Vul een bedrijfsnaam in.'; return; }
     try {
       const d = await api('/api/crm/companies', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'create', name, status: $('fCoStatus').value, ltv: $('fCoLtv').value }) });
+        body: JSON.stringify({ action: 'create', name, status: $('fCoStatus').value, approached: $('fCoApproached').value === 'yes', sector: $('fCoSector').value }) });
       companies = d.companies;
       renderCoList();
       $('coOverlay').classList.remove('open');
@@ -661,11 +786,12 @@
 
   // --- Boot ---
   async function load() {
+    fillSectorSelects();
     try { await api('/api/crm/me'); } catch { location.href = '/crm'; return; }
     try { companies = await api('/api/crm/companies'); } catch (e) { /* opslag nog niet gekoppeld */ }
     try { actions = await api('/api/crm/actions'); } catch (e) { /* opslag nog niet gekoppeld */ }
     try { ideas = await api('/api/crm/ideas'); } catch (e) { /* opslag nog niet gekoppeld */ }
-    renderActs(); renderCoList(); renderIdeas();
+    renderActs(); renderReminders(); renderCoList(); renderIdeas();
   }
   $('logoutBtn').onclick = async () => { await fetch('/crm/logout', { method: 'POST' }); location.href = '/crm'; };
 

@@ -27,6 +27,15 @@ const SESSION_SECRET = process.env.SESSION_SECRET || crypto.randomBytes(32).toSt
 const SESSION_TTL = 24 * 60 * 60 * 1000; // 24 hours — log in once per day
 const CODE_TTL = 10 * 60 * 1000; // 10 minutes
 
+// CRM: fixed sector list for company categorization.
+const CRM_SECTORS = [
+  'Horeca', 'Sport & Fitness', 'Financien & Verzekeringen', 'Vastgoed & Makelaardij',
+  'Bouw & Techniek', 'Detailhandel & Retail', 'Zorg & Welzijn', 'Onderwijs',
+  'Automotive & Transport', 'Media & Marketing', 'ICT & Technologie',
+  'Zakelijke Dienstverlening', 'Overheid & Non-profit', 'Evenementen & Cultuur',
+  'Voeding & Drank', 'Reizen & Vrije Tijd', 'Overig',
+];
+
 // ---------- Minimal SMTP client (STARTTLS on 587 or implicit TLS on 465) ----------
 function smtpConfigured() {
   return !!process.env.RESEND_API_KEY ||
@@ -560,7 +569,8 @@ const server = http.createServer(async (req, res) => {
             id: crypto.randomUUID(),
             name,
             status: ['lead', 'prospect', 'klant', 'inactief'].includes(body.status) ? body.status : 'lead',
-            ltv: Math.max(0, Number(body.ltv) || 0),
+            approached: !!body.approached,
+            sector: CRM_SECTORS.includes(body.sector) ? body.sector : '',
             contacts: [],
             createdAt: Date.now(),
           };
@@ -583,7 +593,8 @@ const server = http.createServer(async (req, res) => {
           if (!co) return json(res, 404, { error: 'Niet gevonden' });
           if (body.name !== undefined) co.name = String(body.name).trim().slice(0, 200) || co.name;
           if (body.status !== undefined) co.status = ['lead', 'prospect', 'klant', 'inactief'].includes(body.status) ? body.status : co.status;
-          if (body.ltv !== undefined) co.ltv = Math.max(0, Number(body.ltv) || 0);
+          if (body.approached !== undefined) co.approached = !!body.approached;
+          if (body.sector !== undefined) co.sector = CRM_SECTORS.includes(body.sector) ? body.sector : '';
         } else if (body.action === 'contact-add') {
           if (!co) return json(res, 404, { error: 'Niet gevonden' });
           const name = String((body.contact && body.contact.name) || '').trim().slice(0, 200);
@@ -703,7 +714,7 @@ const server = http.createServer(async (req, res) => {
             due: String(body.due || '').slice(0, 10),
             time: /^\d{2}:\d{2}$/.test(String(body.time || '')) ? String(body.time) : '',
             prio: Math.min(4, Math.max(1, Number(body.prio) || 4)),
-            done: false,
+            done: !!body.done,
             createdAt: Date.now(),
           });
         } else if (body.action === 'update') {
