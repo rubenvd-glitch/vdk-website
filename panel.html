@@ -272,7 +272,6 @@
     <button data-i18n="nav.rem" onclick="showView('reminders')">Herinneringen</button>
     <button data-i18n="nav.sug" onclick="showView('sugs')">Suggesties</button>
     <button data-i18n="nav.idea" onclick="showView('ideas')">Ideeënbox</button>
-    <button data-i18n="nav.crm" onclick="showView('crm')">CRM</button>
     <button data-i18n="nav.log" onclick="showView('log')" id="logMenuBtn" style="display:none;">Logboek</button>
     <div class="lock" id="lockBox">
       <label class="switch">
@@ -344,14 +343,6 @@
         <button id="ideaTabArch"></button>
       </div>
       <div id="ideaList"></div>
-    </div>
-
-    <div id="view-crm" style="display:none;">
-      <div class="section-head">
-        <h2 data-i18n="crm.title">CRM</h2>
-      </div>
-      <div class="section-sub" data-i18n="crm.sub">Beheer hier straks je contacten en deals.</div>
-      <div class="empty" data-i18n="crm.soon">De CRM wordt nog gebouwd — kom snel terug.</div>
     </div>
 
     <div id="view-log" style="display:none;">
@@ -537,8 +528,7 @@
 
     const I18N = {
       en: {
-        'nav.home':'Dashboard','nav.rem':'Reminders','nav.sug':'Suggestions','nav.idea':'Idea box','nav.crm':'CRM','nav.log':'Log',
-        'crm.title':'CRM','crm.sub':'Manage your contacts and deals from here.','crm.soon':'The CRM is being built — check back soon.',
+        'nav.home':'Dashboard','nav.rem':'Reminders','nav.sug':'Suggestions','nav.idea':'Idea box','nav.log':'Log',
         'save':'Save','cancel':'Cancel',
         'name.ask':'What should I call you?',
         'home.week':'This coming week','home.weekSub':'Your reminders for the next 7 days.',
@@ -599,8 +589,7 @@
         'locale':'en-GB'
       },
       nl: {
-        'nav.home':'Dashboard','nav.rem':'Herinneringen','nav.sug':'Suggesties','nav.idea':'Ideeënbox','nav.crm':'CRM','nav.log':'Logboek',
-        'crm.title':'CRM','crm.sub':'Beheer hier straks je contacten en deals.','crm.soon':'De CRM wordt nog gebouwd — kom snel terug.',
+        'nav.home':'Dashboard','nav.rem':'Herinneringen','nav.sug':'Suggesties','nav.idea':'Ideeënbox','nav.log':'Logboek',
         'save':'Opslaan','cancel':'Annuleren',
         'name.ask':'Hoe mag ik je noemen?',
         'home.week':'Komende week','home.weekSub':'Je herinneringen voor de komende 7 dagen.',
@@ -1088,7 +1077,7 @@
       } catch (e) { flashSetMsg(e.message); }
     };
 
-    const views = { home: 'view-home', reminders: 'view-reminders', sugs: 'view-sugs', ideas: 'view-ideas', crm: 'view-crm', settings: 'view-settings', log: 'view-log' };
+    const views = { home: 'view-home', reminders: 'view-reminders', sugs: 'view-sugs', ideas: 'view-ideas', settings: 'view-settings', log: 'view-log' };
     function closeDrawer() { $('drawer').classList.remove('open'); $('backdrop').classList.remove('show'); }
     window.showView = (v) => {
       if (v === 'log' && !(me && me.isAdmin)) v = 'home';
@@ -1134,7 +1123,6 @@
     async function load() {
       try { me = await api('/api/me'); } catch { location.href = '/admin'; return; }
       greet();
-      if (location.pathname === '/crm') showView('crm');
       try {
         profile = await api('/api/profile');
         profileLoaded = true;
