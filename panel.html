@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Admin panel — VDK Business Services</title>
+  <title>Base panel — VDK Business Services</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     @keyframes fadeUp {
@@ -1121,7 +1121,7 @@
     }
 
     async function load() {
-      try { me = await api('/api/me'); } catch { location.href = '/admin'; return; }
+      try { me = await api('/api/me'); } catch { location.href = '/base'; return; }
       greet();
       try {
         profile = await api('/api/profile');
@@ -1297,7 +1297,7 @@
     $('filterSel').onchange = render;
     $('tabActive').onclick = () => { view = 'active'; $('tabActive').classList.add('active'); $('tabDone').classList.remove('active'); render(); };
     $('tabDone').onclick = () => { view = 'done'; $('tabDone').classList.add('active'); $('tabActive').classList.remove('active'); render(); };
-    $('logoutBtn').onclick = async () => { await fetch('/admin/logout', { method: 'POST' }); location.href = '/'; };
+    $('logoutBtn').onclick = async () => { await fetch('/base/logout',, { method: 'POST' }); location.href = '/'; };
 
     applyLang();
     load();
