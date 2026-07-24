@@ -8,14 +8,14 @@
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body { height: 100%; }
     body {
-      background: #d0d9d5;
+      background: #cfd6d5;
       display: flex;
       align-items: center;
       justify-content: center;
       font-family: 'Helvetica Neue', Arial, sans-serif;
     }
     .logo-wrap { text-align: center; padding: 24px; }
-    .logo-wrap svg { max-width: min(420px, 80vw); height: auto; }
+    .logo-wrap img, .logo-wrap svg { max-width: min(420px, 80vw); height: auto; }
     .panel-links {
       display: flex; gap: 14px; justify-content: center; flex-wrap: wrap;
       margin-top: 32px;
@@ -32,7 +32,9 @@
 </head>
 <body>
   <div class="logo-wrap">
-    <svg width="420" viewBox="0 0 500 250" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="VDK Business Services">
+    <img src="/logo.png" alt="VDK Business Services"
+         onerror="this.style.display='none';document.getElementById('logo-fallback').style.display='inline';">
+    <svg id="logo-fallback" style="display:none" width="420" viewBox="0 0 500 250" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="VDK Business Services">
       <g fill="#22251f">
         <polygon points="50,30 78,30 118,110 158,30 186,30 132,140 104,140"/>
         <path fill-rule="evenodd" d="M200,30 H265 L300,62 V108 L265,140 H200 Z M222,52 H256 L278,68 V102 L256,118 H222 Z"/>
