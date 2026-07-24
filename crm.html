@@ -105,10 +105,11 @@
   .co-left { display: flex; align-items: center; flex-wrap: wrap; gap: 0; }
   .co-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
   .co-badge { font-size: 11px; font-weight: 700; border-radius: 999px; padding: 3px 10px; margin-left: 10px; }
-  .st-lead { background: #22283a; color: #93a4f5; }
-  .st-prospect { background: #3a2a14; color: #f0b45c; }
-  .st-klant { background: #17321c; color: #7fd68f; }
-  .st-inactief { background: #232a33; color: #8b94a1; }
+  .st-frozen { background: #4a86e8; color: #bfe0f6; }
+  .st-cold { background: #bfe1f6; color: #0a53a8; }
+  .st-lukewarm { background: #ffff00; color: #473821; }
+  .st-warm { background: #ff9900; color: #ffcfc9; }
+  .st-hot { background: #cc0000; color: #000000; }
   .ap-yes { background: #17321c; color: #7fd68f; }
   .ap-no { background: #232a33; color: #8b94a1; }
   .co-sector { font-size: 11.5px; color: #5a6472; }
@@ -129,6 +130,7 @@
     border-radius: 8px; background: #0e1116; color: #e6e9ed; font-family: inherit;
   }
   .field select:focus, .field input:focus { outline: none; border-color: #7fb4f0; }
+  .status-hint { font-size: 12px; color: #8b94a1; margin-top: 6px; line-height: 1.5; }
   .backlink { background: none; border: none; color: #8b94a1; font-size: 13px; cursor: pointer;
     display: flex; align-items: center; gap: 6px; margin-bottom: 16px; font-family: inherit; padding: 0; }
   .backlink:hover { color: #e6e9ed; }
@@ -206,6 +208,13 @@
         <button class="btn-primary" id="newRemBtn">+ Nieuwe herinnering</button>
       </div>
       <div class="section-sub">Open taken per bedrijf, met notitie, datum en prioriteit. Rond je 'm af, dan wordt het een actie.</div>
+      <div class="co-filters">
+        <select id="remFilterType">
+          <option value="">Alles</option>
+          <option value="bedrijf">Bedrijf</option>
+          <option value="todo">To-do</option>
+        </select>
+      </div>
       <div id="remList"></div>
     </div>
 
@@ -230,10 +239,11 @@
       <div class="co-filters">
         <select id="coFilterStatus">
           <option value="">Alle sales statussen</option>
-          <option value="lead">Lead</option>
-          <option value="prospect">Prospect</option>
-          <option value="klant">Klant</option>
-          <option value="inactief">Inactief</option>
+          <option value="frozen">Frozen</option>
+          <option value="cold">Cold</option>
+          <option value="lukewarm">Luke warm</option>
+          <option value="warm">Warm</option>
+          <option value="hot">Hot</option>
         </select>
         <select id="coFilterApproached">
           <option value="">Benaderd + niet benaderd</option>
@@ -270,11 +280,13 @@
           <div class="field">
             <label>Sales status</label>
             <select id="coEditStatus">
-              <option value="lead">Lead</option>
-              <option value="prospect">Prospect</option>
-              <option value="klant">Klant</option>
-              <option value="inactief">Inactief</option>
+              <option value="frozen">Frozen</option>
+              <option value="cold">Cold</option>
+              <option value="lukewarm">Luke warm</option>
+              <option value="warm">Warm</option>
+              <option value="hot">Hot</option>
             </select>
+            <div class="status-hint" id="coEditStatusHint"></div>
           </div>
           <div class="field">
             <label>Benaderd</label>
@@ -410,11 +422,13 @@
         <div class="field">
           <label>Sales status</label>
           <select id="fCoStatus">
-            <option value="lead">Lead</option>
-            <option value="prospect">Prospect</option>
-            <option value="klant">Klant</option>
-            <option value="inactief">Inactief</option>
+            <option value="frozen">Frozen</option>
+            <option value="cold">Cold</option>
+            <option value="lukewarm">Luke warm</option>
+            <option value="warm">Warm</option>
+            <option value="hot">Hot</option>
           </select>
+          <div class="status-hint" id="fCoStatusHint"></div>
         </div>
         <div class="field">
           <label>Benaderd</label>
@@ -529,7 +543,25 @@
     $('crmSetMsg').textContent = msg;
     setTimeout(() => { if ($('crmSetMsg').textContent === msg) $('crmSetMsg').textContent = ''; }, 2500);
   }
-  const STATUS_LABEL = { lead: 'Lead', prospect: 'Prospect', klant: 'Klant', inactief: 'Inactief' };
+  const STATUS_LABEL = { frozen: 'Frozen', cold: 'Cold', lukewarm: 'Luke warm', warm: 'Warm', hot: 'Hot' };
+  // Explanations straight from het BCR-plan van aanpak, shown as a hint under de status-select.
+  const STATUS_HINT = {
+    frozen: 'Het bedrijf heeft aangegeven dat er momenteel geen budget, interesse of ruimte is voor sponsoring, of wil niet meer benaderd worden. Strategie: stoppen met actieve acquisitie, geen follow-up.',
+    cold: 'Het bedrijf is nog niet benaderd. Strategie: langzamerhand contact opnemen, focus ligt op warmere prospects.',
+    lukewarm: 'De contactpersoon heeft je netjes te woord gestaan, maar toont weinig proactieve interesse. Strategie: lagere prioriteit, brochure sturen en follow-up op lange termijn plannen.',
+    warm: 'De prospect reageert positief en enthousiast en overweegt serieus sponsor te worden, maar heeft nog een duwtje in de rug nodig. Strategie: primaire focus, strak contact houden met maatwerk.',
+    hot: 'Het voorstel sluit perfect aan en het bedrijf is intern al akkoord. Nog enkel pakketkeuze, logo en ondertekening. Strategie: direct schakelen om de overeenkomst te formaliseren.',
+  };
+  function fillStatusSelects() {
+    const opts = Object.keys(STATUS_LABEL).map((k) => `<option value="${k}">${esc(STATUS_LABEL[k])}</option>`).join('');
+    $('coEditStatus').innerHTML = opts;
+    $('fCoStatus').innerHTML = opts;
+  }
+  function updateStatusHint(selectId, hintId) {
+    $(hintId).textContent = STATUS_HINT[$(selectId).value] || '';
+  }
+  $('coEditStatus').addEventListener('change', () => updateStatusHint('coEditStatus', 'coEditStatusHint'));
+  $('fCoStatus').addEventListener('change', () => updateStatusHint('fCoStatus', 'fCoStatusHint'));
   const SECTORS = [
     'Horeca', 'Sport & Fitness', 'Financien & Verzekeringen', 'Vastgoed & Makelaardij',
     'Bouw & Techniek', 'Detailhandel & Retail', 'Zorg & Welzijn', 'Onderwijs',
@@ -635,7 +667,13 @@
   }
 
   function renderActs() { renderActList(actions.filter((a) => a.done), 'actList', { emptyText: 'Geen acties.' }); }
-  function renderReminders() { renderActList(actions.filter((a) => !a.done), 'remList', { emptyText: 'Geen open herinneringen.', showComplete: true }); }
+  function renderReminders() {
+    const type = $('remFilterType').value;
+    const list = actions.filter((a) => !a.done)
+      .filter((a) => !type || (type === 'bedrijf' ? !!a.companyId : !a.companyId));
+    renderActList(list, 'remList', { emptyText: 'Geen open herinneringen.', showComplete: true });
+  }
+  $('remFilterType').onchange = renderReminders;
 
   function isoPlusDays(n) {
     const d = new Date();
@@ -666,7 +704,13 @@
   };
 
   function fillCoDatalist() {
-    $('coNames').innerHTML = companies.map((c) => `<option value="${esc(c.name)}">`).join('');
+    // Empty by default so no suggestion list pops up on focus — only once the
+    // user actually types a letter do matching company names appear.
+    $('coNames').innerHTML = '';
+  }
+  function updateCoDatalist() {
+    const v = $('fCo').value.trim();
+    $('coNames').innerHTML = v ? companies.map((c) => `<option value="${esc(c.name)}">`).join('') : '';
   }
 
   let modalKind = 'herinnering';
@@ -713,7 +757,7 @@
     const exists = !!companies.find((c) => c.name.toLowerCase() === name.toLowerCase());
     $('newCoContactWrap').style.display = (name && !exists) ? 'block' : 'none';
   }
-  $('fCo').addEventListener('input', toggleNewCoContact);
+  $('fCo').addEventListener('input', () => { toggleNewCoContact(); updateCoDatalist(); });
   $('newRemBtn').onclick = () => openActModal(null, null, 'herinnering');
   $('newActBtn').onclick = () => openActModal(null, null, 'actie');
   $('actCancelBtn').onclick = () => $('actOverlay').classList.remove('open');
@@ -728,7 +772,7 @@
         let co = companies.find((c) => c.name.toLowerCase() === name.toLowerCase());
         if (!co) {
           const contactName = $('fContactName').value.trim();
-          const createBody = { action: 'create', name, status: 'lead' };
+          const createBody = { action: 'create', name, status: 'cold' };
           if (contactName) {
             createBody.contact = { name: contactName, email: $('fContactEmail').value.trim(), phone: $('fContactPhone').value.trim() };
           }
@@ -807,6 +851,7 @@
     $('coDetailName').textContent = co.name;
     $('coEditName').value = co.name;
     $('coEditStatus').value = co.status;
+    updateStatusHint('coEditStatus', 'coEditStatusHint');
     $('coEditApproached').value = co.approached ? 'yes' : 'no';
     $('coEditSector').value = co.sector || '';
     renderActList(actions.filter((a) => a.companyId === activeCoId && !a.done), 'coRemList', { emptyText: 'Geen open herinneringen.', showComplete: true });
@@ -902,7 +947,8 @@
   $('coNewActBtn').onclick = () => openActModal(null, activeCoId, 'actie');
 
   $('newCoBtn').onclick = () => {
-    $('fCoName').value = ''; $('fCoStatus').value = 'lead'; $('fCoApproached').value = 'no'; $('fCoSector').value = '';
+    $('fCoName').value = ''; $('fCoStatus').value = 'cold'; $('fCoApproached').value = 'no'; $('fCoSector').value = '';
+    updateStatusHint('fCoStatus', 'fCoStatusHint');
     $('coModalErr').textContent = '';
     $('coOverlay').classList.add('open');
     $('fCoName').focus();
@@ -991,6 +1037,7 @@
 
   async function load() {
     fillSectorSelects();
+    fillStatusSelects();
     try { me = await api('/api/crm/me'); } catch { location.href = '/crm'; return; }
     try { profile = await api('/api/crm/profile'); } catch (e) { /* opslag nog niet gekoppeld */ }
     LANG = profile.lang || 'en';

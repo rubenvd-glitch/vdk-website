@@ -36,6 +36,9 @@ const CRM_SECTORS = [
   'Voeding & Drank', 'Reizen & Vrije Tijd', 'Overig',
 ];
 
+// CRM: sales-temperature scale for company status, matching the BCR spreadsheet.
+const CRM_SALES_STATUSES = ['frozen', 'cold', 'lukewarm', 'warm', 'hot'];
+
 // ---------- Minimal SMTP client (STARTTLS on 587 or implicit TLS on 465) ----------
 function smtpConfigured() {
   return !!process.env.RESEND_API_KEY ||
@@ -594,7 +597,7 @@ const server = http.createServer(async (req, res) => {
           const co = {
             id: crypto.randomUUID(),
             name,
-            status: ['lead', 'prospect', 'klant', 'inactief'].includes(body.status) ? body.status : 'lead',
+            status: CRM_SALES_STATUSES.includes(body.status) ? body.status : 'cold',
             approached: !!body.approached,
             sector: CRM_SECTORS.includes(body.sector) ? body.sector : '',
             contacts: [],
@@ -618,7 +621,7 @@ const server = http.createServer(async (req, res) => {
         if (body.action === 'update') {
           if (!co) return json(res, 404, { error: 'Niet gevonden' });
           if (body.name !== undefined) co.name = String(body.name).trim().slice(0, 200) || co.name;
-          if (body.status !== undefined) co.status = ['lead', 'prospect', 'klant', 'inactief'].includes(body.status) ? body.status : co.status;
+          if (body.status !== undefined) co.status = CRM_SALES_STATUSES.includes(body.status) ? body.status : co.status;
           if (body.approached !== undefined) co.approached = !!body.approached;
           if (body.sector !== undefined) co.sector = CRM_SECTORS.includes(body.sector) ? body.sector : '';
         } else if (body.action === 'contact-add') {
