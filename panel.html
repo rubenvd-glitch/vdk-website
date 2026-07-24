@@ -1297,7 +1297,7 @@
     $('filterSel').onchange = render;
     $('tabActive').onclick = () => { view = 'active'; $('tabActive').classList.add('active'); $('tabDone').classList.remove('active'); render(); };
     $('tabDone').onclick = () => { view = 'done'; $('tabDone').classList.add('active'); $('tabActive').classList.remove('active'); render(); };
-    $('logoutBtn').onclick = async () => { await fetch('/base/logout',, { method: 'POST' }); location.href = '/'; };
+    $('logoutBtn').onclick = async () => { await fetch('/base/logout', { method: 'POST' }); location.href = '/'; };
 
     applyLang();
     load();
