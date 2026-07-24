@@ -1,54 +1,675 @@
 <!DOCTYPE html>
 <html lang="nl">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>VDK CRM</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      min-height: 100vh; background: #0e1116; color: #e6e9ed;
-      font-family: 'Helvetica Neue', Arial, sans-serif;
-    }
-    header {
-      background: #12161d; border-bottom: 1px solid #232a33; padding: 14px 28px;
-      display: flex; justify-content: space-between; align-items: center;
-    }
-    header h1 { font-size: 16px; letter-spacing: 2px; font-weight: 700; }
-    header button {
-      background: none; border: 1px solid #39424e; color: #8b94a1;
-      padding: 8px 14px; border-radius: 8px; font-size: 13px; cursor: pointer; font-family: inherit;
-    }
-    header button:hover { border-color: #7fb4f0; color: #e6e9ed; }
-    main { max-width: 640px; margin: 0 auto; padding: 60px 24px; text-align: center; }
-    main h2 { font-size: 22px; margin-bottom: 12px; }
-    main p { color: #8b94a1; font-size: 15px; line-height: 1.5; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VDK CRM</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    min-height: 100vh; background: #0e1116; color: #e6e9ed;
+    font-family: 'Helvetica Neue', Arial, sans-serif; padding-bottom: 60px;
+  }
+  a { color: #7fb4f0; }
+  header {
+    background: #12161d; border-bottom: 1px solid #232a33; padding: 14px 28px;
+    display: flex; justify-content: space-between; align-items: center;
+    position: sticky; top: 0; z-index: 10; gap: 16px; flex-wrap: wrap;
+  }
+  header h1 { font-size: 16px; letter-spacing: 2px; font-weight: 700; }
+  nav.tabs { display: flex; gap: 6px; }
+  nav.tabs button {
+    background: none; border: 1px solid transparent; color: #8b94a1;
+    padding: 8px 14px; border-radius: 8px; font-size: 13px; cursor: pointer; font-family: inherit; font-weight: 600;
+  }
+  nav.tabs button.active { background: #1c222b; color: #e6e9ed; border-color: #2e3844; }
+  nav.tabs button:hover { color: #e6e9ed; }
+  header .logoutBtn {
+    background: none; border: 1px solid #39424e; color: #8b94a1;
+    padding: 8px 14px; border-radius: 8px; font-size: 13px; cursor: pointer; font-family: inherit;
+  }
+  header .logoutBtn:hover { border-color: #7fb4f0; color: #e6e9ed; }
+  main { max-width: 760px; margin: 0 auto; padding: 28px 20px; }
+  .view { display: none; }
+  .view.active { display: block; }
+  .section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+  .section-head h2 { font-size: 19px; }
+  .section-sub { color: #8b94a1; font-size: 13px; margin-bottom: 18px; }
+  .btn-primary {
+    background: #7fb4f0; color: #0e1116; border: none; border-radius: 8px;
+    padding: 9px 14px; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit;
+  }
+  .btn-ghost {
+    background: transparent; border: 1px solid #39424e; color: #8b94a1;
+    padding: 9px 14px; border-radius: 8px; font-size: 13px; cursor: pointer; font-family: inherit;
+  }
+  .btn-ghost:hover { border-color: #7fb4f0; color: #e6e9ed; }
+  .empty { color: #5a6472; font-size: 14px; padding: 24px 0; text-align: center; }
+
+  .act, .co-row {
+    background: #151a21; border: 1px solid #232a33; border-radius: 12px;
+    padding: 14px 16px; margin-bottom: 10px; display: flex; gap: 12px; align-items: flex-start;
+    transition: border-color .15s ease;
+  }
+  .act:hover, .co-row:hover { border-color: #2e3844; }
+  .prio { font-size: 11px; font-weight: 700; border-radius: 6px; padding: 3px 6px; flex-shrink: 0; margin-top: 2px; }
+  .p1 { background: #3a1418; color: #f28b8b; }
+  .p2 { background: #3a2a14; color: #f0b45c; }
+  .p3 { background: #3a3814; color: #e8e05c; }
+  .p4 { background: #17321c; color: #7fd68f; }
+  .act-body { flex: 1; min-width: 0; }
+  .act-co { font-size: 14.5px; font-weight: 700; }
+  .act-note { font-size: 13px; color: #a7afba; margin-top: 3px; white-space: pre-wrap; }
+  .act-meta { font-size: 12px; color: #5a6472; margin-top: 6px; }
+  .act.done { opacity: .5; }
+  .act.done .act-co { text-decoration: line-through; }
+  .act-actions { display: flex; gap: 6px; flex-shrink: 0; }
+  .icon-btn { background: none; border: none; color: #5a6472; cursor: pointer; padding: 4px; border-radius: 6px; }
+  .icon-btn:hover { color: #e6e9ed; background: #1c222b; }
+  .icon-btn svg { width: 16px; height: 16px; display: block; }
+
+  .searchbar { width: 100%; padding: 11px 14px; font-size: 14px; border: 1px solid #2e3844;
+    border-radius: 9px; background: #151a21; color: #e6e9ed; margin-bottom: 16px; }
+  .searchbar:focus { outline: none; border-color: #7fb4f0; }
+
+  .co-row { cursor: pointer; justify-content: space-between; align-items: center; }
+  .co-name { font-size: 14.5px; font-weight: 700; }
+  .co-badge { font-size: 11px; font-weight: 700; border-radius: 999px; padding: 3px 10px; margin-left: 10px; }
+  .st-lead { background: #22283a; color: #93a4f5; }
+  .st-prospect { background: #3a2a14; color: #f0b45c; }
+  .st-klant { background: #17321c; color: #7fd68f; }
+  .st-inactief { background: #232a33; color: #8b94a1; }
+  .co-ltv { color: #8b94a1; font-size: 13px; }
+
+  .detail-card { background: #151a21; border: 1px solid #232a33; border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+  .detail-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; gap: 10px; }
+  .detail-head h3 { font-size: 18px; }
+  .field-row { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 4px; }
+  .field { flex: 1; min-width: 140px; }
+  .field label { display: block; font-size: 11px; color: #8b94a1; margin-bottom: 5px; text-transform: uppercase; letter-spacing: .5px; }
+  .field select, .field input {
+    width: 100%; padding: 9px 11px; font-size: 14px; border: 1px solid #2e3844;
+    border-radius: 8px; background: #0e1116; color: #e6e9ed; font-family: inherit;
+  }
+  .field select:focus, .field input:focus { outline: none; border-color: #7fb4f0; }
+  .backlink { background: none; border: none; color: #8b94a1; font-size: 13px; cursor: pointer;
+    display: flex; align-items: center; gap: 6px; margin-bottom: 16px; font-family: inherit; padding: 0; }
+  .backlink:hover { color: #e6e9ed; }
+
+  .idea-card { background: #151a21; border: 1px solid #7b6ef666; border-radius: 12px; padding: 15px 18px;
+    margin-bottom: 12px; cursor: pointer; }
+  .idea-card:hover { border-color: #7b6ef6aa; }
+  .idea-card .t { font-size: 14.5px; font-weight: 700; }
+  .idea-card .d { font-size: 13px; color: #a7afba; margin-top: 4px; }
+  .idea-acts { display: flex; gap: 8px; margin-top: 10px; }
+  .idea-acts button { font-size: 12px; padding: 6px 10px; border-radius: 7px; border: 1px solid #39424e;
+    background: transparent; color: #8b94a1; cursor: pointer; font-family: inherit; }
+  .idea-acts button:hover { color: #e6e9ed; border-color: #7fb4f0; }
+  .tabs2 { display: flex; gap: 8px; margin-bottom: 14px; }
+  .tabs2 button { background: none; border: none; color: #5a6472; font-size: 13px; cursor: pointer;
+    padding: 6px 2px; border-bottom: 2px solid transparent; font-family: inherit; }
+  .tabs2 button.active { color: #e6e9ed; border-color: #7fb4f0; }
+
+  .overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 20;
+    align-items: center; justify-content: center; padding: 20px; }
+  .overlay.open { display: flex; }
+  .modal { background: #151a21; border: 1px solid #2e3844; border-radius: 14px; padding: 24px;
+    width: min(440px, 92vw); max-height: 88vh; overflow-y: auto; }
+  .modal h3 { font-size: 17px; margin-bottom: 14px; }
+  .modal label { display: block; font-size: 12px; color: #8b94a1; margin-bottom: 5px; margin-top: 12px; }
+  .modal input, .modal textarea, .modal select {
+    width: 100%; padding: 10px 12px; font-size: 14px; border: 1px solid #2e3844;
+    border-radius: 8px; background: #0e1116; color: #e6e9ed; font-family: inherit;
+  }
+  .modal textarea { resize: vertical; min-height: 70px; }
+  .modal input:focus, .modal textarea:focus, .modal select:focus { outline: none; border-color: #7fb4f0; }
+  .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+  .modal-err { color: #f28b8b; font-size: 13px; margin-top: 10px; min-height: 16px; }
+</style>
 </head>
 <body>
   <header>
     <h1>VDK CRM</h1>
-    <button id="logoutBtn">Uitloggen</button>
+    <nav class="tabs">
+      <button data-view="acties" class="active">Acties</button>
+      <button data-view="bedrijven">Bedrijven</button>
+      <button data-view="ideas">Ideeënbox</button>
+    </nav>
+    <button class="logoutBtn" id="logoutBtn">Uitloggen</button>
   </header>
+
   <main>
-    <h2>Welkom<span id="who"></span></h2>
-    <p>De CRM wordt nog gebouwd — contacten en deals komen hier binnenkort. Dit is een volledig losse service van VDK Base, met een eigen inlog.</p>
+    <!-- ACTIES -->
+    <div class="view active" id="view-acties">
+      <div class="section-head">
+        <h2>Acties</h2>
+        <button class="btn-primary" id="newActBtn">+ Nieuwe actie</button>
+      </div>
+      <div class="section-sub">Taken per bedrijf, met notitie, datum en prioriteit.</div>
+      <div id="actList"></div>
+    </div>
+
+    <!-- BEDRIJVEN (lijst) -->
+    <div class="view" id="view-bedrijven">
+      <div class="section-head">
+        <h2>Bedrijven</h2>
+        <button class="btn-primary" id="newCoBtn">+ Nieuw bedrijf</button>
+      </div>
+      <div class="section-sub">Zoek een bedrijf om de status, LTV en acties te zien.</div>
+      <input class="searchbar" id="coSearch" placeholder="Zoek op bedrijfsnaam…">
+      <div id="coList"></div>
+    </div>
+
+    <!-- BEDRIJF detail (aparte pagina binnen de app) -->
+    <div class="view" id="view-co-detail">
+      <button class="backlink" id="coBackBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+        Terug naar bedrijven
+      </button>
+      <div class="detail-card">
+        <div class="detail-head">
+          <h3 id="coDetailName"></h3>
+          <button class="icon-btn" id="coDeleteBtn" title="Verwijderen">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+          </button>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label>Bedrijfsnaam</label>
+            <input id="coEditName" type="text">
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label>Sales status</label>
+            <select id="coEditStatus">
+              <option value="lead">Lead</option>
+              <option value="prospect">Prospect</option>
+              <option value="klant">Klant</option>
+              <option value="inactief">Inactief</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>LTV (€)</label>
+            <input id="coEditLtv" type="number" min="0" step="1">
+          </div>
+        </div>
+      </div>
+
+      <div class="section-head">
+        <h2 style="font-size:16px;">Contactpersonen</h2>
+        <button class="btn-ghost" id="coNewContactBtn">+ Contact</button>
+      </div>
+      <div id="coContactList" style="margin-bottom:24px;"></div>
+
+      <div class="section-head">
+        <h2 style="font-size:16px;">Acties voor dit bedrijf</h2>
+        <button class="btn-ghost" id="coNewActBtn">+ Actie</button>
+      </div>
+      <div id="coActList"></div>
+    </div>
+
+    <!-- IDEEENBOX -->
+    <div class="view" id="view-ideas">
+      <div class="section-head">
+        <h2>Ideeënbox</h2>
+        <button class="btn-primary" id="newIdeaBtn">+ Nieuw idee</button>
+      </div>
+      <div class="section-sub">Parkeer hier elk idee dat langskomt, zodat het je focus niet steelt. De box vraagt er later naar: is dit je tijd en moeite waard? Uitwerken, uitstellen of loslaten.</div>
+      <div class="tabs2">
+        <button id="ideaTabBox" class="active">In de box</button>
+        <button id="ideaTabArch">Losgelaten</button>
+      </div>
+      <div id="ideaList"></div>
+    </div>
   </main>
-  <script>
-    (async () => {
-      try {
-        const r = await fetch('/api/crm/me');
-        if (!r.ok) throw new Error();
-        const me = await r.json();
-        document.getElementById('who').textContent = ', ' + me.email;
-      } catch {
-        location.href = '/crm';
+
+  <!-- Modal: actie -->
+  <div class="overlay" id="actOverlay">
+    <div class="modal">
+      <h3 id="actModalTitle">Nieuwe actie</h3>
+      <label>Bedrijfsnaam</label>
+      <input id="fCo" list="coNames" autocomplete="off">
+      <datalist id="coNames"></datalist>
+      <label>Notitie</label>
+      <textarea id="fNote"></textarea>
+      <div class="field-row">
+        <div class="field"><label>Datum</label><input id="fDue" type="date"></div>
+        <div class="field"><label>Tijd</label><input id="fTime" type="time"></div>
+      </div>
+      <label>Prioriteit</label>
+      <select id="fPrio">
+        <option value="1">P1 — urgent</option>
+        <option value="2">P2 — hoog</option>
+        <option value="3">P3 — normaal</option>
+        <option value="4" selected>P4 — laag</option>
+      </select>
+      <div id="newCoContactWrap" style="display:none; border-top: 1px solid #232a33; margin-top: 16px; padding-top: 12px;">
+        <div style="font-size:12px; color:#8b94a1; margin-bottom:8px;">Nieuw bedrijf — contactpersoon (optioneel)</div>
+        <label>Naam</label>
+        <input id="fContactName" autocomplete="off">
+        <div class="field-row">
+          <div class="field"><label>E-mail</label><input id="fContactEmail" type="email" autocomplete="off"></div>
+          <div class="field"><label>Telefoon</label><input id="fContactPhone" type="tel" autocomplete="off"></div>
+        </div>
+      </div>
+      <div class="modal-err" id="actModalErr"></div>
+      <div class="modal-actions">
+        <button class="btn-ghost" id="actCancelBtn">Annuleren</button>
+        <button class="btn-primary" id="actSaveBtn">Opslaan</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: nieuw bedrijf -->
+  <div class="overlay" id="coOverlay">
+    <div class="modal">
+      <h3>Nieuw bedrijf</h3>
+      <label>Bedrijfsnaam</label>
+      <input id="fCoName" autocomplete="off">
+      <div class="field-row">
+        <div class="field">
+          <label>Sales status</label>
+          <select id="fCoStatus">
+            <option value="lead">Lead</option>
+            <option value="prospect">Prospect</option>
+            <option value="klant">Klant</option>
+            <option value="inactief">Inactief</option>
+          </select>
+        </div>
+        <div class="field"><label>LTV (€)</label><input id="fCoLtv" type="number" min="0" step="1" value="0"></div>
+      </div>
+      <div class="modal-err" id="coModalErr"></div>
+      <div class="modal-actions">
+        <button class="btn-ghost" id="coCancelBtn">Annuleren</button>
+        <button class="btn-primary" id="coSaveBtn">Opslaan</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: contactpersoon -->
+  <div class="overlay" id="contactOverlay">
+    <div class="modal">
+      <h3 id="contactModalTitle">Nieuw contact</h3>
+      <label>Naam</label>
+      <input id="fContactName2" autocomplete="off">
+      <div class="field-row">
+        <div class="field"><label>E-mail</label><input id="fContactEmail2" type="email" autocomplete="off"></div>
+        <div class="field"><label>Telefoon</label><input id="fContactPhone2" type="tel" autocomplete="off"></div>
+      </div>
+      <div class="modal-err" id="contactModalErr"></div>
+      <div class="modal-actions">
+        <button class="btn-ghost" id="contactCancelBtn">Annuleren</button>
+        <button class="btn-primary" id="contactSaveBtn">Opslaan</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: idee -->
+  <div class="overlay" id="ideaOverlay">
+    <div class="modal">
+      <h3>Nieuw idee</h3>
+      <label>Titel</label>
+      <input id="fIdeaTitle" autocomplete="off">
+      <label>Omschrijving (optioneel)</label>
+      <textarea id="fIdeaDesc"></textarea>
+      <div class="modal-err" id="ideaModalErr"></div>
+      <div class="modal-actions">
+        <button class="btn-ghost" id="ideaCancelBtn">Annuleren</button>
+        <button class="btn-primary" id="ideaSaveBtn">Opslaan</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const STATUS_LABEL = { lead: 'Lead', prospect: 'Prospect', klant: 'Klant', inactief: 'Inactief' };
+
+  let companies = [], actions = [], ideas = [];
+  let ideaView = 'box';
+  let activeCoId = null;
+  let editingActId = null;
+
+  async function api(path, opts) {
+    const r = await fetch(path, opts);
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || 'Er ging iets mis');
+    return d;
+  }
+
+  function showView(v) {
+    document.querySelectorAll('.view').forEach((el) => el.classList.remove('active'));
+    document.querySelectorAll('nav.tabs button').forEach((b) => b.classList.toggle('active', b.dataset.view === v));
+    const map = { acties: 'view-acties', bedrijven: 'view-bedrijven', ideas: 'view-ideas', codetail: 'view-co-detail' };
+    $(map[v]).classList.add('active');
+  }
+  document.querySelectorAll('nav.tabs button').forEach((b) => {
+    b.onclick = () => showView(b.dataset.view);
+  });
+
+  function coName(id) {
+    const co = companies.find((c) => c.id === id);
+    return co ? co.name : '(onbekend bedrijf)';
+  }
+
+  function dueInfo(a) {
+    if (!a.due) return 'Geen datum';
+    const parts = [a.due];
+    if (a.time) parts.push(a.time);
+    return parts.join(' ');
+  }
+
+  function renderActList(list, targetId) {
+    const el = $(targetId);
+    if (!list.length) { el.innerHTML = '<div class="empty">Geen acties.</div>'; return; }
+    const sorted = [...list].sort((a, b) => (a.done - b.done) || a.prio - b.prio || (a.due || '9999').localeCompare(b.due || '9999'));
+    el.innerHTML = sorted.map((a) => `
+      <div class="act ${a.done ? 'done' : ''}">
+        <span class="prio p${a.prio}">P${a.prio}</span>
+        <div class="act-body">
+          <div class="act-co">${esc(coName(a.companyId))}</div>
+          ${a.note ? `<div class="act-note">${esc(a.note)}</div>` : ''}
+          <div class="act-meta">${esc(dueInfo(a))}</div>
+        </div>
+        <div class="act-actions">
+          <button class="icon-btn" onclick="toggleAct('${a.id}', ${!a.done})" title="Afronden">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+          </button>
+          <button class="icon-btn" onclick="editAct('${a.id}')" title="Bewerken">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+          </button>
+          <button class="icon-btn" onclick="removeAct('${a.id}')" title="Verwijderen">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+          </button>
+        </div>
+      </div>`).join('');
+  }
+
+  function renderActs() { renderActList(actions, 'actList'); }
+
+  window.toggleAct = async (id, done) => {
+    const d = await api('/api/crm/actions', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'update', id, done }) });
+    actions = d.actions; renderActs(); if (activeCoId) renderCoDetail();
+  };
+  window.removeAct = async (id) => {
+    if (!confirm('Deze actie verwijderen?')) return;
+    const d = await api('/api/crm/actions', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'delete', id }) });
+    actions = d.actions; renderActs(); if (activeCoId) renderCoDetail();
+  };
+  window.editAct = (id) => {
+    const a = actions.find((x) => x.id === id);
+    if (!a) return;
+    openActModal(a);
+  };
+
+  function fillCoDatalist() {
+    $('coNames').innerHTML = companies.map((c) => `<option value="${esc(c.name)}">`).join('');
+  }
+
+  function openActModal(a, presetCoId) {
+    editingActId = a ? a.id : null;
+    $('actModalTitle').textContent = a ? 'Actie bewerken' : 'Nieuwe actie';
+    fillCoDatalist();
+    $('fCo').value = a ? coName(a.companyId) : (presetCoId ? coName(presetCoId) : '');
+    $('fNote').value = a ? (a.note || '') : '';
+    $('fDue').value = a ? (a.due || '') : '';
+    $('fTime').value = a ? (a.time || '') : '';
+    $('fPrio').value = a ? String(a.prio) : '4';
+    $('fContactName').value = ''; $('fContactEmail').value = ''; $('fContactPhone').value = '';
+    $('actModalErr').textContent = '';
+    $('actOverlay').classList.add('open');
+    toggleNewCoContact();
+    $('fCo').focus();
+  }
+  function toggleNewCoContact() {
+    const name = $('fCo').value.trim();
+    const exists = !!companies.find((c) => c.name.toLowerCase() === name.toLowerCase());
+    $('newCoContactWrap').style.display = (name && !exists) ? 'block' : 'none';
+  }
+  $('fCo').addEventListener('input', toggleNewCoContact);
+  $('newActBtn').onclick = () => openActModal(null);
+  $('actCancelBtn').onclick = () => $('actOverlay').classList.remove('open');
+
+  $('actSaveBtn').onclick = async () => {
+    const name = $('fCo').value.trim();
+    if (!name) { $('actModalErr').textContent = 'Vul een bedrijfsnaam in.'; return; }
+    let co = companies.find((c) => c.name.toLowerCase() === name.toLowerCase());
+    try {
+      if (!co) {
+        const contactName = $('fContactName').value.trim();
+        const createBody = { action: 'create', name, status: 'lead', ltv: 0 };
+        if (contactName) {
+          createBody.contact = { name: contactName, email: $('fContactEmail').value.trim(), phone: $('fContactPhone').value.trim() };
+        }
+        const dco = await api('/api/crm/companies', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(createBody) });
+        companies = dco.companies;
+        co = dco.company || companies.find((c) => c.name.toLowerCase() === name.toLowerCase());
       }
-    })();
-    document.getElementById('logoutBtn').onclick = async () => {
-      await fetch('/crm/logout', { method: 'POST' });
-      location.href = '/crm';
-    };
-  </script>
+      const payload = {
+        action: editingActId ? 'update' : 'create',
+        id: editingActId || undefined,
+        companyId: co.id,
+        note: $('fNote').value,
+        due: $('fDue').value,
+        time: $('fTime').value,
+        prio: $('fPrio').value,
+      };
+      const d = await api('/api/crm/actions', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload) });
+      actions = d.actions;
+      renderActs();
+      if (activeCoId) renderCoDetail();
+      $('actOverlay').classList.remove('open');
+    } catch (e) { $('actModalErr').textContent = e.message; }
+  };
+
+  // --- Bedrijven ---
+  function renderCoList() {
+    const q = $('coSearch').value.trim().toLowerCase();
+    const list = companies.filter((c) => c.name.toLowerCase().includes(q))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    const el = $('coList');
+    if (!list.length) { el.innerHTML = '<div class="empty">Geen bedrijven gevonden.</div>'; return; }
+    el.innerHTML = list.map((c) => `
+      <div class="co-row" onclick="openCo('${c.id}')">
+        <div>
+          <span class="co-name">${esc(c.name)}</span>
+          <span class="co-badge st-${c.status}">${esc(STATUS_LABEL[c.status] || c.status)}</span>
+        </div>
+        <div class="co-ltv">LTV € ${Number(c.ltv || 0).toLocaleString('nl-NL')}</div>
+      </div>`).join('');
+  }
+  $('coSearch').oninput = renderCoList;
+
+  window.openCo = (id) => {
+    activeCoId = id;
+    showView('codetail');
+    renderCoDetail();
+  };
+  $('coBackBtn').onclick = () => { activeCoId = null; showView('bedrijven'); };
+
+  function renderCoDetail() {
+    const co = companies.find((c) => c.id === activeCoId);
+    if (!co) { showView('bedrijven'); return; }
+    $('coDetailName').textContent = co.name;
+    $('coEditName').value = co.name;
+    $('coEditStatus').value = co.status;
+    $('coEditLtv').value = co.ltv;
+    renderActList(actions.filter((a) => a.companyId === activeCoId), 'coActList');
+    renderCoContacts(co);
+  }
+
+  function renderCoContacts(co) {
+    const list = co.contacts || [];
+    const el = $('coContactList');
+    if (!list.length) { el.innerHTML = '<div class="empty">Nog geen contactpersonen.</div>'; return; }
+    el.innerHTML = list.map((c) => `
+      <div class="act">
+        <div class="act-body">
+          <div class="act-co">${esc(c.name)}</div>
+          <div class="act-meta">${[c.email, c.phone].filter(Boolean).map(esc).join(' · ') || 'Geen extra gegevens'}</div>
+        </div>
+        <div class="act-actions">
+          <button class="icon-btn" onclick="editContact('${c.id}')" title="Bewerken">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+          </button>
+          <button class="icon-btn" onclick="removeContact('${c.id}')" title="Verwijderen">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+          </button>
+        </div>
+      </div>`).join('');
+  }
+
+  let editingContactId = null;
+  function openContactModal(c) {
+    editingContactId = c ? c.id : null;
+    $('contactModalTitle').textContent = c ? 'Contact bewerken' : 'Nieuw contact';
+    $('fContactName2').value = c ? c.name : '';
+    $('fContactEmail2').value = c ? (c.email || '') : '';
+    $('fContactPhone2').value = c ? (c.phone || '') : '';
+    $('contactModalErr').textContent = '';
+    $('contactOverlay').classList.add('open');
+    $('fContactName2').focus();
+  }
+  $('coNewContactBtn').onclick = () => openContactModal(null);
+  $('contactCancelBtn').onclick = () => $('contactOverlay').classList.remove('open');
+  window.editContact = (id) => {
+    const co = companies.find((c) => c.id === activeCoId);
+    const c = co && (co.contacts || []).find((x) => x.id === id);
+    if (c) openContactModal(c);
+  };
+  window.removeContact = async (id) => {
+    if (!confirm('Deze contactpersoon verwijderen?')) return;
+    const d = await api('/api/crm/companies', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'contact-delete', id: activeCoId, contactId: id }) });
+    companies = d.companies;
+    renderCoDetail();
+  };
+  $('contactSaveBtn').onclick = async () => {
+    const name = $('fContactName2').value.trim();
+    if (!name) { $('contactModalErr').textContent = 'Vul een naam in.'; return; }
+    const contact = { name, email: $('fContactEmail2').value.trim(), phone: $('fContactPhone2').value.trim() };
+    try {
+      const d = await api('/api/crm/companies', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editingContactId
+          ? { action: 'contact-update', id: activeCoId, contactId: editingContactId, contact }
+          : { action: 'contact-add', id: activeCoId, contact }) });
+      companies = d.companies;
+      renderCoDetail();
+      $('contactOverlay').classList.remove('open');
+    } catch (e) { $('contactModalErr').textContent = e.message; }
+  };
+
+  async function saveCoField(patch) {
+    const d = await api('/api/crm/companies', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'update', id: activeCoId, ...patch }) });
+    companies = d.companies;
+    renderCoList();
+  }
+  $('coEditName').addEventListener('change', () => { saveCoField({ name: $('coEditName').value }).then(() => { $('coDetailName').textContent = $('coEditName').value; }); });
+  $('coEditStatus').addEventListener('change', () => saveCoField({ status: $('coEditStatus').value }));
+  $('coEditLtv').addEventListener('change', () => saveCoField({ ltv: $('coEditLtv').value }));
+
+  $('coDeleteBtn').onclick = async () => {
+    if (!confirm('Dit bedrijf en de bijbehorende acties verwijderen?')) return;
+    const d = await api('/api/crm/companies', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'delete', id: activeCoId }) });
+    companies = d.companies;
+    const da = await api('/api/crm/actions');
+    actions = da;
+    activeCoId = null;
+    renderActs(); renderCoList();
+    showView('bedrijven');
+  };
+
+  $('coNewActBtn').onclick = () => openActModal(null, activeCoId);
+
+  $('newCoBtn').onclick = () => {
+    $('fCoName').value = ''; $('fCoStatus').value = 'lead'; $('fCoLtv').value = 0;
+    $('coModalErr').textContent = '';
+    $('coOverlay').classList.add('open');
+    $('fCoName').focus();
+  };
+  $('coCancelBtn').onclick = () => $('coOverlay').classList.remove('open');
+  $('coSaveBtn').onclick = async () => {
+    const name = $('fCoName').value.trim();
+    if (!name) { $('coModalErr').textContent = 'Vul een bedrijfsnaam in.'; return; }
+    try {
+      const d = await api('/api/crm/companies', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'create', name, status: $('fCoStatus').value, ltv: $('fCoLtv').value }) });
+      companies = d.companies;
+      renderCoList();
+      $('coOverlay').classList.remove('open');
+    } catch (e) { $('coModalErr').textContent = e.message; }
+  };
+
+  // --- Ideeënbox ---
+  function ideaStatusLine(idea) {
+    const today = new Date().toISOString().slice(0, 10);
+    if (idea.nextReview > today) return `Volgende check: ${idea.nextReview}`;
+    return 'Klaar om te checken';
+  }
+  function renderIdeas() {
+    const list = ideas.filter((i) => !!i.archived === (ideaView === 'arch'));
+    const el = $('ideaList');
+    if (!list.length) { el.innerHTML = `<div class="empty">${ideaView === 'arch' ? 'Nog niets losgelaten.' : 'Nog geen ideeën. Voeg er een toe.'}</div>`; return; }
+    el.innerHTML = list.map((i) => `
+      <div class="idea-card">
+        <div class="t">${esc(i.title)}</div>
+        ${i.desc ? `<div class="d">${esc(i.desc)}</div>` : ''}
+        <div class="d">${esc(ideaStatusLine(i))}</div>
+        ${ideaView === 'box' ? `
+        <div class="idea-acts">
+          <button onclick="ideaAct('${i.id}','keep')">Uitwerken</button>
+          <button onclick="ideaAct('${i.id}','snoozed')">Uitstellen</button>
+          <button onclick="ideaAct('${i.id}','archive')">Loslaten</button>
+        </div>` : `
+        <div class="idea-acts">
+          <button onclick="ideaAct('${i.id}','restore')">Terugzetten</button>
+        </div>`}
+      </div>`).join('');
+  }
+  window.ideaAct = async (id, action) => {
+    if (action === 'snoozed') { return; }
+    const d = await api('/api/crm/ideas', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, id }) });
+    ideas = d.ideas; renderIdeas();
+  };
+  $('ideaTabBox').onclick = () => { ideaView = 'box'; $('ideaTabBox').classList.add('active'); $('ideaTabArch').classList.remove('active'); renderIdeas(); };
+  $('ideaTabArch').onclick = () => { ideaView = 'arch'; $('ideaTabArch').classList.add('active'); $('ideaTabBox').classList.remove('active'); renderIdeas(); };
+
+  $('newIdeaBtn').onclick = () => {
+    $('fIdeaTitle').value = ''; $('fIdeaDesc').value = ''; $('ideaModalErr').textContent = '';
+    $('ideaOverlay').classList.add('open');
+    $('fIdeaTitle').focus();
+  };
+  $('ideaCancelBtn').onclick = () => $('ideaOverlay').classList.remove('open');
+  $('ideaSaveBtn').onclick = async () => {
+    const title = $('fIdeaTitle').value.trim();
+    if (!title) { $('ideaModalErr').textContent = 'Vul een titel in.'; return; }
+    try {
+      const d = await api('/api/crm/ideas', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'create', title, desc: $('fIdeaDesc').value }) });
+      ideas = d.ideas; renderIdeas();
+      $('ideaOverlay').classList.remove('open');
+    } catch (e) { $('ideaModalErr').textContent = e.message; }
+  };
+
+  // --- Boot ---
+  async function load() {
+    try { await api('/api/crm/me'); } catch { location.href = '/crm'; return; }
+    try { companies = await api('/api/crm/companies'); } catch (e) { /* opslag nog niet gekoppeld */ }
+    try { actions = await api('/api/crm/actions'); } catch (e) { /* opslag nog niet gekoppeld */ }
+    try { ideas = await api('/api/crm/ideas'); } catch (e) { /* opslag nog niet gekoppeld */ }
+    renderActs(); renderCoList(); renderIdeas();
+  }
+  $('logoutBtn').onclick = async () => { await fetch('/crm/logout', { method: 'POST' }); location.href = '/crm'; };
+
+  load();
+</script>
 </body>
 </html>

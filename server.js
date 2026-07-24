@@ -1,4 +1,4 @@
-// VDK Business Services — website + 2FA admin panel + separate CRM service
+// VDK Business Services — website + 2FA admin panel (Base) + separate CRM service
 // Zero dependencies: runs with plain Node.js (v18+). Start with: node server.js
 'use strict';
 
@@ -331,7 +331,7 @@ function sessionCookie(realm, value, maxAgeMs) {
 }
 
 // ---------- 2FA codes + rate limiting (in-memory) ----------
-// Namespaced per realm so an admin-panel code and a CRM code never collide.
+// Namespaced per realm so a Base code and a CRM code never collide.
 const codes = new Map(); // "realm:email" -> { hash, expires, attempts }
 const rateLimit = new Map(); // ip -> { count, resetAt }
 
@@ -394,8 +394,8 @@ function readBody(req) {
   });
 }
 
-// Shared 2FA request/verify handlers, parameterized by realm so the Base
-// panel and the CRM never share a login state.
+// Shared 2FA request/verify handlers, parameterized by realm so Base and the
+// CRM never share a login state.
 async function handleRequestCode(req, res, realm) {
   if (!allowRate(req.socket.remoteAddress)) return json(res, 429, { error: 'Too many attempts. Try again later.' });
   const body = await readBody(req);
@@ -416,7 +416,7 @@ async function handleRequestCode(req, res, realm) {
   const code = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
   await saveLoginCode(realm, email, { hash: hashCode(code), attempts: 0 });
 
-  const subjectApp = realm === 'crm' ? 'VDK CRM' : 'VDK admin';
+  const subjectApp = realm === 'crm' ? 'VDK CRM' : 'VDK Base';
   if (smtpConfigured()) {
     try {
       await sendMail({
@@ -486,10 +486,10 @@ const server = http.createServer(async (req, res) => {
   const p = url.pathname;
   const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress;
 
-  // --- Admin (Base) auth API ---
-  if (req.method === 'POST' && p === '/admin/request-code') return handleRequestCode(req, res, 'admin');
-  if (req.method === 'POST' && p === '/admin/verify') return handleVerify(req, res, 'admin');
-  if (req.method === 'POST' && p === '/admin/logout') {
+  // --- Base auth API ---
+  if (req.method === 'POST' && p === '/base/request-code') return handleRequestCode(req, res, 'admin');
+  if (req.method === 'POST' && p === '/base/verify') return handleVerify(req, res, 'admin');
+  if (req.method === 'POST' && p === '/base/logout') {
     const s = getSession(req, 'admin');
     if (s) sessionStores.admin.delete(s.id);
     return json(res, 200, { ok: true }, { 'Set-Cookie': sessionCookie('admin', '', 0) });
@@ -516,6 +516,191 @@ const server = http.createServer(async (req, res) => {
     const s = getSession(req, 'crm');
     if (!s) return json(res, 401, { error: 'Not logged in' });
     return json(res, 200, { email: s.email, isAdmin: s.email === ADMIN_EMAIL });
+  }
+
+  if (p === '/api/crm/companies') {
+    const s = getSession(req, 'crm');
+    if (!s) return json(res, 401, { error: 'Not logged in' });
+    const key = `crmco:${s.email}`;
+    try {
+      if (req.method === 'GET') return json(res, 200, (await kvGetJson(key)) || []);
+      if (req.method === 'POST') {
+        const body = await readBody(req);
+        let list = (await kvGetJson(key)) || [];
+        if (body.action === 'create') {
+          const name = String(body.name || '').trim().slice(0, 200);
+          if (!name) return json(res, 400, { error: 'Bedrijfsnaam is verplicht' });
+          const co = {
+            id: crypto.randomUUID(),
+            name,
+            status: ['lead', 'prospect', 'klant', 'inactief'].includes(body.status) ? body.status : 'lead',
+            ltv: Math.max(0, Number(body.ltv) || 0),
+            contacts: [],
+            createdAt: Date.now(),
+          };
+          // Optional contact person supplied at company-creation time (e.g. when
+          // creating a new action for a company that doesn't exist yet).
+          if (body.contact && String(body.contact.name || '').trim()) {
+            co.contacts.push({
+              id: crypto.randomUUID(),
+              name: String(body.contact.name).trim().slice(0, 200),
+              email: String(body.contact.email || '').trim().slice(0, 200),
+              phone: String(body.contact.phone || '').trim().slice(0, 60),
+            });
+          }
+          list.push(co);
+          await kvSetJson(key, list);
+          return json(res, 200, { ok: true, companies: list, company: co });
+        }
+        const co = list.find((x) => x.id === body.id);
+        if (body.action === 'update') {
+          if (!co) return json(res, 404, { error: 'Niet gevonden' });
+          if (body.name !== undefined) co.name = String(body.name).trim().slice(0, 200) || co.name;
+          if (body.status !== undefined) co.status = ['lead', 'prospect', 'klant', 'inactief'].includes(body.status) ? body.status : co.status;
+          if (body.ltv !== undefined) co.ltv = Math.max(0, Number(body.ltv) || 0);
+        } else if (body.action === 'contact-add') {
+          if (!co) return json(res, 404, { error: 'Niet gevonden' });
+          const name = String((body.contact && body.contact.name) || '').trim().slice(0, 200);
+          if (!name) return json(res, 400, { error: 'Naam contactpersoon is verplicht' });
+          if (!co.contacts) co.contacts = [];
+          co.contacts.push({
+            id: crypto.randomUUID(),
+            name,
+            email: String((body.contact && body.contact.email) || '').trim().slice(0, 200),
+            phone: String((body.contact && body.contact.phone) || '').trim().slice(0, 60),
+          });
+        } else if (body.action === 'contact-update') {
+          if (!co) return json(res, 404, { error: 'Niet gevonden' });
+          const c = (co.contacts || []).find((x) => x.id === body.contactId);
+          if (!c) return json(res, 404, { error: 'Contactpersoon niet gevonden' });
+          const patch = body.contact || {};
+          if (patch.name !== undefined) c.name = String(patch.name).trim().slice(0, 200) || c.name;
+          if (patch.email !== undefined) c.email = String(patch.email).trim().slice(0, 200);
+          if (patch.phone !== undefined) c.phone = String(patch.phone).trim().slice(0, 60);
+        } else if (body.action === 'contact-delete') {
+          if (!co) return json(res, 404, { error: 'Niet gevonden' });
+          co.contacts = (co.contacts || []).filter((x) => x.id !== body.contactId);
+        } else if (body.action === 'delete') {
+          if (!co) return json(res, 404, { error: 'Niet gevonden' });
+          list = list.filter((x) => x.id !== body.id);
+          // Also drop any acties tied to this company.
+          const actKey = `crmact:${s.email}`;
+          try {
+            const acts = (await kvGetJson(actKey)) || [];
+            await kvSetJson(actKey, acts.filter((a) => a.companyId !== body.id));
+          } catch (e) { /* ignore */ }
+        } else {
+          return json(res, 400, { error: 'Onbekende actie' });
+        }
+        await kvSetJson(key, list);
+        return json(res, 200, { ok: true, companies: list });
+      }
+    } catch (e) {
+      console.error('crm companies API error:', e.message);
+      return json(res, 500, { error: 'Opslag niet bereikbaar. Is Upstash gekoppeld?' });
+    }
+  }
+
+  if (p === '/api/crm/ideas') {
+    const s = getSession(req, 'crm');
+    if (!s) return json(res, 401, { error: 'Not logged in' });
+    const key = `crmidea:${s.email}`;
+    try {
+      if (req.method === 'GET') return json(res, 200, (await kvGetJson(key)) || []);
+      if (req.method === 'POST') {
+        const body = await readBody(req);
+        let list = (await kvGetJson(key)) || [];
+        const todayISO = new Date().toISOString().slice(0, 10);
+        const plus = (n) => {
+          const d = new Date(todayISO + 'T00:00:00Z');
+          d.setUTCDate(d.getUTCDate() + n);
+          return d.toISOString().slice(0, 10);
+        };
+        if (body.action === 'create') {
+          const title = String(body.title || '').trim().slice(0, 200);
+          if (!title) return json(res, 400, { error: 'Titel is verplicht' });
+          list.push({
+            id: crypto.randomUUID(),
+            title,
+            desc: String(body.desc || '').trim().slice(0, 3000),
+            createdAt: Date.now(),
+            nextReview: plus(14),
+            reviews: 0,
+            archived: false,
+          });
+        } else {
+          const r = list.find((x) => x.id === body.id);
+          if (!r) return json(res, 404, { error: 'Niet gevonden' });
+          if (body.action === 'update') {
+            if (body.title !== undefined) r.title = String(body.title).trim().slice(0, 200) || r.title;
+            if (body.desc !== undefined) r.desc = String(body.desc).trim().slice(0, 3000);
+          } else if (body.action === 'keep') {
+            r.reviews = (r.reviews || 0) + 1;
+            r.nextReview = plus(r.reviews === 1 ? 42 : 90);
+          } else if (body.action === 'archive') {
+            r.archived = true;
+          } else if (body.action === 'restore') {
+            r.archived = false;
+            r.reviews = 0;
+            r.nextReview = plus(14);
+          } else if (body.action === 'delete') {
+            list = list.filter((x) => x.id !== body.id);
+          } else {
+            return json(res, 400, { error: 'Onbekende actie' });
+          }
+        }
+        await kvSetJson(key, list);
+        return json(res, 200, { ok: true, ideas: list });
+      }
+    } catch (e) {
+      console.error('crm ideas API error:', e.message);
+      return json(res, 500, { error: 'Opslag niet bereikbaar. Is Upstash gekoppeld?' });
+    }
+  }
+
+  if (p === '/api/crm/actions') {
+    const s = getSession(req, 'crm');
+    if (!s) return json(res, 401, { error: 'Not logged in' });
+    const key = `crmact:${s.email}`;
+    try {
+      if (req.method === 'GET') return json(res, 200, (await kvGetJson(key)) || []);
+      if (req.method === 'POST') {
+        const body = await readBody(req);
+        let list = (await kvGetJson(key)) || [];
+        if (body.action === 'create') {
+          const companyId = String(body.companyId || '').trim();
+          if (!companyId) return json(res, 400, { error: 'Bedrijf is verplicht' });
+          list.push({
+            id: crypto.randomUUID(),
+            companyId,
+            note: String(body.note || '').trim().slice(0, 2000),
+            due: String(body.due || '').slice(0, 10),
+            time: /^\d{2}:\d{2}$/.test(String(body.time || '')) ? String(body.time) : '',
+            prio: Math.min(4, Math.max(1, Number(body.prio) || 4)),
+            done: false,
+            createdAt: Date.now(),
+          });
+        } else if (body.action === 'update') {
+          const a = list.find((x) => x.id === body.id);
+          if (!a) return json(res, 404, { error: 'Niet gevonden' });
+          if (body.companyId !== undefined) a.companyId = String(body.companyId).trim() || a.companyId;
+          if (body.note !== undefined) a.note = String(body.note).trim().slice(0, 2000);
+          if (body.due !== undefined) a.due = String(body.due).slice(0, 10);
+          if (body.time !== undefined) a.time = /^\d{2}:\d{2}$/.test(String(body.time)) ? String(body.time) : '';
+          if (body.prio !== undefined) a.prio = Math.min(4, Math.max(1, Number(body.prio) || 4));
+          if (body.done !== undefined) a.done = !!body.done;
+        } else if (body.action === 'delete') {
+          list = list.filter((x) => x.id !== body.id);
+        } else {
+          return json(res, 400, { error: 'Onbekende actie' });
+        }
+        await kvSetJson(key, list);
+        return json(res, 200, { ok: true, actions: list });
+      }
+    } catch (e) {
+      console.error('crm actions API error:', e.message);
+      return json(res, 500, { error: 'Opslag niet bereikbaar. Is Upstash gekoppeld?' });
+    }
   }
 
   if (p === '/api/reminders') {
@@ -808,12 +993,12 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
-  // --- Admin (Base) pages ---
-  if (p === '/admin' || p === '/admin/') {
+  // --- Base pages ---
+  if (p === '/base' || p === '/base/') {
     const s = getSession(req, 'admin');
     return serveFile(res, path.join(__dirname, s ? 'panel.html' : 'login.html'));
   }
-  if (p === '/admin/me') {
+  if (p === '/base/me') {
     const s = getSession(req, 'admin');
     if (!s) return json(res, 401, { error: 'Not logged in' });
     return json(res, 200, { email: s.email });
