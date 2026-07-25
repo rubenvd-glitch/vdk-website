@@ -634,9 +634,14 @@ const homeBody = `<?xml version="1.0" encoding="utf-8"?>
 <A:propfind xmlns:A="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav"><A:prop><C:calendar-home-set/></A:prop></A:propfind>`;
 const rh = await caldavRequestFollow(principalUrl, { method: 'PROPFIND', headers: { Depth: '0' }, body: homeBody, auth });
 if (rh.status === 401) throw new Error('Ongeldige iCloud-inloggegevens of app-specifiek wachtwoord.');
-const homeHref = xmlHrefs(rh.body).find((h) => h.includes('/calendars/')) || xmlHrefs(rh.body)[0];
+const allHomeHrefs = xmlHrefs(rh.body);
+const homeHref = allHomeHrefs.find((h) => h.includes('/calendars/')) || allHomeHrefs[0];
 if (!homeHref) throw new Error(`Kon geen agenda-basis vinden bij iCloud.${caldavDiag(rh)}`);
-const homeUrl = new URL(homeHref, rh.url).toString();
+let homeUrl = new URL(homeHref, rh.url).toString();
+// WebDAV collections must be addressed with a trailing slash — some
+// servers (Apple's included, per observed behaviour) 400 a Depth:1
+// PROPFIND against a collection URL missing one.
+if (!homeUrl.endsWith('/')) homeUrl += '/';
 
 const listBody = `<?xml version="1.0" encoding="utf-8"?>
 <A:propfind xmlns:A="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
@@ -644,7 +649,13 @@ const listBody = `<?xml version="1.0" encoding="utf-8"?>
 </A:propfind>`;
 const rl = await caldavRequestFollow(homeUrl, { method: 'PROPFIND', headers: { Depth: '1' }, body: listBody, auth });
 const hrefs = xmlHrefs(rl.body).filter((h) => h !== new URL(homeUrl).pathname && h.endsWith('/'));
-if (!hrefs.length) throw new Error(`Geen agenda's gevonden in je iCloud-account.${caldavDiag(rl)}`);
+if (!hrefs.length) {
+// Surface the exact URL we queried and every candidate href seen in the
+// previous step, so a wrong homeHref pick (e.g. picking the request's
+// own echoed href instead of the real calendar-home-set value) is
+// immediately visible instead of requiring another guess.
+throw new Error(`Geen agenda's gevonden in je iCloud-account. [home-url: ${homeUrl}, home-candidates: ${JSON.stringify(allHomeHrefs)}]${caldavDiag(rl)}`);
+}
 // Prefer a calendar literally called "home"/"Home"/"Agenda" if present, else the first one.
 let chosen = hrefs.find((h) => /home|agenda|kalender/i.test(h)) || hrefs[0];
 const calendarUrl = new URL(chosen, homeUrl).toString();
