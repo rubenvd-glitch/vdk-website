@@ -606,7 +606,7 @@ if (!principalHref) throw new Error(`Kon geen iCloud-principal vinden. Klopt het
 const principalUrl = new URL(principalHref, r.url).toString();
 
 const homeBody = `<?xml version="1.0" encoding="utf-8"?>
-<C:propfind xmlns:C="urn:ietf:params:xml:ns:caldav" xmlns:A="DAV:"><A:prop><C:calendar-home-set/></A:prop></C:propfind>`;
+<A:propfind xmlns:A="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav"><A:prop><C:calendar-home-set/></A:prop></A:propfind>`;
 const rh = await caldavRequestFollow(principalUrl, { method: 'PROPFIND', headers: { Depth: '0' }, body: homeBody, auth });
 if (rh.status === 401) throw new Error('Ongeldige iCloud-inloggegevens of app-specifiek wachtwoord.');
 const homeHref = xmlHrefs(rh.body).find((h) => h.includes('/calendars/')) || xmlHrefs(rh.body)[0];
