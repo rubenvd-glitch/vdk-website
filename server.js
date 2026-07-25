@@ -594,6 +594,14 @@ return r;
 // Discovers the user's default calendar via CalDAV well-known discovery.
 // iCloud splits accounts across partitioned servers, so every step (not just
 // the first) can come back as a redirect to that partition's host.
+function caldavDiag(r) {
+// Short diagnostic snippet appended to error messages so failures are
+// debuggable from the thrown message alone (surfaced in the UI/logs)
+// instead of requiring a fresh guess-and-redeploy cycle each time.
+const snippet = String(r.body || '').replace(/\s+/g, ' ').trim().slice(0, 220);
+return ` [status ${r.status}${snippet ? `, body: ${snippet}` : ''}]`;
+}
+
 async function appleDiscoverCalendar(auth) {
 const principalBody = `<?xml version="1.0" encoding="utf-8"?>
 <A:propfind xmlns:A="DAV:"><A:prop><A:current-user-principal/></A:prop></A:propfind>`;
@@ -602,7 +610,7 @@ method: 'PROPFIND', headers: { Depth: '0' }, body: principalBody, auth,
 });
 if (r.status === 401) throw new Error('Ongeldige iCloud-inloggegevens of app-specifiek wachtwoord.');
 const principalHref = xmlHrefs(r.body)[0];
-if (!principalHref) throw new Error(`Kon geen iCloud-principal vinden. Klopt het app-specifiek wachtwoord? (status ${r.status})`);
+if (!principalHref) throw new Error(`Kon geen iCloud-principal vinden. Klopt het app-specifiek wachtwoord?${caldavDiag(r)}`);
 const principalUrl = new URL(principalHref, r.url).toString();
 
 const homeBody = `<?xml version="1.0" encoding="utf-8"?>
@@ -610,7 +618,7 @@ const homeBody = `<?xml version="1.0" encoding="utf-8"?>
 const rh = await caldavRequestFollow(principalUrl, { method: 'PROPFIND', headers: { Depth: '0' }, body: homeBody, auth });
 if (rh.status === 401) throw new Error('Ongeldige iCloud-inloggegevens of app-specifiek wachtwoord.');
 const homeHref = xmlHrefs(rh.body).find((h) => h.includes('/calendars/')) || xmlHrefs(rh.body)[0];
-if (!homeHref) throw new Error(`Kon geen agenda-basis vinden bij iCloud. (status ${rh.status})`);
+if (!homeHref) throw new Error(`Kon geen agenda-basis vinden bij iCloud.${caldavDiag(rh)}`);
 const homeUrl = new URL(homeHref, rh.url).toString();
 
 const listBody = `<?xml version="1.0" encoding="utf-8"?>
@@ -619,7 +627,7 @@ const listBody = `<?xml version="1.0" encoding="utf-8"?>
 </A:propfind>`;
 const rl = await caldavRequestFollow(homeUrl, { method: 'PROPFIND', headers: { Depth: '1' }, body: listBody, auth });
 const hrefs = xmlHrefs(rl.body).filter((h) => h !== new URL(homeUrl).pathname && h.endsWith('/'));
-if (!hrefs.length) throw new Error(`Geen agenda's gevonden in je iCloud-account. (status ${rl.status})`);
+if (!hrefs.length) throw new Error(`Geen agenda's gevonden in je iCloud-account.${caldavDiag(rl)}`);
 // Prefer a calendar literally called "home"/"Home"/"Agenda" if present, else the first one.
 let chosen = hrefs.find((h) => /home|agenda|kalender/i.test(h)) || hrefs[0];
 const calendarUrl = new URL(chosen, homeUrl).toString();
