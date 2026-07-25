@@ -586,6 +586,22 @@ let m;
 while ((m = re.exec(body))) out.push(m[1].trim());
 return out;
 }
+// Extracts the href nested specifically INSIDE a given property tag (e.g.
+// <current-user-principal><href>...</href></current-user-principal>).
+// Critical distinction from xmlHrefs(body)[0]: a WebDAV multistatus
+// response's very first <href> is almost always the outer
+// <response><href> that just echoes back the requested resource's own
+// URL, NOT the property value being asked for. Blindly taking the first
+// href in the whole document silently "discovers" the request URL itself
+// as if it were the principal/calendar-home-set, which is why this
+// bounced back to https://caldav.icloud.com/ instead of a real account
+// path — the bug was here, not in redirects/XML namespaces/encoding.
+function xmlPropHref(body, tag) {
+const propRe = new RegExp(`<[^:>]*:?${tag}[^>]*>([\\s\\S]*?)<\\/[^:>]*:?${tag}>`, 'i');
+const m = body.match(propRe);
+if (!m) return '';
+return xmlHrefs(m[1])[0] || '';
+}
 
 // Sends a CalDAV request and transparently follows redirects (iCloud routes
 // each account to a partitioned host like pXX-caldav.icloud.com and issues a
@@ -626,7 +642,9 @@ const r = await caldavRequestFollow('https://caldav.icloud.com/', {
 method: 'PROPFIND', headers: { Depth: '0' }, body: principalBody, auth,
 });
 if (r.status === 401) throw new Error('Ongeldige iCloud-inloggegevens of app-specifiek wachtwoord.');
-const principalHref = xmlHrefs(r.body)[0];
+// Must read the href nested inside <current-user-principal>, not just
+// "the first href in the response" (that's the resource's own self-href).
+const principalHref = xmlPropHref(r.body, 'current-user-principal');
 if (!principalHref) throw new Error(`Kon geen iCloud-principal vinden. Klopt het app-specifiek wachtwoord?${caldavDiag(r)}`);
 const principalUrl = new URL(principalHref, r.url).toString();
 
@@ -634,9 +652,11 @@ const homeBody = `<?xml version="1.0" encoding="utf-8"?>
 <A:propfind xmlns:A="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav"><A:prop><C:calendar-home-set/></A:prop></A:propfind>`;
 const rh = await caldavRequestFollow(principalUrl, { method: 'PROPFIND', headers: { Depth: '0' }, body: homeBody, auth });
 if (rh.status === 401) throw new Error('Ongeldige iCloud-inloggegevens of app-specifiek wachtwoord.');
+// Same fix here: read the href nested inside <calendar-home-set>, not the
+// outer <response><href> (which would just echo back principalUrl).
+const homeHref = xmlPropHref(rh.body, 'calendar-home-set');
 const allHomeHrefs = xmlHrefs(rh.body);
-const homeHref = allHomeHrefs.find((h) => h.includes('/calendars/')) || allHomeHrefs[0];
-if (!homeHref) throw new Error(`Kon geen agenda-basis vinden bij iCloud.${caldavDiag(rh)}`);
+if (!homeHref) throw new Error(`Kon geen agenda-basis vinden bij iCloud. [candidates seen: ${JSON.stringify(allHomeHrefs)}]${caldavDiag(rh)}`);
 let homeUrl = new URL(homeHref, rh.url).toString();
 // WebDAV collections must be addressed with a trailing slash — some
 // servers (Apple's included, per observed behaviour) 400 a Depth:1
