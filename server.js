@@ -552,6 +552,11 @@ headers: {
 Authorization: `Basic ${basic}`,
 'Content-Type': headers['Content-Type'] || 'text/xml; charset=utf-8',
 Depth: headers.Depth || '0',
+// Node sets no User-Agent by default. iCloud's edge appears to reject
+// PROPFIND requests with an empty-body 400 for at least the calendar
+// listing step, which is consistent with a WAF/UA filter — real CalDAV
+// clients (macOS CalendarAgent, DAVKit-based apps) always send one.
+'User-Agent': headers['User-Agent'] || 'DAVKit/8.0.3 (1197); CalendarStore/8.0.3 (1197); iCal/8.0.3 (1197); Mac OS X/10.15.7 (19H2)',
 ...(bodyBuf ? { 'Content-Length': String(bodyBuf.length) } : {}),
 ...headers,
 },
@@ -601,14 +606,17 @@ return r;
 // iCloud splits accounts across partitioned servers, so every step (not just
 // the first) can come back as a redirect to that partition's host.
 function caldavDiag(r) {
-// Short diagnostic snippet appended to error messages so failures are
+// Diagnostic snippet appended to error messages so failures are
 // debuggable from the thrown message alone (surfaced in the UI/logs)
 // instead of requiring a fresh guess-and-redeploy cycle each time.
+// Dumps ALL response headers (not just a couple of guessed names) since
+// an empty response body on a 400 means the real signal, if any, is in
+// the headers (server/WAF identity, rate-limit hints, etc).
 const snippet = String(r.body || '').replace(/\s+/g, ' ').trim().slice(0, 220);
-const ct = r.headers && r.headers['content-type'];
-const errHint = r.headers && (r.headers['x-apple-error'] || r.headers['x-responding-server']);
-const extras = [ct ? `content-type: ${ct}` : '', errHint ? `hint: ${errHint}` : ''].filter(Boolean).join(', ');
-return ` [status ${r.status}${snippet ? `, body: ${snippet}` : ', empty body'}${extras ? `, ${extras}` : ''}]`;
+let headersDump = '';
+try { headersDump = JSON.stringify(r.headers || {}); } catch (e) { headersDump = '(unserializable)'; }
+if (headersDump.length > 300) headersDump = headersDump.slice(0, 300) + '…';
+return ` [status ${r.status}${snippet ? `, body: ${snippet}` : ', empty body'}, headers: ${headersDump}]`;
 }
 
 async function appleDiscoverCalendar(auth) {
