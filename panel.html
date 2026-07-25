@@ -253,6 +253,12 @@ background: #fff; top: 3px; left: 3px; transition: .15s;
 }
 .switch input:checked + .slider { background: #2ea36f; }
 .switch input:checked + .slider:before { transform: translateX(18px); }
+.cal-event { display: flex; gap: 10px; align-items: baseline; padding: 8px 2px; border-bottom: 1px solid #1c222b; font-size: 13.5px; }
+.cal-event:last-child { border-bottom: none; }
+.cal-event .cal-time { color: #8b94a1; font-size: 12.5px; flex: 0 0 70px; }
+.cal-event .cal-src { font-size: 11px; padding: 2px 7px; border-radius: 999px; flex: 0 0 auto; font-weight: 700; }
+.cal-src.google { background: #17281c; color: #7fd68f; }
+.cal-src.apple { background: #232a33; color: #cfd6de; }
 </style>
 </head>
 <body>
@@ -308,6 +314,11 @@ background: #fff; top: 3px; left: 3px; transition: .15s;
 
 <div id="sugCards"></div>
 <div id="ideaCards"></div>
+
+<div id="calTodayCard" style="display:none;">
+<h2 data-i18n="cal.today" style="font-size:19px; margin:26px 0 10px;">Agenda vandaag</h2>
+<div class="rem" id="calTodayList" style="display:block;"></div>
+</div>
 
 <h2 data-i18n="home.week" style="font-size:19px; margin:26px 0 14px;">Komende week</h2>
 <div id="weekList"></div>
@@ -424,14 +435,25 @@ background: #fff; top: 3px; left: 3px; transition: .15s;
 
 <div class="set-card">
 <h3 data-i18n="set.cal">Agenda koppelen</h3>
-<div class="section-sub" data-i18n="set.calSub" style="margin:8px 0 4px;">Zodra je agenda gekoppeld is.</div>
+<div class="section-sub" data-i18n="set.calSub" style="margin:8px 0 4px;">Importeer je agenda en push herinneringen ernaartoe (altijd met bevestiging vooraf).</div>
 <div class="set-row">
-<div class="lbl">Google Calendar</div>
-<button class="btn-ghost-border" data-i18n="set.soon" disabled>Binnenkort beschikbaar</button>
+<div class="lbl">Google Calendar<div class="hint" id="calGoogleHint"></div></div>
+<div style="display:flex; gap:8px;">
+<button class="btn-primary" id="calGoogleConnectBtn" data-i18n="set.connect" style="padding:9px 14px;">Koppelen</button>
+<button class="btn-ghost-border" id="calGoogleDisconnectBtn" style="display:none; cursor:pointer;" data-i18n="set.disconnect">Ontkoppelen</button>
 </div>
-<div class="set-row">
-<div class="lbl">Apple Calendar</div>
-<button class="btn-ghost-border" data-i18n="set.soon" disabled>Binnenkort beschikbaar</button>
+</div>
+<div class="set-row" style="display:block;">
+<div class="lbl">Apple Calendar<div class="hint" id="calAppleHint"></div></div>
+<div id="calAppleForm" style="margin-top:10px; display:flex; flex-direction:column; gap:8px;">
+<input type="text" id="calAppleId" placeholder="jouw@icloud.com" autocomplete="off">
+<input type="text" id="calApplePw" placeholder="app-specifiek wachtwoord (xxxx-xxxx-xxxx-xxxx)" autocomplete="off">
+<div style="display:flex; gap:8px;">
+<button class="btn-primary" id="calAppleConnectBtn" style="padding:9px 14px;" data-i18n="set.connect">Koppelen</button>
+<button class="btn-ghost-border" id="calAppleDisconnectBtn" style="display:none; cursor:pointer;" data-i18n="set.disconnect">Ontkoppelen</button>
+</div>
+<div class="hint" style="font-size:12.5px; color:#8b94a1; line-height:1.6;" data-i18n="set.calAppleHelp">Maak een gratis app-specifiek wachtwoord op appleid.apple.com → Aanmelden en beveiliging → App-specifieke wachtwoorden.</div>
+</div>
 </div>
 </div>
 <div class="empty" id="setMsg" style="padding:8px 0;"></div>
@@ -536,6 +558,19 @@ background: #fff; top: 3px; left: 3px; transition: .15s;
 </div>
 </div>
 
+<div class="overlay" id="calPushOverlay">
+<div class="modal" style="width:min(420px,100%);">
+<h3 data-i18n="cal.pushTitle">Push naar je agenda?</h3>
+<div class="sub" id="calPushSub"></div>
+<div id="calPushChoices" style="display:flex; flex-direction:column; gap:10px; margin-bottom:6px;"></div>
+<div class="err" id="calPushErr"></div>
+<div class="modal-actions">
+<button class="btn-ghost" id="calPushSkipBtn" data-i18n="cal.pushSkip">Nee, bedankt</button>
+<button class="btn-primary" id="calPushYesBtn" data-i18n="cal.pushYes">Ja, push</button>
+</div>
+</div>
+</div>
+
 <script>
 
 const I18N = {
@@ -593,9 +628,16 @@ en: {
 'set.tg':'Telegram notifications','set.tgSub':'Get a push message on logins and new accounts, and a daily summary with your site analytics every evening at 20:00.',
 'set.tgHelp':'One-time setup: create a bot via @BotFather in Telegram, put the token in Render as TELEGRAM_BOT_TOKEN, send your bot a message and click Link here.',
 'set.status':'Status','set.link':'Link','set.test':'Test message','set.soon':'Coming soon',
-'set.cal':'Connect calendar','set.calSub':'Once your calendar is connected, suggestions can take your availability into account, for example proposing a date on a quiet day.',
+'set.cal':'Connect calendar','set.calSub':'Import your calendar and push reminders to it (always with a confirmation first).',
+'set.connect':'Connect','set.disconnect':'Disconnect',
+'set.calAppleHelp':'Create a free app-specific password at appleid.apple.com → Sign-In and Security → App-Specific Passwords.',
 'set.saved':'Saved.','set.nameSaved':'Name saved.','set.tgSent':'Test message sent.','set.tgLinked':'Telegram linked. Check your app for the confirmation.',
 'tg.none':'No bot token set in Render yet.','tg.ready':'Token is ready; not linked yet.','tg.linked':'Linked and active.','tg.linking':'Linking…','tg.checking':'Checking…',
+'cal.notConnected':'Not connected.','cal.connected':'Connected as {v}.','cal.connecting':'Connecting…','cal.disconnected':'Disconnected.',
+'cal.errConnect':'Could not connect. Check your details.',
+'cal.today':"Today's calendar",'cal.empty':'Nothing on your calendar today.',
+'cal.pushTitle':'Push to your calendar?','cal.pushSub':'"{title}" has a date. Want to add it to your connected calendar(s)?',
+'cal.pushYes':'Yes, push','cal.pushSkip':'No thanks','cal.pushDone':'Pushed to your calendar.','cal.pushErr':'Could not push to the calendar.',
 'lock.on':'<strong>Locked:</strong> only your email can sign in','lock.off':'<strong>Open:</strong> others can create an account with their email',
 'lockCrm.on':'<strong>CRM locked:</strong> only your email can access the CRM','lockCrm.off':'<strong>CRM open:</strong> others can log in to the CRM with their email',
 'greet.night':'Good night','greet.morning':'Good morning','greet.afternoon':'Good afternoon','greet.evening':'Good evening',
@@ -657,9 +699,16 @@ nl: {
 'set.tg':'Telegram-meldingen','set.tgSub':'Krijg een pushbericht bij logins en nieuwe accounts, en elke avond om 20:00 een dagoverzicht met je site-analytics.',
 'set.tgHelp':'Eenmalig instellen: maak een bot via @BotFather in Telegram, zet het token in Render als TELEGRAM_BOT_TOKEN, stuur je bot een berichtje en klik hier op Koppelen.',
 'set.status':'Status','set.link':'Koppelen','set.test':'Testbericht','set.soon':'Binnenkort beschikbaar',
-'set.cal':'Agenda koppelen','set.calSub':'Zodra je agenda gekoppeld is kunnen suggesties rekening houden met je beschikbaarheid, bijvoorbeeld een date voorstellen op een rustige dag.',
+'set.cal':'Agenda koppelen','set.calSub':'Importeer je agenda en push herinneringen ernaartoe (altijd eerst met bevestiging).',
+'set.connect':'Koppelen','set.disconnect':'Ontkoppelen',
+'set.calAppleHelp':'Maak een gratis app-specifiek wachtwoord op appleid.apple.com → Aanmelden en beveiliging → App-specifieke wachtwoorden.',
 'set.saved':'Opgeslagen.','set.nameSaved':'Naam opgeslagen.','set.tgSent':'Testbericht verstuurd.','set.tgLinked':'Telegram gekoppeld. Check je app voor het bevestigingsbericht.',
 'tg.none':'Nog geen bot-token ingesteld in Render.','tg.ready':'Token staat klaar; nog niet gekoppeld.','tg.linked':'Gekoppeld en actief.','tg.linking':'Koppelen…','tg.checking':'Controleren…',
+'cal.notConnected':'Niet gekoppeld.','cal.connected':'Gekoppeld als {v}.','cal.connecting':'Koppelen…','cal.disconnected':'Ontkoppeld.',
+'cal.errConnect':'Koppelen mislukt. Controleer je gegevens.',
+'cal.today':'Agenda vandaag','cal.empty':'Niets in je agenda vandaag.',
+'cal.pushTitle':'Push naar je agenda?','cal.pushSub':'"{title}" heeft een datum. Wil je deze toevoegen aan je gekoppelde agenda(\'s)?',
+'cal.pushYes':'Ja, push','cal.pushSkip':'Nee, bedankt','cal.pushDone':'Gepusht naar je agenda.','cal.pushErr':'Kon niet pushen naar de agenda.',
 'lock.on':'<strong>Vergrendeld:</strong> alleen jouw e-mail kan inloggen','lock.off':'<strong>Open:</strong> anderen kunnen een account aanmaken met hun e-mail',
 'lockCrm.on':'<strong>CRM vergrendeld:</strong> alleen jouw e-mail heeft toegang tot het CRM','lockCrm.off':'<strong>CRM open:</strong> anderen kunnen met hun e-mail inloggen op het CRM',
 'greet.night':'Goedenacht','greet.morning':'Goedemorgen','greet.afternoon':'Goedemiddag','greet.evening':'Goedenavond',
@@ -688,6 +737,8 @@ let profileLoaded = false;
 let editing = null, sugEditing = null, ideaEditing = null, sugFreq = 'm1';
 let pendingConvert = null, pendingIdeaConvert = null;
 let selDays = 0, selPrio = 4, pickedDate = null, noDate = false;
+let calStatus = { google: false, apple: false };
+let pendingPushReminder = null;
 
 const $ = (id) => document.getElementById(id);
 const fmt = (d) => d.toLocaleDateString(t('locale'), { day: 'numeric', month: 'long', year: 'numeric' });
@@ -885,6 +936,94 @@ try { await saveProfile({ showIdeaCards: $('setShowIdea').checked }); flashSetMs
 catch (e) { flashSetMsg(e.message); }
 };
 
+// ---------- Calendar integration (Google + Apple) ----------
+async function loadCalStatus() {
+try {
+calStatus = await api('/api/calendar/status');
+} catch (e) { calStatus = { google: false, apple: false }; }
+renderCalSettings();
+loadCalToday();
+}
+function renderCalSettings() {
+$('calGoogleHint').textContent = calStatus.google ? t('cal.connected', { v: calStatus.googleEmail || 'Google' }) : t('cal.notConnected');
+$('calGoogleConnectBtn').style.display = calStatus.google ? 'none' : 'inline-block';
+$('calGoogleDisconnectBtn').style.display = calStatus.google ? 'inline-block' : 'none';
+$('calAppleHint').textContent = calStatus.apple ? t('cal.connected', { v: calStatus.appleId || 'iCloud' }) : t('cal.notConnected');
+$('calAppleForm').style.display = calStatus.apple ? 'none' : 'flex';
+$('calAppleDisconnectBtn').style.display = calStatus.apple ? 'inline-block' : 'none';
+}
+$('calGoogleConnectBtn').onclick = () => { location.href = '/api/calendar/google/connect'; };
+$('calGoogleDisconnectBtn').onclick = async () => {
+try { await api('/api/calendar/google/disconnect', { method: 'POST' }); calStatus.google = false; renderCalSettings(); flashSetMsg(t('cal.disconnected')); }
+catch (e) { flashSetMsg(e.message); }
+};
+$('calAppleConnectBtn').onclick = async () => {
+const appleId = $('calAppleId').value.trim();
+const appPassword = $('calApplePw').value.trim();
+if (!appleId || !appPassword) return;
+try {
+await api('/api/calendar/apple/connect', {
+method: 'POST', headers: { 'Content-Type': 'application/json' },
+body: JSON.stringify({ appleId, appPassword }),
+});
+calStatus.apple = true; calStatus.appleId = appleId;
+renderCalSettings();
+flashSetMsg(t('set.saved'));
+} catch (e) { flashSetMsg(e.message || t('cal.errConnect')); }
+};
+$('calAppleDisconnectBtn').onclick = async () => {
+try { await api('/api/calendar/apple/disconnect', { method: 'POST' }); calStatus.apple = false; renderCalSettings(); flashSetMsg(t('cal.disconnected')); }
+catch (e) { flashSetMsg(e.message); }
+};
+
+async function loadCalToday() {
+if (!calStatus.google && !calStatus.apple) { $('calTodayCard').style.display = 'none'; return; }
+try {
+const d = await api('/api/calendar/events?range=today');
+$('calTodayCard').style.display = 'block';
+$('calTodayList').innerHTML = d.events.length
+? d.events.map((ev) => `
+<div class="cal-event">
+<span class="cal-time">${ev.allDay ? '' : (ev.start || '').slice(11, 16)}</span>
+<span>${esc(ev.title)}</span>
+<span class="cal-src ${ev.source}">${ev.source === 'google' ? 'Google' : 'Apple'}</span>
+</div>`).join('')
+: `<div class="empty" style="padding:4px 0;">${t('cal.empty')}</div>`;
+} catch (e) { /* niet ingelogd of storing niet bereikbaar */ }
+}
+
+function maybeOfferPush(rem) {
+if (!rem.due) return;
+if (!calStatus.google && !calStatus.apple) return;
+pendingPushReminder = rem;
+$('calPushSub').textContent = t('cal.pushSub', { title: rem.title });
+const choices = [];
+if (calStatus.google) choices.push(`<label style="display:flex;align-items:center;gap:8px;font-size:14px;"><input type="checkbox" id="pushGoogle" checked> Google Calendar</label>`);
+if (calStatus.apple) choices.push(`<label style="display:flex;align-items:center;gap:8px;font-size:14px;"><input type="checkbox" id="pushApple" checked> Apple Calendar</label>`);
+$('calPushChoices').innerHTML = choices.join('');
+$('calPushErr').textContent = '';
+$('calPushOverlay').classList.add('open');
+}
+$('calPushSkipBtn').onclick = () => { pendingPushReminder = null; $('calPushOverlay').classList.remove('open'); };
+$('calPushOverlay').onclick = (e) => { if (e.target === $('calPushOverlay')) { pendingPushReminder = null; $('calPushOverlay').classList.remove('open'); } };
+$('calPushYesBtn').onclick = async () => {
+if (!pendingPushReminder) return;
+const calendars = [];
+if ($('pushGoogle') && $('pushGoogle').checked) calendars.push('google');
+if ($('pushApple') && $('pushApple').checked) calendars.push('apple');
+if (!calendars.length) { $('calPushErr').textContent = t('cal.errConnect'); return; }
+try {
+await api('/api/calendar/push', {
+method: 'POST', headers: { 'Content-Type': 'application/json' },
+body: JSON.stringify({ title: pendingPushReminder.title, note: pendingPushReminder.note, due: pendingPushReminder.due, time: pendingPushReminder.time, calendars }),
+});
+pendingPushReminder = null;
+$('calPushOverlay').classList.remove('open');
+flashSetMsg(t('cal.pushDone'));
+loadCalToday();
+} catch (e) { $('calPushErr').textContent = e.message || t('cal.pushErr'); }
+};
+
 window.convertSug = (id) => {
 const r = suggestions.find((x) => x.id === id);
 if (!r) return;
@@ -971,7 +1110,7 @@ function renderIdeas() {
 const todayISO = iso(new Date());
 const due = ideas.filter((r) => !r.archived && r.nextReview <= todayISO);
 $('ideaCards').innerHTML = profile.showIdeaCards === false ? '' : due.map((r) => `
-<div class="idea-card" onclick="showView('ideas')">${t('idea.check')}: “${esc(r.title)}” — ${t('idea.worth')}</div>`).join('');
+<div class="idea-card" onclick="showView('ideas')">${t('idea.check')}: "${esc(r.title)}" — ${t('idea.worth')}</div>`).join('');
 
 const shown = ideas.filter((r) => (ideaView === 'box' ? !r.archived : r.archived));
 $('ideaTabBox').textContent = `${t('idea.tabBox')} (${ideas.filter((r) => !r.archived).length})`;
@@ -1179,6 +1318,7 @@ try {
 ideas = await api('/api/ideas');
 renderIdeas();
 } catch (e) { /* opslag nog niet gekoppeld */ }
+loadCalStatus();
 if (me.isAdmin) {
 $('logMenuBtn').style.display = 'block';
 loadTg();
@@ -1318,6 +1458,7 @@ if (pendingIdeaConvert) {
 const iid = pendingIdeaConvert; pendingIdeaConvert = null;
 await ideaAct(iid, 'archive');
 }
+if (payload.due) maybeOfferPush({ title: payload.title, note: payload.note, due: payload.due, time: payload.time });
 } catch (e) { $('modalErr').textContent = e.message; }
 };
 
@@ -1350,6 +1491,7 @@ $('logoutBtn').onclick = async () => { await fetch('/base/logout', { method: 'PO
 
 applyLang();
 load();
+if (location.hash.includes('settings')) showView('settings');
 </script>
 </body>
 </html>
