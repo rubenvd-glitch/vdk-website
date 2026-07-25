@@ -425,115 +425,14 @@ req.on('end', () => { try { resolve(JSON.parse(data || '{}')); } catch { resolve
 });
 }
 
-// ---------- Calendar integration: Google Calendar (OAuth2) + Apple Calendar (CalDAV) ----------
+// ---------- Calendar integration: Apple Calendar (CalDAV) ----------
 // Works for both realms (admin/Base and crm/CRM) independently. Credentials are
 // namespaced per realm+email in KV, never shared between the two apps.
-// Google: standard OAuth2 (needs GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET/GOOGLE_REDIRECT_URI
-// env vars). Apple: no public consumer OAuth exists, so we use CalDAV with an
-// app-specific password the user generates at appleid.apple.com — this is the
-// only route that supports both importing events AND pushing new ones.
-const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
-const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
-const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || '';
-const GOOGLE_SCOPE = 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly';
-
-function calGoogleKey(realm, email) { return `calg:${realm}:${email}`; }
+// Google Calendar was scaffolded earlier (OAuth2) but removed 2026-07-25 at the
+// user's request — no users yet, so no point maintaining untested surface area.
+// Push it back when someone actually asks for Google; see CONTEXT.md for what
+// existed (constants, handlers, routes, UI) so it can be restored quickly.
 function calAppleKey(realm, email) { return `cala:${realm}:${email}`; }
-
-function b64url(obj) { return Buffer.from(JSON.stringify(obj)).toString('base64url'); }
-function fromB64url(s) { try { return JSON.parse(Buffer.from(s, 'base64url').toString('utf8')); } catch { return null; } }
-
-async function httpJson(urlStr, opts = {}) {
-const r = await fetch(urlStr, opts);
-const text = await r.text();
-let data;
-try { data = JSON.parse(text); } catch { data = { raw: text }; }
-if (!r.ok) throw new Error(data.error_description || data.error || `HTTP ${r.status}: ${text.slice(0, 200)}`);
-return data;
-}
-
-async function googleExchangeCode(code) {
-const body = new URLSearchParams({
-code, client_id: GOOGLE_CLIENT_ID, client_secret: GOOGLE_CLIENT_SECRET,
-redirect_uri: GOOGLE_REDIRECT_URI, grant_type: 'authorization_code',
-});
-return httpJson('https://oauth2.googleapis.com/token', {
-method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: body.toString(),
-});
-}
-
-async function googleRefreshToken(refreshToken) {
-const body = new URLSearchParams({
-refresh_token: refreshToken, client_id: GOOGLE_CLIENT_ID, client_secret: GOOGLE_CLIENT_SECRET,
-grant_type: 'refresh_token',
-});
-return httpJson('https://oauth2.googleapis.com/token', {
-method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: body.toString(),
-});
-}
-
-// Returns a valid access token for this realm+email, refreshing if needed. Null if not connected.
-async function googleGetAccessToken(realm, email) {
-const key = calGoogleKey(realm, email);
-const cred = await kvGetJson(key);
-if (!cred) return null;
-if (cred.accessToken && cred.expiresAt && Date.now() < cred.expiresAt - 60000) return cred.accessToken;
-const t = await googleRefreshToken(cred.refreshToken);
-cred.accessToken = t.access_token;
-cred.expiresAt = Date.now() + (t.expires_in || 3600) * 1000;
-await kvSetJson(key, cred);
-return cred.accessToken;
-}
-
-async function googleListEvents(realm, email, timeMinISO, timeMaxISO) {
-const token = await googleGetAccessToken(realm, email);
-if (!token) return [];
-const params = new URLSearchParams({
-timeMin: timeMinISO, timeMax: timeMaxISO, singleEvents: 'true', orderBy: 'startTime', maxResults: '50',
-});
-const d = await httpJson(`https://www.googleapis.com/calendar/v3/calendars/primary/events?${params}`, {
-headers: { Authorization: `Bearer ${token}` },
-});
-return (d.items || []).map((ev) => ({
-source: 'google',
-id: ev.id,
-title: ev.summary || '(geen titel)',
-start: (ev.start && (ev.start.dateTime || ev.start.date)) || '',
-end: (ev.end && (ev.end.dateTime || ev.end.date)) || '',
-allDay: !!(ev.start && ev.start.date && !ev.start.dateTime),
-}));
-}
-
-async function googleCreateEvent(realm, email, { title, note, due, time }) {
-const token = await googleGetAccessToken(realm, email);
-if (!token) throw new Error('Google Calendar niet gekoppeld');
-let body;
-if (time) {
-const startISO = `${due}T${time}:00`;
-const endDate = new Date(`${due}T${time}:00`);
-endDate.setHours(endDate.getHours() + 1);
-body = {
-summary: title,
-description: note || undefined,
-start: { dateTime: startISO, timeZone: 'Europe/Amsterdam' },
-end: { dateTime: endDate.toISOString().slice(0, 19), timeZone: 'Europe/Amsterdam' },
-};
-} else {
-const endDate = new Date(due + 'T00:00:00');
-endDate.setDate(endDate.getDate() + 1);
-body = {
-summary: title,
-description: note || undefined,
-start: { date: due },
-end: { date: endDate.toISOString().slice(0, 10) },
-};
-}
-return httpJson('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
-method: 'POST',
-headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-body: JSON.stringify(body),
-});
-}
 
 // ---------- Apple Calendar via CalDAV (basic auth with an app-specific password) ----------
 function caldavRequest(urlStr, { method = 'GET', headers = {}, body, auth } = {}) {
@@ -676,10 +575,18 @@ if (!hrefs.length) {
 // immediately visible instead of requiring another guess.
 throw new Error(`Geen agenda's gevonden in je iCloud-account. [home-url: ${homeUrl}, home-candidates: ${JSON.stringify(allHomeHrefs)}]${caldavDiag(rl)}`);
 }
-// Prefer a calendar literally called "home"/"Home"/"Agenda" if present, else the first one.
+// Prefer a calendar literally called "home"/"Home"/"Agenda" if present for
+// the default WRITE calendar (used when pushing a reminder), but return
+// every discovered calendar too — an account can have several (Home,
+// Work, Birthdays, shared calendars, ...), and the actual events a user
+// expects to see may live on one that this name heuristic doesn't match.
+// Reading only the single "chosen" one would silently show "nothing
+// scheduled" even when today genuinely has events, just on another
+// calendar.
 let chosen = hrefs.find((h) => /home|agenda|kalender/i.test(h)) || hrefs[0];
 const calendarUrl = new URL(chosen, homeUrl).toString();
-return { principalUrl, calendarHomeUrl: homeUrl, calendarUrl };
+const calendarUrls = hrefs.map((h) => new URL(h, homeUrl).toString());
+return { principalUrl, calendarHomeUrl: homeUrl, calendarUrl, calendarUrls };
 }
 
 async function appleTestConnection(auth) {
@@ -725,7 +632,7 @@ if (r.status >= 400) throw new Error(`Apple Agenda gaf een fout (status ${r.stat
 return { ok: true, uid };
 }
 
-async function appleListEvents(cred, startDate, endDate) {
+async function appleListEventsForCalendar(calendarUrl, auth, startDate, endDate) {
 const reportBody = `<?xml version="1.0" encoding="utf-8"?>
 <C:calendar-query xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
 <D:prop><D:getetag/><C:calendar-data/></D:prop>
@@ -733,10 +640,10 @@ const reportBody = `<?xml version="1.0" encoding="utf-8"?>
 <C:time-range start="${startDate}T000000Z" end="${endDate}T000000Z"/>
 </C:comp-filter></C:comp-filter></C:filter>
 </C:calendar-query>`;
-const r = await caldavRequest(cred.calendarUrl, {
-method: 'REPORT', headers: { Depth: '1' }, body: reportBody,
-auth: { appleId: cred.appleId, appPassword: cred.appPassword },
+const r = await caldavRequestFollow(calendarUrl, {
+method: 'REPORT', headers: { Depth: '1' }, body: reportBody, auth,
 });
+if (r.status >= 300) return [];
 const blocks = r.body.split(/BEGIN:VEVENT/).slice(1);
 return blocks.map((b) => {
 const summary = (b.match(/SUMMARY:(.*)/) || [, ''])[1].trim();
@@ -745,75 +652,31 @@ return { source: 'apple', title: summary || '(geen titel)', start: dtstart, end:
 });
 }
 
+async function appleListEvents(cred, startDate, endDate) {
+const auth = { appleId: cred.appleId, appPassword: cred.appPassword };
+// Query every discovered calendar, not just the single "default" one
+// picked at connect-time — an account can have several calendars (Home,
+// Work, Birthdays, shared ones), and today's real events may live on one
+// the name-heuristic didn't pick. Older stored connections (from before
+// this fix) only have a single `calendarUrl`, so fall back to that.
+const calendarUrls = (cred.calendarUrls && cred.calendarUrls.length) ? cred.calendarUrls : [cred.calendarUrl];
+const perCalendar = await Promise.all(
+calendarUrls.map((url) => appleListEventsForCalendar(url, auth, startDate, endDate).catch(() => []))
+);
+return perCalendar.flat();
+}
+
 // Realm-aware handlers, mirroring the handleRequestCode/handleVerify pattern
 // used for 2FA: one implementation, mounted for both "admin" (Base) and "crm".
 async function handleCalendarStatus(req, res, realm) {
 const s = await getSession(req, realm);
 if (!s) return json(res, 401, { error: 'Not logged in' });
 try {
-const g = await kvGetJson(calGoogleKey(realm, s.email));
 const a = await kvGetJson(calAppleKey(realm, s.email));
 return json(res, 200, {
-google: !!g, googleEmail: g && g.email ? g.email : null,
 apple: !!a, appleId: a && a.appleId ? a.appleId : null,
 });
-} catch (e) { return json(res, 200, { google: false, apple: false }); }
-}
-
-async function handleGoogleConnect(req, res, realm) {
-const s = await getSession(req, realm);
-if (!s) return json(res, 401, { error: 'Not logged in' });
-if (!GOOGLE_CLIENT_ID || !GOOGLE_REDIRECT_URI) return json(res, 400, { error: 'Google Calendar is nog niet ingesteld (env vars ontbreken).' });
-const state = b64url({ realm, email: s.email });
-const params = new URLSearchParams({
-client_id: GOOGLE_CLIENT_ID, redirect_uri: GOOGLE_REDIRECT_URI, response_type: 'code',
-scope: GOOGLE_SCOPE, access_type: 'offline', prompt: 'consent', state,
-});
-res.writeHead(302, { Location: `https://accounts.google.com/o/oauth2/v2/auth?${params}` });
-res.end();
-}
-
-async function handleGoogleCallback(req, res, url) {
-const code = url.searchParams.get('code');
-const stateRaw = url.searchParams.get('state');
-const state = stateRaw && fromB64url(stateRaw);
-const err = url.searchParams.get('error');
-const backTo = (realm) => (realm === 'crm' ? '/crm' : '/base');
-if (err || !code || !state) {
-res.writeHead(302, { Location: `${backTo(state && state.realm)}#settings?cal=error` });
-return res.end();
-}
-try {
-const s = await getSession(req, state.realm);
-if (!s || s.email !== state.email) throw new Error('sessie verlopen');
-const tok = await googleExchangeCode(code);
-if (!tok.refresh_token) {
-// Google only returns a refresh_token on first consent; if the user had
-// connected before and revoked only on our side, ask them to revoke access
-// at myaccount.google.com/permissions and try again.
-throw new Error('Geen refresh token ontvangen. Verwijder de VDK-toegang bij Google (myaccount.google.com/permissions) en probeer opnieuw.');
-}
-await kvSetJson(calGoogleKey(state.realm, s.email), {
-refreshToken: tok.refresh_token,
-accessToken: tok.access_token,
-expiresAt: Date.now() + (tok.expires_in || 3600) * 1000,
-connectedAt: Date.now(),
-});
-logEvent('agenda gekoppeld', `google (${state.realm})`);
-res.writeHead(302, { Location: `${backTo(state.realm)}#settings?cal=google_ok` });
-res.end();
-} catch (e) {
-console.error('google callback error:', e.message);
-res.writeHead(302, { Location: `${backTo(state.realm)}#settings?cal=error` });
-res.end();
-}
-}
-
-async function handleGoogleDisconnect(req, res, realm) {
-const s = await getSession(req, realm);
-if (!s) return json(res, 401, { error: 'Not logged in' });
-await kvDel(calGoogleKey(realm, s.email)).catch(() => {});
-return json(res, 200, { ok: true });
+} catch (e) { return json(res, 200, { apple: false }); }
 }
 
 async function handleAppleConnect(req, res, realm) {
@@ -826,7 +689,7 @@ if (!appleId || !appPassword) return json(res, 400, { error: 'Vul je iCloud e-ma
 try {
 const disc = await appleTestConnection({ appleId, appPassword });
 await kvSetJson(calAppleKey(realm, s.email), {
-appleId, appPassword, calendarUrl: disc.calendarUrl, connectedAt: Date.now(),
+appleId, appPassword, calendarUrl: disc.calendarUrl, calendarUrls: disc.calendarUrls || [disc.calendarUrl], connectedAt: Date.now(),
 });
 logEvent('agenda gekoppeld', `apple (${realm})`);
 return json(res, 200, { ok: true });
@@ -850,13 +713,6 @@ const start = new Date(); start.setHours(0, 0, 0, 0);
 const end = new Date(start);
 end.setDate(end.getDate() + (range === 'week' ? 7 : 1));
 const events = [];
-try {
-const g = await kvGetJson(calGoogleKey(realm, s.email));
-if (g) {
-const items = await googleListEvents(realm, s.email, start.toISOString(), end.toISOString());
-events.push(...items);
-}
-} catch (e) { console.error('google events error:', e.message); }
 try {
 const a = await kvGetJson(calAppleKey(realm, s.email));
 if (a) {
@@ -884,10 +740,6 @@ if (!title) return json(res, 400, { error: 'Titel ontbreekt.' });
 if (!due) return json(res, 400, { error: 'Zonder datum kan er niets naar de agenda gepusht worden.' });
 if (!calendars.length) return json(res, 400, { error: 'Kies minstens één agenda.' });
 const results = {};
-if (calendars.includes('google')) {
-try { await googleCreateEvent(realm, s.email, { title, note, due, time }); results.google = 'ok'; }
-catch (e) { results.google = e.message; }
-}
 if (calendars.includes('apple')) {
 try {
 const cred = await kvGetJson(calAppleKey(realm, s.email));
@@ -1044,25 +896,19 @@ return json(res, 200, { ok: true }, { 'Set-Cookie': sessionCookie('crm', '', 0) 
 }
 
 // --- Calendar API (Base + CRM, shared implementation) ---
+// Apple Calendar only for now — Google Calendar was removed 2026-07-25 (no
+// users yet; add it back when someone actually asks, see CONTEXT.md).
 if (p === '/api/calendar/status') return handleCalendarStatus(req, res, 'admin');
-if (p === '/api/calendar/google/connect') return handleGoogleConnect(req, res, 'admin');
-if (p === '/api/calendar/google/disconnect' && req.method === 'POST') return handleGoogleDisconnect(req, res, 'admin');
 if (p === '/api/calendar/apple/connect' && req.method === 'POST') return handleAppleConnect(req, res, 'admin');
 if (p === '/api/calendar/apple/disconnect' && req.method === 'POST') return handleAppleDisconnect(req, res, 'admin');
 if (p === '/api/calendar/events') return handleCalendarEvents(req, res, 'admin', url);
 if (p === '/api/calendar/push' && req.method === 'POST') return handleCalendarPush(req, res, 'admin');
 
 if (p === '/api/crm/calendar/status') return handleCalendarStatus(req, res, 'crm');
-if (p === '/api/crm/calendar/google/connect') return handleGoogleConnect(req, res, 'crm');
-if (p === '/api/crm/calendar/google/disconnect' && req.method === 'POST') return handleGoogleDisconnect(req, res, 'crm');
 if (p === '/api/crm/calendar/apple/connect' && req.method === 'POST') return handleAppleConnect(req, res, 'crm');
 if (p === '/api/crm/calendar/apple/disconnect' && req.method === 'POST') return handleAppleDisconnect(req, res, 'crm');
 if (p === '/api/crm/calendar/events') return handleCalendarEvents(req, res, 'crm', url);
 if (p === '/api/crm/calendar/push' && req.method === 'POST') return handleCalendarPush(req, res, 'crm');
-
-// One shared OAuth redirect URI covers both realms — the realm travels in
-// Google's "state" param (set by handleGoogleConnect above).
-if (p === '/api/calendar/google/callback') return handleGoogleCallback(req, res, url);
 
 // --- Panel API (Base) ---
 if (p === '/api/me') {

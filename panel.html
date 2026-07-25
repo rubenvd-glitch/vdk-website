@@ -257,7 +257,6 @@ background: #fff; top: 3px; left: 3px; transition: .15s;
 .cal-event:last-child { border-bottom: none; }
 .cal-event .cal-time { color: #8b94a1; font-size: 12.5px; flex: 0 0 70px; }
 .cal-event .cal-src { font-size: 11px; padding: 2px 7px; border-radius: 999px; flex: 0 0 auto; font-weight: 700; }
-.cal-src.google { background: #17281c; color: #7fd68f; }
 .cal-src.apple { background: #232a33; color: #cfd6de; }
 </style>
 </head>
@@ -436,13 +435,6 @@ background: #fff; top: 3px; left: 3px; transition: .15s;
 <div class="set-card">
 <h3 data-i18n="set.cal">Agenda koppelen</h3>
 <div class="section-sub" data-i18n="set.calSub" style="margin:8px 0 4px;">Importeer je agenda en push herinneringen ernaartoe (altijd met bevestiging vooraf).</div>
-<div class="set-row">
-<div class="lbl">Google Calendar<div class="hint" id="calGoogleHint"></div></div>
-<div style="display:flex; gap:8px;">
-<button class="btn-primary" id="calGoogleConnectBtn" data-i18n="set.connect" style="padding:9px 14px;">Koppelen</button>
-<button class="btn-ghost-border" id="calGoogleDisconnectBtn" style="display:none; cursor:pointer;" data-i18n="set.disconnect">Ontkoppelen</button>
-</div>
-</div>
 <div class="set-row" style="display:block;">
 <div class="lbl">Apple Calendar<div class="hint" id="calAppleHint"></div></div>
 <div id="calAppleForm" style="margin-top:10px; display:flex; flex-direction:column; gap:8px;">
@@ -737,7 +729,7 @@ let profileLoaded = false;
 let editing = null, sugEditing = null, ideaEditing = null, sugFreq = 'm1';
 let pendingConvert = null, pendingIdeaConvert = null;
 let selDays = 0, selPrio = 4, pickedDate = null, noDate = false;
-let calStatus = { google: false, apple: false };
+let calStatus = { apple: false };
 let pendingPushReminder = null;
 
 const $ = (id) => document.getElementById(id);
@@ -936,27 +928,21 @@ try { await saveProfile({ showIdeaCards: $('setShowIdea').checked }); flashSetMs
 catch (e) { flashSetMsg(e.message); }
 };
 
-// ---------- Calendar integration (Google + Apple) ----------
+// ---------- Calendar integration (Apple) ----------
+// Google Calendar was removed 2026-07-25 (no users yet — add back when
+// someone actually asks; see CONTEXT.md for what existed).
 async function loadCalStatus() {
 try {
 calStatus = await api('/api/calendar/status');
-} catch (e) { calStatus = { google: false, apple: false }; }
+} catch (e) { calStatus = { apple: false }; }
 renderCalSettings();
 loadCalToday();
 }
 function renderCalSettings() {
-$('calGoogleHint').textContent = calStatus.google ? t('cal.connected', { v: calStatus.googleEmail || 'Google' }) : t('cal.notConnected');
-$('calGoogleConnectBtn').style.display = calStatus.google ? 'none' : 'inline-block';
-$('calGoogleDisconnectBtn').style.display = calStatus.google ? 'inline-block' : 'none';
 $('calAppleHint').textContent = calStatus.apple ? t('cal.connected', { v: calStatus.appleId || 'iCloud' }) : t('cal.notConnected');
 $('calAppleForm').style.display = calStatus.apple ? 'none' : 'flex';
 $('calAppleDisconnectBtn').style.display = calStatus.apple ? 'inline-block' : 'none';
 }
-$('calGoogleConnectBtn').onclick = () => { location.href = '/api/calendar/google/connect'; };
-$('calGoogleDisconnectBtn').onclick = async () => {
-try { await api('/api/calendar/google/disconnect', { method: 'POST' }); calStatus.google = false; renderCalSettings(); flashSetMsg(t('cal.disconnected')); }
-catch (e) { flashSetMsg(e.message); }
-};
 $('calAppleConnectBtn').onclick = async () => {
 const appleId = $('calAppleId').value.trim();
 const appPassword = $('calApplePw').value.trim();
@@ -977,7 +963,7 @@ catch (e) { flashSetMsg(e.message); }
 };
 
 async function loadCalToday() {
-if (!calStatus.google && !calStatus.apple) { $('calTodayCard').style.display = 'none'; return; }
+if (!calStatus.apple) { $('calTodayCard').style.display = 'none'; return; }
 try {
 const d = await api('/api/calendar/events?range=today');
 $('calTodayCard').style.display = 'block';
@@ -986,7 +972,7 @@ $('calTodayList').innerHTML = d.events.length
 <div class="cal-event">
 <span class="cal-time">${ev.allDay ? '' : (ev.start || '').slice(11, 16)}</span>
 <span>${esc(ev.title)}</span>
-<span class="cal-src ${ev.source}">${ev.source === 'google' ? 'Google' : 'Apple'}</span>
+<span class="cal-src ${ev.source}">Apple</span>
 </div>`).join('')
 : `<div class="empty" style="padding:4px 0;">${t('cal.empty')}</div>`;
 } catch (e) { /* niet ingelogd of storing niet bereikbaar */ }
@@ -994,11 +980,10 @@ $('calTodayList').innerHTML = d.events.length
 
 function maybeOfferPush(rem) {
 if (!rem.due) return;
-if (!calStatus.google && !calStatus.apple) return;
+if (!calStatus.apple) return;
 pendingPushReminder = rem;
 $('calPushSub').textContent = t('cal.pushSub', { title: rem.title });
 const choices = [];
-if (calStatus.google) choices.push(`<label style="display:flex;align-items:center;gap:8px;font-size:14px;"><input type="checkbox" id="pushGoogle" checked> Google Calendar</label>`);
 if (calStatus.apple) choices.push(`<label style="display:flex;align-items:center;gap:8px;font-size:14px;"><input type="checkbox" id="pushApple" checked> Apple Calendar</label>`);
 $('calPushChoices').innerHTML = choices.join('');
 $('calPushErr').textContent = '';
@@ -1009,7 +994,6 @@ $('calPushOverlay').onclick = (e) => { if (e.target === $('calPushOverlay')) { p
 $('calPushYesBtn').onclick = async () => {
 if (!pendingPushReminder) return;
 const calendars = [];
-if ($('pushGoogle') && $('pushGoogle').checked) calendars.push('google');
 if ($('pushApple') && $('pushApple').checked) calendars.push('apple');
 if (!calendars.length) { $('calPushErr').textContent = t('cal.errConnect'); return; }
 try {
