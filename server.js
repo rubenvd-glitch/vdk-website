@@ -576,37 +576,50 @@ while ((m = re.exec(body))) out.push(m[1].trim());
 return out;
 }
 
+// Sends a CalDAV request and transparently follows redirects (iCloud routes
+// each account to a partitioned host like pXX-caldav.icloud.com and issues a
+// 301/302 for almost every step of discovery, not just the very first call).
+async function caldavRequestFollow(urlStr, opts, maxRedirects = 5) {
+let currentUrl = urlStr;
+let r = await caldavRequest(currentUrl, opts);
+let hops = 0;
+while (r.status >= 300 && r.status < 400 && r.headers.location && hops < maxRedirects) {
+currentUrl = new URL(r.headers.location, r.url).toString();
+r = await caldavRequest(currentUrl, opts);
+hops += 1;
+}
+return r;
+}
+
 // Discovers the user's default calendar via CalDAV well-known discovery.
-// iCloud splits accounts across partitioned servers, so we must follow the
-// principal URL returned by the initial PROPFIND rather than assuming a fixed host.
+// iCloud splits accounts across partitioned servers, so every step (not just
+// the first) can come back as a redirect to that partition's host.
 async function appleDiscoverCalendar(auth) {
 const principalBody = `<?xml version="1.0" encoding="utf-8"?>
 <A:propfind xmlns:A="DAV:"><A:prop><A:current-user-principal/></A:prop></A:propfind>`;
-let r = await caldavRequest('https://caldav.icloud.com/', {
+const r = await caldavRequestFollow('https://caldav.icloud.com/', {
 method: 'PROPFIND', headers: { Depth: '0' }, body: principalBody, auth,
 });
 if (r.status === 401) throw new Error('Ongeldige iCloud-inloggegevens of app-specifiek wachtwoord.');
-if (r.status >= 300 && r.status < 400 && r.headers.location) {
-r = await caldavRequest(r.headers.location, { method: 'PROPFIND', headers: { Depth: '0' }, body: principalBody, auth });
-}
 const principalHref = xmlHrefs(r.body)[0];
-if (!principalHref) throw new Error('Kon geen iCloud-principal vinden. Klopt het app-specifiek wachtwoord?');
+if (!principalHref) throw new Error(`Kon geen iCloud-principal vinden. Klopt het app-specifiek wachtwoord? (status ${r.status})`);
 const principalUrl = new URL(principalHref, r.url).toString();
 
 const homeBody = `<?xml version="1.0" encoding="utf-8"?>
 <C:propfind xmlns:C="urn:ietf:params:xml:ns:caldav" xmlns:A="DAV:"><A:prop><C:calendar-home-set/></A:prop></C:propfind>`;
-const rh = await caldavRequest(principalUrl, { method: 'PROPFIND', headers: { Depth: '0' }, body: homeBody, auth });
+const rh = await caldavRequestFollow(principalUrl, { method: 'PROPFIND', headers: { Depth: '0' }, body: homeBody, auth });
+if (rh.status === 401) throw new Error('Ongeldige iCloud-inloggegevens of app-specifiek wachtwoord.');
 const homeHref = xmlHrefs(rh.body).find((h) => h.includes('/calendars/')) || xmlHrefs(rh.body)[0];
-if (!homeHref) throw new Error('Kon geen agenda-basis vinden bij iCloud.');
+if (!homeHref) throw new Error(`Kon geen agenda-basis vinden bij iCloud. (status ${rh.status})`);
 const homeUrl = new URL(homeHref, rh.url).toString();
 
 const listBody = `<?xml version="1.0" encoding="utf-8"?>
 <A:propfind xmlns:A="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
 <A:prop><A:resourcetype/><A:displayname/><C:supported-calendar-component-set/></A:prop>
 </A:propfind>`;
-const rl = await caldavRequest(homeUrl, { method: 'PROPFIND', headers: { Depth: '1' }, body: listBody, auth });
+const rl = await caldavRequestFollow(homeUrl, { method: 'PROPFIND', headers: { Depth: '1' }, body: listBody, auth });
 const hrefs = xmlHrefs(rl.body).filter((h) => h !== new URL(homeUrl).pathname && h.endsWith('/'));
-if (!hrefs.length) throw new Error('Geen agenda\'s gevonden in je iCloud-account.');
+if (!hrefs.length) throw new Error(`Geen agenda's gevonden in je iCloud-account. (status ${rl.status})`);
 // Prefer a calendar literally called "home"/"Home"/"Agenda" if present, else the first one.
 let chosen = hrefs.find((h) => /home|agenda|kalender/i.test(h)) || hrefs[0];
 const calendarUrl = new URL(chosen, homeUrl).toString();
