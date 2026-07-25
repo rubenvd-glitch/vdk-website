@@ -540,6 +540,11 @@ function caldavRequest(urlStr, { method = 'GET', headers = {}, body, auth } = {}
 return new Promise((resolve, reject) => {
 const u = new URL(urlStr);
 const basic = Buffer.from(`${auth.appleId}:${auth.appPassword}`).toString('base64');
+// Set an explicit Content-Length instead of letting Node fall back to
+// chunked transfer-encoding — some CalDAV server configurations (iCloud
+// included, per observed behaviour) reject chunked PROPFIND/REPORT
+// bodies with an empty-body 400 rather than a helpful error.
+const bodyBuf = body ? Buffer.from(body, 'utf8') : null;
 const req = https.request(
 {
 hostname: u.hostname, path: u.pathname + u.search, method, port: 443,
@@ -547,6 +552,7 @@ headers: {
 Authorization: `Basic ${basic}`,
 'Content-Type': headers['Content-Type'] || 'text/xml; charset=utf-8',
 Depth: headers.Depth || '0',
+...(bodyBuf ? { 'Content-Length': String(bodyBuf.length) } : {}),
 ...headers,
 },
 timeout: 15000,
@@ -559,7 +565,7 @@ res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body
 );
 req.on('timeout', () => { req.destroy(); reject(new Error('CalDAV timeout')); });
 req.on('error', reject);
-if (body) req.write(body);
+if (bodyBuf) req.write(bodyBuf);
 req.end();
 });
 }
@@ -599,7 +605,10 @@ function caldavDiag(r) {
 // debuggable from the thrown message alone (surfaced in the UI/logs)
 // instead of requiring a fresh guess-and-redeploy cycle each time.
 const snippet = String(r.body || '').replace(/\s+/g, ' ').trim().slice(0, 220);
-return ` [status ${r.status}${snippet ? `, body: ${snippet}` : ''}]`;
+const ct = r.headers && r.headers['content-type'];
+const errHint = r.headers && (r.headers['x-apple-error'] || r.headers['x-responding-server']);
+const extras = [ct ? `content-type: ${ct}` : '', errHint ? `hint: ${errHint}` : ''].filter(Boolean).join(', ');
+return ` [status ${r.status}${snippet ? `, body: ${snippet}` : ', empty body'}${extras ? `, ${extras}` : ''}]`;
 }
 
 async function appleDiscoverCalendar(auth) {
