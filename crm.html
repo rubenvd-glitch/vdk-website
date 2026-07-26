@@ -434,6 +434,10 @@ Terug naar bedrijven
 <div class="field"><label>Telefoon</label><input id="fContactPhone" type="tel" autocomplete="off"></div>
 </div>
 </div>
+<label style="display:flex; align-items:center; gap:8px; margin-top:12px; cursor:pointer;" id="calOnlyRow">
+<input type="checkbox" id="fCalOnly" style="width:auto; margin:0;">
+<span style="font-weight:400;">Alleen naar agenda sturen (niet bewaren als to-do)</span>
+</label>
 <div class="modal-err" id="actModalErr"></div>
 <div class="modal-actions">
 <button class="btn-ghost" id="actCancelBtn">Annuleren</button>
@@ -850,6 +854,14 @@ $('bedrijfFieldWrap').style.display = type === 'bedrijf' ? 'block' : 'none';
 $('todoFieldWrap').style.display = type === 'todo' ? 'block' : 'none';
 if (type === 'todo') $('newCoContactWrap').style.display = 'none';
 else toggleNewCoContact();
+updateCalOnlyVisibility();
+}
+function updateCalOnlyVisibility() {
+// Calendar-only push only makes sense for a standalone to-do reminder
+// (not a company-linked action, and not an already-done "actie").
+const eligible = entryType === 'todo' && modalKind !== 'actie' && calStatus.apple;
+$('calOnlyRow').style.display = eligible ? 'flex' : 'none';
+if (!eligible) $('fCalOnly').checked = false;
 }
 $('typeBedrijfBtn').onclick = () => setEntryType('bedrijf');
 $('typeTodoBtn').onclick = () => setEntryType('todo');
@@ -870,6 +882,8 @@ $('fDue').value = a ? (a.due || '') : '';
 $('fTime').value = a ? (a.time || '') : '';
 $('fPrio').value = a ? String(a.prio) : '4';
 $('fContactName').value = ''; $('fContactEmail').value = ''; $('fContactPhone').value = '';
+$('fCalOnly').checked = false;
+updateCalOnlyVisibility();
 $('actModalErr').textContent = '';
 $('actOverlay').classList.add('open');
 toggleNewCoContact();
@@ -890,6 +904,16 @@ $('actSaveBtn').onclick = async () => {
 let companyId = '';
 let title = '';
 try {
+if (entryType === 'todo' && $('fCalOnly').checked && $('fDue').value && !editingActId) {
+title = $('fTitle').value.trim();
+if (!title) { $('actModalErr').textContent = 'Vul een titel in.'; return; }
+await api('/api/crm/calendar/push', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+body: JSON.stringify({ title, note: $('fNote').value, due: $('fDue').value, time: $('fTime').value, calendars: ['apple'] }) });
+$('actOverlay').classList.remove('open');
+flashSetMsg('Naar agenda gestuurd.');
+loadCalToday();
+return;
+}
 if (entryType === 'bedrijf') {
 const name = $('fCo').value.trim();
 if (!name) { $('actModalErr').textContent = 'Vul een bedrijfsnaam in.'; return; }

@@ -487,6 +487,11 @@ background: #fff; top: 3px; left: 3px; transition: .15s;
 <button class="cp4" data-p="4" data-i18n="p.4">P4</button>
 </div>
 
+<label style="display:flex; align-items:center; gap:8px; margin-top:12px; cursor:pointer;" id="calOnlyRow">
+<input type="checkbox" id="fCalOnly" style="width:auto; margin:0;">
+<span data-i18n="rem.calOnly" style="font-weight:400;">Alleen naar agenda sturen (niet bewaren als to-do)</span>
+</label>
+
 <div class="err" id="modalErr"></div>
 <div class="modal-actions">
 <button class="btn-ghost" id="cancelBtn" data-i18n="cancel">Annuleren</button>
@@ -575,6 +580,7 @@ en: {
 'rem.title':'Reminders','rem.new':'+ New reminder',
 'rem.sub':'Plan tasks with a date, time and priority. Anything within 7 days also shows on your dashboard.',
 'rem.modalSub':'Plan a task with an optional note, date and priority.',
+'rem.calOnly':'Send to calendar only (don\'t save as a to-do)',
 'rem.modalNew':'New reminder','rem.modalEdit':'Edit reminder',
 'tab.active':'Active','tab.done':'Done',
 'f.all':'All','f.today':'Today','f.week':'This week','f.month':'Next 30 days','f.late':'Overdue','f.nodate':'No date',
@@ -646,6 +652,7 @@ nl: {
 'rem.title':'Herinneringen','rem.new':'+ Nieuwe herinnering',
 'rem.sub':'Plan hier taken met een datum, tijd en prioriteit. Alles wat binnen 7 dagen valt zie je ook op het dashboard.',
 'rem.modalSub':'Plan een taak met een optionele notitie, datum en prioriteit.',
+'rem.calOnly':'Alleen naar agenda sturen (niet bewaren als to-do)',
 'rem.modalNew':'Nieuwe herinnering','rem.modalEdit':'Herinnering aanpassen',
 'tab.active':'Actief','tab.done':'Afgerond',
 'f.all':'Alles','f.today':'Vandaag','f.week':'Komende week','f.month':'Komende 30 dagen','f.late':'Te laat','f.nodate':'Geen datum',
@@ -1364,6 +1371,7 @@ $('fDate').style.display = pickedDate ? 'block' : 'none';
 $('fDate').value = pickedDate || '';
 $('fTime').value = r && r.time ? r.time : '';
 $('modalErr').textContent = '';
+$('fCalOnly').checked = false;
 paintChips();
 $('overlay').classList.add('open');
 $('fTitle').focus();
@@ -1384,6 +1392,12 @@ const tv = $('fTime').value;
 $('datePreview').textContent = d
 ? `${t('prev.on')} ${fmt(new Date(d + 'T00:00:00'))}${tv ? ` ${t('prev.at')} ${tv}` : ''}`
 : t('prev.none');
+// The "calendar-only" checkbox only makes sense with a due date and an
+// actually connected calendar — hide it (and force it unchecked)
+// otherwise so it can't silently do nothing.
+const calOnlyEligible = !!d && calStatus.apple;
+$('calOnlyRow').style.display = calOnlyEligible ? 'flex' : 'none';
+if (!calOnlyEligible) $('fCalOnly').checked = false;
 }
 
 function targetDate() {
@@ -1430,6 +1444,21 @@ time: $('fTime').value || '',
 prio: selPrio,
 };
 if (!payload.title.trim()) { $('modalErr').textContent = t('err.title'); return; }
+// "Only send to calendar" — checking this box IS the confirmation the
+// push flow normally asks for separately, so skip creating a to-do
+// entirely and push straight to Apple Calendar instead.
+if ($('fCalOnly').checked && payload.due && !editing) {
+try {
+await api('/api/calendar/push', {
+method: 'POST', headers: { 'Content-Type': 'application/json' },
+body: JSON.stringify({ title: payload.title, note: payload.note, due: payload.due, time: payload.time, calendars: ['apple'] }),
+});
+$('overlay').classList.remove('open');
+flashSetMsg(t('cal.pushDone'));
+loadCalToday();
+} catch (e) { $('modalErr').textContent = e.message || t('cal.pushErr'); }
+return;
+}
 try {
 const d = await api('/api/reminders', {
 method: 'POST', headers: { 'Content-Type': 'application/json' },
