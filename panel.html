@@ -328,6 +328,98 @@ display: flex; align-items: center; justify-content: center;
 }
 .color-chips button:hover { transform: scale(1.08); }
 .color-chips button.sel { border-color: #e6e9ed; }
+
+/* --- Gym Coach --- */
+.gym-tabs2 { display: flex; gap: 8px; margin-bottom: 14px; border-bottom: 1px solid #232a33; flex-wrap: wrap; }
+.gym-tabs2 button { background: none; border: none; color: #5a6472; font-size: 13.5px; cursor: pointer;
+padding: 9px 4px; border-bottom: 2px solid transparent; font-family: inherit; }
+.gym-tabs2 button.active { color: #e6e9ed; border-color: #7fdc9e; font-weight: 700; }
+.coach-card {
+background: #141d18; border: 1px solid #2ea36f66; border-radius: 12px;
+padding: 15px 18px; margin-bottom: 12px;
+}
+.coach-card .ex { font-size: 14.5px; font-weight: 700; margin-bottom: 4px; }
+.coach-card .msg { font-size: 13.5px; color: #cfe8d8; line-height: 1.5; }
+.coach-card.warn { background: #1d1815; border-color: #f0883e66; }
+.coach-card.warn .msg { color: #f0d8c0; }
+.coach-card.neutral { background: #151a21; border-color: #232a33; }
+.coach-card.neutral .msg { color: #a7afba; }
+.gym-log-row {
+background: #151a21; border: 1px solid #232a33; border-radius: 12px;
+padding: 13px 16px; margin-bottom: 9px; display: flex; gap: 12px; align-items: center;
+}
+.gym-log-row .lbody { flex: 1; min-width: 0; }
+.gym-log-row .ex { font-size: 14.5px; font-weight: 700; }
+.gym-log-row .meta { font-size: 12.5px; color: #8b94a1; margin-top: 3px; }
+.gym-log-row .note { font-size: 12.5px; color: #a7afba; margin-top: 3px; white-space: pre-wrap; }
+.gym-log-row .actions { display: flex; gap: 6px; flex-shrink: 0; }
+.ex-pick { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+.ex-pick button {
+background: #151a21; border: 1px solid #232a33; color: #cfd6de;
+padding: 8px 13px; border-radius: 999px; font-size: 13px; cursor: pointer; font-family: inherit;
+}
+.ex-pick button.active { background: #7fdc9e; color: #0e1116; border-color: #7fdc9e; font-weight: 700; }
+table.hist { width: 100%; border-collapse: collapse; font-size: 13.5px; margin-top: 6px; }
+table.hist th { text-align: left; color: #8b94a1; font-weight: 600; padding: 8px 10px; border-bottom: 1px solid #232a33; }
+table.hist td { padding: 8px 10px; border-bottom: 1px solid #1c222b; }
+.sparkline { width: 100%; height: 60px; display: block; }
+.field-row2 { display: flex; gap: 12px; }
+.field-row2 > div { flex: 1; min-width: 0; }
+
+/* --- Gym Coach: session planner (muscle-coverage advisor) --- */
+.planner-box { background: #151a21; border: 1px solid #232a33; border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+.planner-box h4 { font-size: 13.5px; color: #cfd6de; margin: 0 0 10px; }
+.plan-add-row { display: flex; gap: 8px; margin-bottom: 12px; }
+.plan-add-row input { flex: 1; }
+.plan-list { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 4px; }
+.plan-pill {
+background: #1c2530; border: 1px solid #2a3441; color: #e6e9ed; padding: 6px 8px 6px 12px;
+border-radius: 999px; font-size: 12.5px; display: flex; align-items: center; gap: 8px;
+}
+.plan-pill button {
+background: none; border: none; color: #8b94a1; cursor: pointer; font-size: 14px; line-height: 1;
+padding: 2px; font-family: inherit;
+}
+.plan-pill button:hover { color: #f28b8b; }
+.plan-empty { color: #5a6472; font-size: 13px; padding: 4px 0 8px; }
+.mz-wrap { display: flex; gap: 22px; flex-wrap: wrap; align-items: flex-start; }
+.mz-svg { width: 140px; height: 240px; flex-shrink: 0; }
+.mz-svg .mz-part { transition: fill .15s, stroke .15s; }
+.mz-empty { fill: #232a33; stroke: #2f3947; stroke-width: 1.5; }
+.mz-partial { fill: #3a2a14; stroke: #f0b45c; stroke-width: 1.5; }
+.mz-full { fill: #17321c; stroke: #7fd68f; stroke-width: 1.5; }
+.mz-skin { fill: #1a2028; stroke: none; }
+.mz-legend { flex: 1; min-width: 220px; }
+.mz-group { margin-bottom: 14px; }
+.mz-group-name { font-size: 13.5px; font-weight: 700; color: #cfd6de; margin-bottom: 6px; }
+.mz-region { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #a7afba; padding: 3px 0; }
+.mz-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.mz-dot.mz-full { background: #7fd68f; border: none; }
+.mz-dot.mz-partial { background: #f0b45c; border: none; }
+.mz-dot.mz-empty { background: #454f5c; border: none; }
+.mz-suggest { color: #7fdc9e; margin-left: auto; cursor: pointer; font-size: 12px; white-space: nowrap; }
+.mz-suggest:hover { text-decoration: underline; }
+.group-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.group-chips button {
+background: #151a21; border: 1px solid #232a33; color: #cfd6de;
+padding: 7px 13px; border-radius: 999px; font-size: 13px; cursor: pointer; font-family: inherit;
+}
+.group-chips button.active { background: #7fdc9e; color: #0e1116; border-color: #7fdc9e; font-weight: 700; }
+.tmpl-row {
+background: #151a21; border: 1px solid #232a33; border-radius: 10px; padding: 10px 14px;
+margin-bottom: 8px; display: flex; align-items: center; gap: 10px;
+}
+.tmpl-row .tname { flex: 1; font-size: 13.5px; font-weight: 700; }
+.tmpl-row .tmeta { font-size: 12px; color: #8b94a1; }
+.goal-kind-toggle { display: flex; gap: 8px; margin-bottom: 14px; }
+.goal-kind-toggle button {
+flex: 1; background: #151a21; border: 1px solid #232a33; color: #8b94a1;
+padding: 9px; border-radius: 8px; font-size: 13px; cursor: pointer; font-family: inherit;
+}
+.goal-kind-toggle button.active { background: #1c2530; border-color: #7fdc9e; color: #e6e9ed; font-weight: 700; }
+.goal-general-card { border-left: 3px solid #6fa8dc; }
+.goal-general-card .cat { font-size: 11px; color: #8b94a1; text-transform: uppercase; letter-spacing: .03em; }
+
 </style>
 </head>
 <body>
@@ -352,6 +444,7 @@ display: flex; align-items: center; justify-content: center;
 <button data-i18n="nav.rem" onclick="showView('reminders')">Herinneringen</button>
 <button data-i18n="nav.timeline" onclick="showView('timeline')">Tijdlijn</button>
 <button data-i18n="nav.sug" onclick="showView('sugs')">Suggesties</button>
+<button data-i18n="nav.gym" onclick="showView('gym')">Gym Coach</button>
 <button data-i18n="nav.idea" onclick="showView('ideas')">Ideeënbox</button>
 <button data-i18n="nav.log" onclick="showView('log')" id="logMenuBtn" style="display:none;">Logboek</button>
 <a href="/crm" style="display:block; width:100%; box-sizing:border-box; text-align:left; background:none; border:none; color:#e6e9ed; font-size:15px; padding:12px 14px; border-radius:9px; font-family:inherit; text-decoration:none;" onmouseover="this.style.background='#1c222b'" onmouseout="this.style.background='none'">→ Naar CRM</a>
@@ -384,6 +477,7 @@ display: flex; align-items: center; justify-content: center;
 
 <div id="sugCards"></div>
 <div id="ideaCards"></div>
+<div id="gymCoachCards"></div>
 
 <div id="calTodayCard" style="display:none;">
 <h2 data-i18n="cal.today" style="font-size:19px; margin:26px 0 10px;">Agenda vandaag</h2>
@@ -440,6 +534,107 @@ display: flex; align-items: center; justify-content: center;
 </div>
 <div class="section-sub" data-i18n="sug.sub">Dingen die je regelmatig wilt blijven doen.</div>
 <div id="sugList"></div>
+</div>
+
+<div id="view-gym" style="display:none;">
+<div class="section-head">
+<h2>Gym Coach</h2>
+</div>
+<div class="section-sub">Log je oefeningen, volg je progressie en lichaamssamenstelling, stel doelen — en krijg advies over wanneer je wat traint.</div>
+
+<div class="gym-tabs2" id="gymTabs">
+<button data-gtab="overview" class="active">Overzicht</button>
+<button data-gtab="session">Sessie samenstellen</button>
+<button data-gtab="log">Log</button>
+<button data-gtab="progress">Progressie</button>
+<button data-gtab="bodycomp">Lichaam</button>
+<button data-gtab="goals">Doelen</button>
+</div>
+
+<!-- Overzicht -->
+<div class="gym-sub active" id="gtab-overview">
+<div class="statgrid" id="gymStatGrid" style="margin-bottom:20px;"></div>
+<div class="section-head"><h2 style="font-size:16px;">Coach's advies</h2></div>
+<div id="gymAdviceList"></div>
+<div class="section-head" style="margin-top:20px;">
+<h2 style="font-size:16px;">Recent gelogd</h2>
+<button class="btn-primary" id="gymQuickLogBtn">+ Set loggen</button>
+</div>
+<div id="gymRecentList"></div>
+</div>
+
+<!-- Sessie samenstellen: kies spiergroepen + oefeningen, zie live welke
+     spieren goed gedekt zijn (poppetje) en welke je nog mist. -->
+<div class="gym-sub" id="gtab-session" style="display:none;">
+<div class="section-sub">Stel samen welke spiergroepen je vandaag traint, voeg oefeningen toe, en zie meteen welke spieren goed gedekt zijn en welke je nog mist — met suggesties om aan te vullen.</div>
+
+<div class="planner-box">
+<h4>Welke spiergroepen train je vandaag?</h4>
+<div class="group-chips" id="gymPlanGroupChips"></div>
+
+<h4>Oefeningen in deze sessie</h4>
+<div class="plan-add-row">
+<input id="gymPlanExInput" list="gymExNames" autocomplete="off" placeholder="bijv. Bench Press">
+<button class="btn-primary" id="gymPlanAddBtn">+ Toevoegen</button>
+</div>
+<div class="plan-list" id="gymPlanList"></div>
+</div>
+
+<div class="planner-box">
+<h4>Dekking — welke spieren pak je al goed mee?</h4>
+<div class="mz-wrap">
+<svg class="mz-svg" id="gymMzSvg" viewBox="0 0 120 240" xmlns="http://www.w3.org/2000/svg"></svg>
+<div class="mz-legend" id="gymMzLegend"></div>
+</div>
+</div>
+
+<div class="planner-box">
+<h4>Sessie opslaan als sjabloon</h4>
+<div class="plan-add-row">
+<input id="gymPlanNameInput" autocomplete="off" placeholder="bijv. Chest &amp; Tricep dag">
+<button class="btn-ghost" id="gymPlanSaveTmplBtn">Opslaan</button>
+</div>
+<div id="gymTmplList"></div>
+</div>
+</div>
+
+<!-- Log -->
+<div class="gym-sub" id="gtab-log" style="display:none;">
+<div class="section-head">
+<h2 style="font-size:16px;">Log</h2>
+<button class="btn-primary" id="gymNewLogBtn">+ Nieuwe set</button>
+</div>
+<div id="gymLogList"></div>
+</div>
+
+<!-- Progressie -->
+<div class="gym-sub" id="gtab-progress" style="display:none;">
+<div class="ex-pick" id="gymExPick"></div>
+<div id="gymExDetail"></div>
+</div>
+
+<!-- Lichaam -->
+<div class="gym-sub" id="gtab-bodycomp" style="display:none;">
+<div class="section-head">
+<h2 style="font-size:16px;">Lichaamssamenstelling</h2>
+<button class="btn-primary" id="gymNewBcBtn">+ Nieuwe meting</button>
+</div>
+<div id="gymBcChart"></div>
+<div id="gymBcList"></div>
+</div>
+
+<!-- Doelen -->
+<div class="gym-sub" id="gtab-goals" style="display:none;">
+<div class="section-head">
+<h2 style="font-size:16px;">Doelen</h2>
+<button class="btn-primary" id="gymNewGoalBtn">+ Nieuw doel</button>
+</div>
+<div class="section-sub">Stel per oefening een repsrange in, of een algemeen doel dat niet aan één oefening hangt. De coach gebruikt de oefeningsdoelen om te bepalen wanneer je gewicht of reps mag verhogen.</div>
+<div class="section-head" style="margin-top:4px;"><h2 style="font-size:14px;color:#8b94a1;">Per oefening</h2></div>
+<div id="gymGoalList"></div>
+<div class="section-head" style="margin-top:18px;"><h2 style="font-size:14px;color:#8b94a1;">Algemeen</h2></div>
+<div id="gymGoalGeneralList"></div>
+</div>
 </div>
 
 <div id="view-ideas" style="display:none;">
@@ -502,6 +697,26 @@ display: flex; align-items: center; justify-content: center;
 <div class="set-row">
 <div class="lbl"><span data-i18n="set.showIdea">Idee-checks op het dashboard</span><div class="hint" data-i18n="set.showIdeaHint">Toon idee-checks op het dashboard.</div></div>
 <label class="switch"><input type="checkbox" id="setShowIdea"><span class="slider"></span></label>
+</div>
+</div>
+
+<div class="set-card">
+<h3>Gym Coach</h3>
+<div class="section-sub" style="margin:8px 0 4px;">Instellingen voor de trainingsassistent.</div>
+<div class="set-row">
+<div class="lbl">Gewichtseenheid<div class="hint">Gebruikt overal waar gewicht getoond wordt.</div></div>
+<select id="setGymUnit" style="background:#10141a;color:#cfd6de;border:1px solid #2a323d;border-radius:8px;padding:9px 11px;font-size:14px;font-family:inherit;cursor:pointer;color-scheme:dark;">
+<option value="kg">kg</option>
+<option value="lb">lb</option>
+</select>
+</div>
+<div class="set-row">
+<div class="lbl">Rustdagen per spiergroep<div class="hint">Aantal dagen tussen twee trainingen van dezelfde spiergroep waarna de coach 'm weer aanraadt.</div></div>
+<input type="text" id="setGymRestDays" inputmode="numeric" maxlength="1" style="width:70px; text-align:center;">
+</div>
+<div class="set-row">
+<div class="lbl">Suggesties op het dashboard<div class="hint">Toon de coach's advies-kaart op het dashboard.</div></div>
+<label class="switch"><input type="checkbox" id="setShowGym"><span class="slider"></span></label>
 </div>
 </div>
 
@@ -666,11 +881,154 @@ display: flex; align-items: center; justify-content: center;
 </div>
 </div>
 
+<div class="overlay" id="gymLogOverlay">
+<div class="modal">
+<h3 id="gymLogModalTitle">Nieuwe set</h3>
+<div class="sub">Wat deed je, hoe zwaar, hoeveel reps?</div>
+<label>Oefening</label>
+<input id="gfExercise" list="gymExNames" autocomplete="off" placeholder="bijv. Bench Press">
+<datalist id="gymExNames"></datalist>
+<label>Spiergroep</label>
+<select id="gfMuscle">
+<option value="Legs">Benen</option>
+<option value="Push">Push (borst/schouders/triceps)</option>
+<option value="Pull">Pull (rug/biceps)</option>
+<option value="Core">Core</option>
+<option value="Other">Overig</option>
+</select>
+<div class="field-row2">
+<div>
+<label>Gewicht (<span id="gymUnitLbl1">kg</span>)</label>
+<input id="gfWeight" type="number" step="0.5" min="0">
+</div>
+<div>
+<label>Reps</label>
+<input id="gfReps" type="number" step="1" min="1">
+</div>
+</div>
+<div class="field-row2">
+<div>
+<label>Datum</label>
+<input id="gfDate" type="date">
+</div>
+<div>
+<label>RPE (optioneel, 1–10)</label>
+<input id="gfRpe" type="number" step="1" min="1" max="10">
+</div>
+</div>
+<label>Notitie (optioneel)</label>
+<textarea id="gfNote"></textarea>
+<div class="err" id="gymLogErr"></div>
+<div class="modal-actions">
+<button class="btn-ghost" id="gymLogCancelBtn">Annuleren</button>
+<button class="btn-primary" id="gymLogSaveBtn">Opslaan</button>
+</div>
+</div>
+</div>
+
+<!-- Modal: lichaamsmeting -->
+<div class="overlay" id="gymBcOverlay">
+<div class="modal">
+<h3 id="gymBcModalTitle">Nieuwe meting</h3>
+<div class="field-row2">
+<div>
+<label>Gewicht (<span id="gymUnitLbl2">kg</span>)</label>
+<input id="gfBcWeight" type="number" step="0.1" min="0">
+</div>
+<div>
+<label>Datum</label>
+<input id="gfBcDate" type="date">
+</div>
+</div>
+<div class="field-row2">
+<div>
+<label>Vetpercentage (optioneel)</label>
+<input id="gfBcFat" type="number" step="0.1" min="0" max="100">
+</div>
+<div>
+<label>Spiermassa (optioneel, <span id="gymUnitLbl3">kg</span>)</label>
+<input id="gfBcMuscle" type="number" step="0.1" min="0">
+</div>
+</div>
+<label>Notitie (optioneel)</label>
+<textarea id="gfBcNote"></textarea>
+<div class="err" id="gymBcErr"></div>
+<div class="modal-actions">
+<button class="btn-ghost" id="gymBcCancelBtn">Annuleren</button>
+<button class="btn-primary" id="gymBcSaveBtn">Opslaan</button>
+</div>
+</div>
+</div>
+
+<!-- Modal: doel -->
+<div class="overlay" id="gymGoalOverlay">
+<div class="modal">
+<h3 id="gymGoalModalTitle">Nieuw doel</h3>
+<div class="goal-kind-toggle" id="gymGoalKindToggle">
+<button type="button" data-kind="exercise" class="active">Per oefening</button>
+<button type="button" data-kind="general">Algemeen doel</button>
+</div>
+
+<div id="gymGoalFieldsExercise">
+<div class="sub">De coach vergelijkt je laatst gelogde sets met deze repsrange.</div>
+<label>Oefening</label>
+<input id="gfGoalExercise" list="gymExNames" autocomplete="off" placeholder="bijv. Squat">
+<div class="field-row2">
+<div>
+<label>Repsrange — min</label>
+<input id="gfGoalRepMin" type="number" step="1" min="1" value="8">
+</div>
+<div>
+<label>Repsrange — max</label>
+<input id="gfGoalRepMax" type="number" step="1" min="1" value="12">
+</div>
+</div>
+<label>Streefgewicht (optioneel, <span id="gymUnitLbl4">kg</span>)</label>
+<input id="gfGoalTargetWeight" type="number" step="0.5" min="0">
+</div>
+
+<div id="gymGoalFieldsGeneral" style="display:none;">
+<div class="sub">Een doel dat niet aan één oefening hangt, bijv. "5kg afvallen" of "algeheel sterker worden".</div>
+<label>Titel</label>
+<input id="gfGoalTitle" autocomplete="off" placeholder="bijv. Vetpercentage omlaag">
+<label>Categorie</label>
+<select id="gfGoalCategory">
+<option value="algemeen">Algemeen</option>
+<option value="kracht">Kracht</option>
+<option value="spiermassa">Spiermassa</option>
+<option value="vetverlies">Vetverlies</option>
+<option value="uithoudingsvermogen">Uithoudingsvermogen</option>
+</select>
+<div class="field-row2">
+<div>
+<label>Streefwaarde (optioneel)</label>
+<input id="gfGoalTargetValue" type="number" step="0.1">
+</div>
+<div>
+<label>Eenheid (optioneel)</label>
+<input id="gfGoalTargetUnit" autocomplete="off" placeholder="bijv. kg, %">
+</div>
+</div>
+<label>Streefdatum (optioneel)</label>
+<input id="gfGoalTargetDate" type="date">
+</div>
+
+<label>Notitie (optioneel)</label>
+<textarea id="gfGoalNote"></textarea>
+<div class="err" id="gymGoalErr"></div>
+<div class="modal-actions">
+<button class="btn-ghost" id="gymGoalCancelBtn">Annuleren</button>
+<button class="btn-primary" id="gymGoalSaveBtn">Opslaan</button>
+</div>
+</div>
+</div>
+
+
 <script>
 
 const I18N = {
 en: {
-'nav.home':'Dashboard','nav.rem':'Reminders','nav.timeline':'Timeline','nav.sug':'Suggestions','nav.idea':'Idea box','nav.log':'Log',
+'nav.home':'Dashboard','nav.rem':'Reminders','nav.timeline':'Timeline','nav.sug':'Suggestions','nav.gym':'Gym Coach','nav.idea':'Idea box','nav.log':'Log',
 'save':'Save','cancel':'Cancel',
 'tl.title':'Timeline','tl.add':'+ New item','tl.today':'Today','tl.emptyDay':'Nothing planned for this day.',
 'tl.sub':'A visual day overview of your reminders and calendar, with the option to push new items straight to Apple Calendar.',
@@ -746,7 +1104,7 @@ en: {
 'locale':'en-GB'
 },
 nl: {
-'nav.home':'Dashboard','nav.rem':'Herinneringen','nav.timeline':'Tijdlijn','nav.sug':'Suggesties','nav.idea':'Ideeënbox','nav.log':'Logboek',
+'nav.home':'Dashboard','nav.rem':'Herinneringen','nav.timeline':'Tijdlijn','nav.sug':'Suggesties','nav.gym':'Gym Coach','nav.idea':'Ideeënbox','nav.log':'Logboek',
 'save':'Opslaan','cancel':'Annuleren',
 'tl.title':'Tijdlijn','tl.add':'+ Nieuw item','tl.today':'Vandaag','tl.emptyDay':'Niets gepland op deze dag.',
 'tl.sub':'Een visueel dagoverzicht van je herinneringen en agenda, met de optie om nieuwe items direct naar je Apple Calendar te pushen.',
@@ -1606,7 +1964,7 @@ flashSetMsg(t('set.tgSent'));
 } catch (e) { flashSetMsg(e.message); }
 };
 
-const views = { home: 'view-home', reminders: 'view-reminders', timeline: 'view-timeline', sugs: 'view-sugs', ideas: 'view-ideas', settings: 'view-settings', log: 'view-log' };
+const views = { home: 'view-home', reminders: 'view-reminders', timeline: 'view-timeline', sugs: 'view-sugs', gym: 'view-gym', ideas: 'view-ideas', settings: 'view-settings', log: 'view-log' };
 function closeDrawer() { $('drawer').classList.remove('open'); $('backdrop').classList.remove('show'); }
 window.showView = (v) => {
 if (v === 'log' && !(me && me.isAdmin)) v = 'home';
@@ -1682,6 +2040,7 @@ ideas = await api('/api/ideas');
 renderIdeas();
 } catch (e) { /* opslag nog niet gekoppeld */ }
 loadCalStatus();
+gymLoad();
 if (me.isAdmin) {
 $('logMenuBtn').style.display = 'block';
 loadTg();
@@ -1900,6 +2259,826 @@ $('filterSel').onchange = render;
 $('tabActive').onclick = () => { view = 'active'; $('tabActive').classList.add('active'); $('tabDone').classList.remove('active'); render(); };
 $('tabDone').onclick = () => { view = 'done'; $('tabDone').classList.add('active'); $('tabActive').classList.remove('active'); render(); };
 $('logoutBtn').onclick = async () => { await fetch('/base/logout', { method: 'POST' }); location.href = '/'; };
+
+// ---------- Gym Coach ----------
+// Lives entirely inside Base — same session, same login, just its own view
+// (like Suggestions or the Idea box). No separate app, no separate 2FA.
+const GYM_DEFAULT_EXERCISES = {
+'Squat': 'Legs', 'Deadlift': 'Legs', 'Leg Press': 'Legs', 'Romanian Deadlift': 'Legs',
+'Leg Curl': 'Legs', 'Hip Thrust': 'Legs',
+'Bench Press': 'Push', 'Overhead Press': 'Push', 'Incline Dumbbell Press': 'Push', 'Dips': 'Push',
+'Barbell Row': 'Pull', 'Pull-up': 'Pull', 'Dumbbell Curl': 'Pull', 'Lat Pulldown': 'Pull',
+'Plank': 'Core',
+};
+const GYM_BIG_JUMP = ['squat', 'deadlift', 'leg press', 'romanian deadlift', 'hip thrust'];
+const GYM_GROUP_LABEL = { Legs: 'Benen', Push: 'Push', Pull: 'Pull', Core: 'Core', Other: 'Overig' };
+
+// ---- Session composer: muscle-coverage "poppetje" advisor ----
+// A finer-grained taxonomy than the Legs/Push/Pull/Core groups used for the
+// "when to train" scheduler above — this one tracks actual sub-regions
+// (e.g. the three triceps heads, upper/mid/lower chest) so the planner can
+// tell you not just "you did Push" but "you hit chest and front delts but
+// missed your triceps' long head". Some regions are visible on the front-
+// view body diagram; others (back, rear delts, hamstrings/glutes) aren't
+// drawable from the front, so they're shown as a text legend instead.
+const GYM_MUSCLE_MAP = [
+{ key: 'chest', label: 'Borst', regions: [
+{ key: 'chest_upper', label: 'Bovenborst', visible: true },
+{ key: 'chest_mid', label: 'Middenborst', visible: true },
+{ key: 'chest_lower', label: 'Onderborst', visible: true },
+] },
+{ key: 'shoulders', label: 'Schouders', regions: [
+{ key: 'delt_front', label: 'Voorste delt', visible: true },
+{ key: 'delt_side', label: 'Zijdelt', visible: true },
+{ key: 'delt_rear', label: 'Achterste delt', visible: false },
+] },
+{ key: 'biceps', label: 'Biceps', regions: [
+{ key: 'biceps', label: 'Biceps', visible: true },
+] },
+{ key: 'triceps', label: 'Triceps', regions: [
+{ key: 'tri_long', label: 'Lange kop', visible: false },
+{ key: 'tri_lateral', label: 'Zijkant (lateral head)', visible: false },
+{ key: 'tri_medial', label: 'Mediale kop', visible: false },
+] },
+{ key: 'back', label: 'Rug', regions: [
+{ key: 'lats', label: 'Lats (brede rugspier)', visible: false },
+{ key: 'upperback', label: 'Boven-rug / trapezius', visible: false },
+] },
+{ key: 'core', label: 'Buik', regions: [
+{ key: 'abs', label: 'Buikspieren', visible: true },
+{ key: 'obliques', label: 'Schuine buikspieren', visible: true },
+] },
+{ key: 'legs', label: 'Benen', regions: [
+{ key: 'quads', label: 'Quadriceps', visible: true },
+{ key: 'hamstrings', label: 'Hamstrings', visible: false },
+{ key: 'glutes', label: 'Bilspieren', visible: false },
+{ key: 'calves', label: 'Kuiten', visible: true },
+] },
+];
+// Exercise → [group, region, weight] targets. weight 1 = primary mover,
+// lower = secondary/assisting. Covers the default exercise list plus a
+// handful of common accessory movements so gap-filling suggestions have
+// something concrete to point to.
+const GYM_EXERCISE_TARGETS = {
+'squat': [['legs', 'quads', 1], ['legs', 'glutes', 0.6]],
+'deadlift': [['legs', 'hamstrings', 1], ['legs', 'glutes', 0.8], ['back', 'lats', 0.5], ['back', 'upperback', 0.6]],
+'romanian deadlift': [['legs', 'hamstrings', 1], ['legs', 'glutes', 0.8]],
+'leg press': [['legs', 'quads', 1], ['legs', 'glutes', 0.4]],
+'leg curl': [['legs', 'hamstrings', 1]],
+'hip thrust': [['legs', 'glutes', 1]],
+'calf raise': [['legs', 'calves', 1]],
+'bench press': [['chest', 'chest_mid', 1], ['triceps', 'tri_lateral', 0.5], ['shoulders', 'delt_front', 0.4]],
+'incline dumbbell press': [['chest', 'chest_upper', 1], ['shoulders', 'delt_front', 0.5], ['triceps', 'tri_lateral', 0.3]],
+'incline bench press': [['chest', 'chest_upper', 1], ['triceps', 'tri_lateral', 0.3]],
+'decline bench press': [['chest', 'chest_lower', 1]],
+'chest fly': [['chest', 'chest_mid', 0.8]],
+'cable fly': [['chest', 'chest_mid', 1]],
+'overhead press': [['shoulders', 'delt_front', 1], ['shoulders', 'delt_side', 0.6], ['triceps', 'tri_lateral', 0.4]],
+'lateral raise': [['shoulders', 'delt_side', 1]],
+'front raise': [['shoulders', 'delt_front', 1]],
+'face pull': [['shoulders', 'delt_rear', 1], ['back', 'upperback', 0.5]],
+'reverse fly': [['shoulders', 'delt_rear', 1]],
+'dips': [['chest', 'chest_lower', 0.8], ['triceps', 'tri_lateral', 0.8], ['triceps', 'tri_medial', 0.6]],
+'tricep pushdown': [['triceps', 'tri_lateral', 1]],
+'overhead tricep extension': [['triceps', 'tri_long', 1]],
+'close grip bench press': [['triceps', 'tri_medial', 0.8], ['chest', 'chest_mid', 0.4]],
+'skull crusher': [['triceps', 'tri_long', 0.8], ['triceps', 'tri_lateral', 0.5]],
+'barbell row': [['back', 'lats', 0.8], ['back', 'upperback', 0.6], ['biceps', 'biceps', 0.3]],
+'seated row': [['back', 'lats', 0.7], ['back', 'upperback', 0.6], ['biceps', 'biceps', 0.3]],
+'pull-up': [['back', 'lats', 1], ['biceps', 'biceps', 0.5]],
+'lat pulldown': [['back', 'lats', 1], ['biceps', 'biceps', 0.4]],
+'shrug': [['back', 'upperback', 1]],
+'dumbbell curl': [['biceps', 'biceps', 1]],
+'hammer curl': [['biceps', 'biceps', 0.8]],
+'preacher curl': [['biceps', 'biceps', 1]],
+'plank': [['core', 'abs', 0.8], ['core', 'obliques', 0.5]],
+'crunch': [['core', 'abs', 1]],
+'russian twist': [['core', 'obliques', 1]],
+'good morning': [['legs', 'hamstrings', 0.8], ['back', 'upperback', 0.4]],
+};
+// Best-effort keyword fallback for exercises not in the exact table above
+// (custom names, typos, less common lifts) — same idea as gymGuessMuscle
+// but mapped onto the finer group/region taxonomy used by the planner.
+function gymGuessTargets(name) {
+const n = name.toLowerCase();
+const hits = [];
+if (/incline/.test(n) && /press|bench/.test(n)) hits.push(['chest', 'chest_upper', 0.8]);
+else if (/decline/.test(n) && /press|bench/.test(n)) hits.push(['chest', 'chest_lower', 0.8]);
+else if (/(bench|chest).*press|press.*(bench|chest)/.test(n)) hits.push(['chest', 'chest_mid', 0.8]);
+else if (/fly|flye/.test(n)) hits.push(['chest', 'chest_mid', 0.7]);
+if (/squat|leg press/.test(n)) hits.push(['legs', 'quads', 0.8]);
+if (/deadlift/.test(n)) { hits.push(['legs', 'hamstrings', 0.8]); hits.push(['legs', 'glutes', 0.6]); }
+if (/hip thrust|glute/.test(n)) hits.push(['legs', 'glutes', 0.8]);
+if (/calf/.test(n)) hits.push(['legs', 'calves', 0.8]);
+if (/leg curl|hamstring/.test(n)) hits.push(['legs', 'hamstrings', 0.8]);
+if (/lateral raise|side raise/.test(n)) hits.push(['shoulders', 'delt_side', 0.8]);
+else if (/front raise/.test(n)) hits.push(['shoulders', 'delt_front', 0.8]);
+else if (/rear delt|reverse fly|face pull/.test(n)) hits.push(['shoulders', 'delt_rear', 0.8]);
+else if (/shoulder|overhead/.test(n) && /press/.test(n)) hits.push(['shoulders', 'delt_front', 0.7]);
+if (/row|pulldown|pull-?up|pullup|lat\b/.test(n)) hits.push(['back', 'lats', 0.7]);
+if (/shrug/.test(n)) hits.push(['back', 'upperback', 0.8]);
+if (/tricep|pushdown|skull|kickback/.test(n)) hits.push(['triceps', 'tri_lateral', 0.7]);
+if (/dip/.test(n)) { hits.push(['triceps', 'tri_lateral', 0.6]); hits.push(['chest', 'chest_lower', 0.5]); }
+if (/curl/.test(n) && !/leg|hamstring/.test(n)) hits.push(['biceps', 'biceps', 0.8]);
+if (/plank|crunch|sit-?up|core\b/.test(n)) hits.push(['core', 'abs', 0.7]);
+if (/twist|oblique|woodchop/.test(n)) hits.push(['core', 'obliques', 0.7]);
+return hits;
+}
+function gymTargetsFor(exercise) {
+const key = exercise.trim().toLowerCase();
+return GYM_EXERCISE_TARGETS[key] || gymGuessTargets(key);
+}
+// Computes, for every muscle group/region, how well the given list of
+// exercise names covers it (0 = untouched, up to ~1+ = well covered).
+function gymComputeCoverage(exerciseNames) {
+const score = {}; // "group:region" -> number
+exerciseNames.forEach((ex) => {
+gymTargetsFor(ex).forEach(([g, r, w]) => {
+const k = `${g}:${r}`;
+score[k] = (score[k] || 0) + w;
+});
+});
+return score;
+}
+function gymCoverageLevel(v) {
+if (!v) return 'empty';
+if (v >= 0.6) return 'full';
+return 'partial';
+}
+// Finds the best (highest-weight) exercise from the known table that
+// targets a specific region and isn't already in the current plan —
+// used to suggest a gap-filler.
+function gymSuggestExerciseFor(group, region, exclude) {
+const excl = new Set(exclude.map((x) => x.toLowerCase()));
+let best = null, bestW = 0;
+Object.entries(GYM_EXERCISE_TARGETS).forEach(([name, targets]) => {
+if (excl.has(name)) return;
+targets.forEach(([g, r, w]) => {
+if (g === group && r === region && w > bestW) { best = name; bestW = w; }
+});
+});
+return best;
+}
+
+let gymLog = [], gymBodycomp = [], gymGoals = [], gymCustomEx = [], gymSessionTemplates = [];
+let gymProfile = { unit: 'kg', restDays: 2 };
+let gymEditingLogId = null, gymEditingBcId = null, gymEditingGoalId = null;
+let gymSelectedExercise = null;
+let gymActiveTab = 'overview';
+let gymGoalKind = 'exercise';
+let gymPlanGroups = [], gymPlanExercises = [];
+const GYM_PLAN_GROUP_OPTIONS = GYM_MUSCLE_MAP.map((g) => g.key);
+
+function gymUnit() { return gymProfile.unit || 'kg'; }
+function gymRefreshUnitLabels() {
+['gymUnitLbl1', 'gymUnitLbl2', 'gymUnitLbl3', 'gymUnitLbl4'].forEach((id) => { if ($(id)) $(id).textContent = gymUnit(); });
+}
+function gymGuessMuscle(name) {
+if (GYM_DEFAULT_EXERCISES[name]) return GYM_DEFAULT_EXERCISES[name];
+const n = name.toLowerCase();
+if (/squat|leg|deadlift|hip|lunge|calf/.test(n)) return 'Legs';
+if (/press|push|dip|chest|shoulder|fly/.test(n)) return 'Push';
+if (/row|pull|curl|lat|back/.test(n)) return 'Pull';
+if (/plank|ab|core|crunch/.test(n)) return 'Core';
+return 'Other';
+}
+function gymAllExerciseNames() {
+const custom = gymCustomEx.map((x) => x.name);
+const fromLog = [...new Set(gymLog.map((x) => x.exercise))];
+return [...new Set([...Object.keys(GYM_DEFAULT_EXERCISES), ...custom, ...fromLog])].sort((a, b) => a.localeCompare(b));
+}
+function gymFillExDatalist() {
+$('gymExNames').innerHTML = gymAllExerciseNames().map((n) => `<option value="${esc(n)}">`).join('');
+}
+
+function gymEstOneRm(weight, reps) {
+if (!weight || !reps) return 0;
+return weight * (1 + reps / 30); // Epley formula
+}
+function gymSessionsFor(exercise) {
+const items = gymLog.filter((x) => x.exercise.toLowerCase() === exercise.toLowerCase());
+const byDate = {};
+items.forEach((x) => { (byDate[x.date] = byDate[x.date] || []).push(x); });
+return Object.keys(byDate).sort().reverse().map((d) => ({ date: d, sets: byDate[d] }));
+}
+function gymSuggestedIncrement(exercise, weight) {
+const big = GYM_BIG_JUMP.includes(exercise.toLowerCase());
+const raw = weight * (big ? 0.04 : 0.025);
+const step = big ? 2.5 : 1.25;
+return Math.max(step, Math.round(raw / step) * step);
+}
+function gymAdviceForGoal(goal) {
+const sessions = gymSessionsFor(goal.exercise);
+if (!sessions.length) {
+return { kind: 'neutral', text: `Nog geen sets gelogd voor ${goal.exercise}. Log je eerste sessie om advies te krijgen.` };
+}
+const latest = sessions[0];
+const weight = Math.max(...latest.sets.map((s) => s.weight));
+const allAtOrAboveMax = latest.sets.every((s) => s.reps >= goal.repMax);
+const allBelowMin = latest.sets.every((s) => s.reps < goal.repMin);
+if (goal.targetWeight && weight >= goal.targetWeight && allAtOrAboveMax) {
+return { kind: 'ok', text: `Doel bereikt — je haalde ${weight}${gymUnit()} voor ${goal.repMax}+ reps op ${goal.exercise}. Stel een nieuw doel in wanneer je zover bent.` };
+}
+if (allAtOrAboveMax) {
+const inc = gymSuggestedIncrement(goal.exercise, weight);
+return { kind: 'ok', text: `Vorige sessie haalde je overal ${goal.repMax}+ reps bij ${weight}${gymUnit()} op ${goal.exercise}. Tijd om gewicht toe te voegen — probeer volgende keer ${(weight + inc).toFixed(weight % 1 ? 1 : 0)}${gymUnit()}.` };
+}
+if (allBelowMin) {
+return { kind: 'warn', text: `Vorige sessie bleef je onder de ${goal.repMin} reps bij ${weight}${gymUnit()} op elke set van ${goal.exercise}. Houd het gewicht gelijk (of iets lager) en focus op ${goal.repMin}+ reps voor je weer optelt.` };
+}
+return { kind: 'neutral', text: `Je zit in de range op ${goal.exercise} bij ${weight}${gymUnit()}. Blijf pushen voor ${goal.repMax} reps op elke set voor de volgende gewichtstoename.` };
+}
+
+// "Wanneer en wat train ik vandaag?" — kijkt per spiergroep wanneer die voor
+// het laatst getraind is, en raadt de meest verwaarloosde groep aan (mits
+// die minstens één keer eerder getraind is of een doel heeft). Combineert
+// dit met het reps/gewicht-advies van de doelen in die groep.
+function gymScheduleSuggestion() {
+const today = iso(new Date());
+const groups = ['Legs', 'Push', 'Pull', 'Core'];
+const lastTrained = {};
+gymLog.forEach((x) => {
+const g = x.muscle || 'Other';
+if (!lastTrained[g] || x.date > lastTrained[g]) lastTrained[g] = x.date;
+});
+const trainedToday = groups.filter((g) => lastTrained[g] === today);
+if (trainedToday.length) {
+return { kind: 'ok', text: `Je hebt vandaag al ${trainedToday.map((g) => GYM_GROUP_LABEL[g]).join(' en ')} getraind. Mooi bezig — morgen is er weer een nieuwe groep aan de beurt.` };
+}
+const knownGroups = groups.filter((g) => lastTrained[g] || gymGoals.some((goal) => gymGuessMuscle(goal.exercise) === g));
+if (!knownGroups.length) {
+return { kind: 'neutral', text: 'Log een paar sets en stel een doel per oefening, dan kan de coach hier gaan adviseren wanneer en wat je traint.' };
+}
+const restDays = gymProfile.restDays || 2;
+const withGap = knownGroups.map((g) => {
+const last = lastTrained[g];
+const days = last ? Math.round((new Date(today) - new Date(last)) / 86400000) : 999;
+return { g, days };
+}).sort((a, b) => b.days - a.days);
+const top = withGap[0];
+if (top.days < restDays) {
+return { kind: 'neutral', text: `Elke spiergroep is recent getraind (minder dan ${restDays} dag(en) geleden). Overweeg een rustdag, of een lichte cardio-/mobility-sessie.` };
+}
+const groupGoals = gymGoals.filter((goal) => gymGuessMuscle(goal.exercise) === top.g);
+const groupLabel = GYM_GROUP_LABEL[top.g];
+const daysTxt = top.days >= 999 ? 'nog niet eerder' : `${top.days} dag(en) geleden`;
+let text = `Vandaag is een goede dag voor ${groupLabel} — voor het laatst getraind ${daysTxt}.`;
+if (groupGoals.length) {
+const exList = groupGoals.slice(0, 3).map((goal) => {
+const a = gymAdviceForGoal(goal);
+return `${goal.exercise} (${a.text.replace(/^.*?—\s*/, '').replace(/^Doel bereikt.*$/, 'doel bereikt!')})`;
+});
+text += ` Oefeningen met een doel: ${exList.join('; ')}.`;
+}
+return { kind: 'ok', text, group: top.g };
+}
+
+function gymRenderAdvice() {
+const cards = [];
+const sched = gymScheduleSuggestion();
+cards.push({ ex: 'Vandaag trainen', ...sched });
+gymGoals.forEach((g) => cards.push({ ex: g.exercise, ...gymAdviceForGoal(g) }));
+$('gymAdviceList').innerHTML = cards.map((c) => {
+const cls = c.kind === 'warn' ? 'warn' : c.kind === 'neutral' ? 'neutral' : '';
+return `<div class="coach-card ${cls}"><div class="ex">${esc(c.ex)}</div><div class="msg">${esc(c.text)}</div></div>`;
+}).join('');
+}
+
+function gymRenderHomeCard() {
+if (profile.showGymCards === false) { $('gymCoachCards').innerHTML = ''; return; }
+const sched = gymScheduleSuggestion();
+const cls = sched.kind === 'warn' ? 'warn' : sched.kind === 'neutral' ? 'neutral' : '';
+$('gymCoachCards').innerHTML = `<div class="coach-card ${cls}" style="cursor:pointer;" onclick="showView('gym')"><div class="ex">🏋 Gym Coach</div><div class="msg">${esc(sched.text)}</div></div>`;
+}
+
+function gymRenderStats() {
+const totalSets = gymLog.length;
+const uniqueExercises = new Set(gymLog.map((x) => x.exercise.toLowerCase())).size;
+const thisWeek = (() => {
+const now = new Date(); const start = new Date(now); start.setDate(now.getDate() - 6);
+const startISO = iso(start);
+return new Set(gymLog.filter((x) => x.date >= startISO).map((x) => x.date)).size;
+})();
+const lastBc = gymBodycomp.slice().sort((a, b) => b.date.localeCompare(a.date))[0];
+$('gymStatGrid').innerHTML = `
+<div class="stat"><div class="num">${totalSets}</div><div class="cap">sets gelogd</div></div>
+<div class="stat"><div class="num">${uniqueExercises}</div><div class="cap">oefeningen bijgehouden</div></div>
+<div class="stat"><div class="num">${thisWeek}</div><div class="cap">trainingsdagen deze week</div></div>
+<div class="stat"><div class="num">${lastBc ? lastBc.weight + gymUnit() : '—'}</div><div class="cap">laatste lichaamsgewicht</div></div>`;
+}
+
+function gymLogRowHtml(x) {
+return `<div class="gym-log-row">
+<div class="lbody">
+<div class="ex">${esc(x.exercise)} — ${x.weight}${gymUnit()} × ${x.reps}${x.rpe ? ` @RPE ${x.rpe}` : ''}</div>
+<div class="meta">${esc(x.date)} · ${esc(GYM_GROUP_LABEL[x.muscle] || 'Overig')}</div>
+${x.note ? `<div class="note">${esc(x.note)}</div>` : ''}
+</div>
+<div class="actions">
+<button class="icon-btn" onclick="gymEditLog('${x.id}')" title="Bewerken">${IC.pencil}</button>
+<button class="icon-btn" onclick="gymRemoveLog('${x.id}')" title="Verwijderen">${IC.trash}</button>
+</div>
+</div>`;
+}
+function gymRenderRecent() {
+const recent = gymLog.slice().sort((a, b) => b.createdAt - a.createdAt).slice(0, 8);
+$('gymRecentList').innerHTML = recent.length ? recent.map(gymLogRowHtml).join('') : `<div class="empty">Nog niets gelogd.</div>`;
+}
+function gymRenderLogList() {
+const items = gymLog.slice().sort((a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt);
+$('gymLogList').innerHTML = items.length ? items.map(gymLogRowHtml).join('') : `<div class="empty">Nog geen sets gelogd. Klik op "+ Nieuwe set" om je eerste te loggen.</div>`;
+}
+
+window.gymEditLog = (id) => { const x = gymLog.find((l) => l.id === id); if (x) gymOpenLogModal(x); };
+window.gymRemoveLog = async (id) => {
+if (!confirm('Deze set verwijderen?')) return;
+const d = await api('/api/gym/log', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'delete', id }) });
+gymLog = d.log;
+gymRenderAll();
+};
+function gymOpenLogModal(x) {
+gymEditingLogId = x ? x.id : null;
+$('gymLogModalTitle').textContent = x ? 'Set bewerken' : 'Nieuwe set';
+gymFillExDatalist();
+$('gfExercise').value = x ? x.exercise : (gymSelectedExercise || '');
+$('gfMuscle').value = x ? (x.muscle || 'Other') : gymGuessMuscle($('gfExercise').value || '');
+$('gfWeight').value = x ? x.weight : '';
+$('gfReps').value = x ? x.reps : '';
+$('gfDate').value = x ? x.date : iso(new Date());
+$('gfRpe').value = x && x.rpe ? x.rpe : '';
+$('gfNote').value = x ? (x.note || '') : '';
+$('gymLogErr').textContent = '';
+$('gymLogOverlay').classList.add('open');
+$('gfExercise').focus();
+}
+$('gfExercise').addEventListener('input', () => { $('gfMuscle').value = gymGuessMuscle($('gfExercise').value.trim()); });
+$('gymNewLogBtn').onclick = () => gymOpenLogModal(null);
+$('gymQuickLogBtn').onclick = () => gymOpenLogModal(null);
+$('gymLogCancelBtn').onclick = () => $('gymLogOverlay').classList.remove('open');
+$('gymLogOverlay').onclick = (e) => { if (e.target === $('gymLogOverlay')) $('gymLogOverlay').classList.remove('open'); };
+$('gymLogSaveBtn').onclick = async () => {
+const exercise = $('gfExercise').value.trim();
+const weight = Number($('gfWeight').value) || 0;
+const reps = Number($('gfReps').value) || 0;
+if (!exercise) { $('gymLogErr').textContent = 'Kies of typ een oefening.'; return; }
+if (!reps) { $('gymLogErr').textContent = 'Vul het aantal reps in.'; return; }
+try {
+const payload = {
+action: gymEditingLogId ? 'update' : 'create',
+id: gymEditingLogId || undefined,
+exercise, weight, reps,
+muscle: $('gfMuscle').value,
+date: $('gfDate').value || iso(new Date()),
+rpe: $('gfRpe').value,
+note: $('gfNote').value,
+};
+const d = await api('/api/gym/log', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+gymLog = d.log;
+$('gymLogOverlay').classList.remove('open');
+gymRenderAll();
+} catch (e) { $('gymLogErr').textContent = e.message; }
+};
+
+function gymRenderExercisePicker() {
+const names = [...new Set(gymLog.map((x) => x.exercise))].sort((a, b) => a.localeCompare(b));
+if (!gymSelectedExercise && names.length) gymSelectedExercise = names[0];
+$('gymExPick').innerHTML = names.length
+? names.map((n) => `<button class="${n === gymSelectedExercise ? 'active' : ''}" onclick="gymPickExercise('${esc(n).replace(/'/g, "\\'")}')">${esc(n)}</button>`).join('')
+: '';
+}
+window.gymPickExercise = (name) => { gymSelectedExercise = name; gymRenderExercisesTab(); };
+
+function gymBuildSparkline(points) {
+if (points.length < 2) return '';
+const w = 600, h = 60, pad = 6;
+const vals = points.map((p) => p.v);
+const min = Math.min(...vals), max = Math.max(...vals);
+const range = max - min || 1;
+const stepX = (w - pad * 2) / (points.length - 1);
+const coords = points.map((p, i) => {
+const x = pad + i * stepX;
+const y = h - pad - ((p.v - min) / range) * (h - pad * 2);
+return `${x.toFixed(1)},${y.toFixed(1)}`;
+});
+return `<svg class="sparkline" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+<polyline points="${coords.join(' ')}" fill="none" stroke="#7fdc9e" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+</svg>`;
+}
+
+function gymRenderExercisesTab() {
+gymRenderExercisePicker();
+const el = $('gymExDetail');
+if (!gymSelectedExercise) { el.innerHTML = `<div class="empty">Log een set om hier progressie te zien.</div>`; return; }
+const sessions = gymSessionsFor(gymSelectedExercise);
+const points = sessions.slice().reverse().map((s) => ({ v: Math.max(...s.sets.map((x) => gymEstOneRm(x.weight, x.reps))), date: s.date }));
+const best = sessions.reduce((acc, s) => {
+s.sets.forEach((x) => {
+if (x.weight > acc.maxWeight) acc.maxWeight = x.weight;
+if (x.reps > acc.maxReps) acc.maxReps = x.reps;
+const orm = gymEstOneRm(x.weight, x.reps);
+if (orm > acc.est1rm) acc.est1rm = orm;
+});
+return acc;
+}, { maxWeight: 0, maxReps: 0, est1rm: 0 });
+el.innerHTML = `
+<div class="statgrid" style="margin-bottom:14px;">
+<div class="stat"><div class="num">${best.maxWeight}${gymUnit()}</div><div class="cap">zwaarste set</div></div>
+<div class="stat"><div class="num">${best.maxReps}</div><div class="cap">meeste reps in een set</div></div>
+<div class="stat"><div class="num">${best.est1rm.toFixed(1)}${gymUnit()}</div><div class="cap">geschatte 1RM (Epley)</div></div>
+</div>
+${points.length >= 2 ? `<div class="set-card"><div class="section-sub" style="margin-bottom:8px;">Geschatte 1RM trend</div>${gymBuildSparkline(points)}</div>` : ''}
+<table class="hist">
+<tr><th>Datum</th><th>Sets (gewicht × reps)</th></tr>
+${sessions.map((s) => `<tr><td>${esc(s.date)}</td><td>${s.sets.map((x) => `${x.weight}${gymUnit()}×${x.reps}${x.rpe ? ` @${x.rpe}` : ''}`).join(', ')}</td></tr>`).join('')}
+</table>`;
+}
+
+function gymBcRowHtml(x) {
+return `<div class="gym-log-row">
+<div class="lbody">
+<div class="ex">${x.weight}${gymUnit()}${x.bodyFat != null ? ` — ${x.bodyFat}% vet` : ''}${x.muscleMass != null ? ` — ${x.muscleMass}${gymUnit()} spiermassa` : ''}</div>
+<div class="meta">${esc(x.date)}</div>
+${x.note ? `<div class="note">${esc(x.note)}</div>` : ''}
+</div>
+<div class="actions">
+<button class="icon-btn" onclick="gymEditBc('${x.id}')" title="Bewerken">${IC.pencil}</button>
+<button class="icon-btn" onclick="gymRemoveBc('${x.id}')" title="Verwijderen">${IC.trash}</button>
+</div>
+</div>`;
+}
+function gymRenderBc() {
+const items = gymBodycomp.slice().sort((a, b) => b.date.localeCompare(a.date));
+$('gymBcList').innerHTML = items.length ? items.map(gymBcRowHtml).join('') : `<div class="empty">Nog geen metingen.</div>`;
+const points = gymBodycomp.slice().sort((a, b) => a.date.localeCompare(b.date)).map((x) => ({ v: x.weight, date: x.date }));
+$('gymBcChart').innerHTML = points.length >= 2
+? `<div class="set-card"><div class="section-sub" style="margin-bottom:8px;">Gewichtstrend</div>${gymBuildSparkline(points)}</div>`
+: '';
+}
+window.gymEditBc = (id) => { const x = gymBodycomp.find((b) => b.id === id); if (x) gymOpenBcModal(x); };
+window.gymRemoveBc = async (id) => {
+if (!confirm('Deze meting verwijderen?')) return;
+const d = await api('/api/gym/bodycomp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'delete', id }) });
+gymBodycomp = d.entries;
+gymRenderAll();
+};
+function gymOpenBcModal(x) {
+gymEditingBcId = x ? x.id : null;
+$('gymBcModalTitle').textContent = x ? 'Meting bewerken' : 'Nieuwe meting';
+$('gfBcWeight').value = x ? x.weight : '';
+$('gfBcDate').value = x ? x.date : iso(new Date());
+$('gfBcFat').value = x && x.bodyFat != null ? x.bodyFat : '';
+$('gfBcMuscle').value = x && x.muscleMass != null ? x.muscleMass : '';
+$('gfBcNote').value = x ? (x.note || '') : '';
+$('gymBcErr').textContent = '';
+$('gymBcOverlay').classList.add('open');
+$('gfBcWeight').focus();
+}
+$('gymNewBcBtn').onclick = () => gymOpenBcModal(null);
+$('gymBcCancelBtn').onclick = () => $('gymBcOverlay').classList.remove('open');
+$('gymBcOverlay').onclick = (e) => { if (e.target === $('gymBcOverlay')) $('gymBcOverlay').classList.remove('open'); };
+$('gymBcSaveBtn').onclick = async () => {
+const weight = Number($('gfBcWeight').value) || 0;
+if (!weight) { $('gymBcErr').textContent = 'Vul je lichaamsgewicht in.'; return; }
+try {
+const payload = {
+action: gymEditingBcId ? 'update' : 'create',
+id: gymEditingBcId || undefined,
+weight, date: $('gfBcDate').value || iso(new Date()),
+bodyFat: $('gfBcFat').value, muscleMass: $('gfBcMuscle').value, note: $('gfBcNote').value,
+};
+const d = await api('/api/gym/bodycomp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+gymBodycomp = d.entries;
+$('gymBcOverlay').classList.remove('open');
+gymRenderAll();
+} catch (e) { $('gymBcErr').textContent = e.message; }
+};
+
+const GYM_GOAL_CAT_LABEL = { kracht: 'Kracht', spiermassa: 'Spiermassa', vetverlies: 'Vetverlies', uithoudingsvermogen: 'Uithoudingsvermogen', algemeen: 'Algemeen' };
+function gymGoalRowHtml(g) {
+return `<div class="gym-log-row">
+<div class="lbody">
+<div class="ex">${esc(g.exercise)} — ${g.repMin}–${g.repMax} reps${g.targetWeight ? ` · streef ${g.targetWeight}${gymUnit()}` : ''}${g.done ? ' · ✓ bereikt' : ''}</div>
+${g.note ? `<div class="note">${esc(g.note)}</div>` : ''}
+</div>
+<div class="actions">
+<button class="icon-btn" onclick="gymToggleGoalDone('${g.id}', ${!g.done})" title="${g.done ? 'Heropenen' : 'Als bereikt markeren'}">${IC.check}</button>
+<button class="icon-btn" onclick="gymEditGoal('${g.id}')" title="Bewerken">${IC.pencil}</button>
+<button class="icon-btn" onclick="gymRemoveGoal('${g.id}')" title="Verwijderen">${IC.trash}</button>
+</div>
+</div>`;
+}
+function gymGeneralGoalRowHtml(g) {
+const bits = [];
+if (g.targetValue != null) bits.push(`streef ${g.targetValue}${g.targetUnit ? ' ' + esc(g.targetUnit) : ''}`);
+if (g.targetDate) bits.push(`voor ${g.targetDate}`);
+return `<div class="gym-log-row goal-general-card">
+<div class="lbody">
+<div class="cat">${GYM_GOAL_CAT_LABEL[g.category] || 'Algemeen'}</div>
+<div class="ex">${esc(g.title)}${bits.length ? ` — ${bits.join(', ')}` : ''}${g.done ? ' · ✓ bereikt' : ''}</div>
+${g.note ? `<div class="note">${esc(g.note)}</div>` : ''}
+</div>
+<div class="actions">
+<button class="icon-btn" onclick="gymToggleGoalDone('${g.id}', ${!g.done})" title="${g.done ? 'Heropenen' : 'Als bereikt markeren'}">${IC.check}</button>
+<button class="icon-btn" onclick="gymEditGoal('${g.id}')" title="Bewerken">${IC.pencil}</button>
+<button class="icon-btn" onclick="gymRemoveGoal('${g.id}')" title="Verwijderen">${IC.trash}</button>
+</div>
+</div>`;
+}
+function gymRenderGoals() {
+const exGoals = gymGoals.filter((g) => g.kind !== 'general');
+const genGoals = gymGoals.filter((g) => g.kind === 'general');
+$('gymGoalList').innerHTML = exGoals.length ? exGoals.map(gymGoalRowHtml).join('') : `<div class="empty">Nog geen doelen per oefening. Voeg er een toe om coach-advies te ontgrendelen.</div>`;
+$('gymGoalGeneralList').innerHTML = genGoals.length ? genGoals.map(gymGeneralGoalRowHtml).join('') : `<div class="empty">Nog geen algemene doelen.</div>`;
+}
+window.gymEditGoal = (id) => { const g = gymGoals.find((x) => x.id === id); if (g) gymOpenGoalModal(g); };
+window.gymRemoveGoal = async (id) => {
+if (!confirm('Dit doel verwijderen?')) return;
+const d = await api('/api/gym/goals', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'delete', id }) });
+gymGoals = d.goals;
+gymRenderAll();
+};
+window.gymToggleGoalDone = async (id, done) => {
+const d = await api('/api/gym/goals', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'update', id, done }) });
+gymGoals = d.goals;
+gymRenderAll();
+};
+function gymSetGoalKind(kind) {
+gymGoalKind = kind;
+document.querySelectorAll('#gymGoalKindToggle button').forEach((b) => b.classList.toggle('active', b.dataset.kind === kind));
+$('gymGoalFieldsExercise').style.display = kind === 'exercise' ? '' : 'none';
+$('gymGoalFieldsGeneral').style.display = kind === 'general' ? '' : 'none';
+}
+$('gymGoalKindToggle').onclick = (e) => {
+const b = e.target.closest('button'); if (!b || gymEditingGoalId) return; // can't switch kind while editing an existing goal
+gymSetGoalKind(b.dataset.kind);
+};
+function gymOpenGoalModal(g) {
+gymEditingGoalId = g ? g.id : null;
+$('gymGoalModalTitle').textContent = g ? 'Doel bewerken' : 'Nieuw doel';
+gymFillExDatalist();
+const kind = g ? (g.kind || 'exercise') : 'exercise';
+gymSetGoalKind(kind);
+document.querySelectorAll('#gymGoalKindToggle button').forEach((b) => { b.style.display = g ? 'none' : ''; });
+$('gfGoalExercise').value = g && kind === 'exercise' ? g.exercise : '';
+$('gfGoalRepMin').value = g && kind === 'exercise' ? g.repMin : 8;
+$('gfGoalRepMax').value = g && kind === 'exercise' ? g.repMax : 12;
+$('gfGoalTargetWeight').value = g && kind === 'exercise' && g.targetWeight != null ? g.targetWeight : '';
+$('gfGoalTitle').value = g && kind === 'general' ? g.title : '';
+$('gfGoalCategory').value = g && kind === 'general' ? (g.category || 'algemeen') : 'algemeen';
+$('gfGoalTargetValue').value = g && kind === 'general' && g.targetValue != null ? g.targetValue : '';
+$('gfGoalTargetUnit').value = g && kind === 'general' ? (g.targetUnit || '') : '';
+$('gfGoalTargetDate').value = g && kind === 'general' ? (g.targetDate || '') : '';
+$('gfGoalNote').value = g ? (g.note || '') : '';
+$('gymGoalErr').textContent = '';
+$('gymGoalOverlay').classList.add('open');
+(kind === 'exercise' ? $('gfGoalExercise') : $('gfGoalTitle')).focus();
+}
+$('gymNewGoalBtn').onclick = () => gymOpenGoalModal(null);
+$('gymGoalCancelBtn').onclick = () => $('gymGoalOverlay').classList.remove('open');
+$('gymGoalOverlay').onclick = (e) => { if (e.target === $('gymGoalOverlay')) $('gymGoalOverlay').classList.remove('open'); };
+$('gymGoalSaveBtn').onclick = async () => {
+try {
+let payload;
+if (gymGoalKind === 'exercise') {
+const exercise = $('gfGoalExercise').value.trim();
+if (!exercise) { $('gymGoalErr').textContent = 'Kies of typ een oefening.'; return; }
+payload = {
+action: gymEditingGoalId ? 'update' : 'create',
+id: gymEditingGoalId || undefined,
+kind: 'exercise', exercise,
+repMin: $('gfGoalRepMin').value, repMax: $('gfGoalRepMax').value,
+targetWeight: $('gfGoalTargetWeight').value, note: $('gfGoalNote').value,
+};
+} else {
+const title = $('gfGoalTitle').value.trim();
+if (!title) { $('gymGoalErr').textContent = 'Geef je doel een titel.'; return; }
+payload = {
+action: gymEditingGoalId ? 'update' : 'create',
+id: gymEditingGoalId || undefined,
+kind: 'general', title,
+category: $('gfGoalCategory').value,
+targetValue: $('gfGoalTargetValue').value, targetUnit: $('gfGoalTargetUnit').value,
+targetDate: $('gfGoalTargetDate').value, note: $('gfGoalNote').value,
+};
+}
+const d = await api('/api/gym/goals', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+gymGoals = d.goals;
+$('gymGoalOverlay').classList.remove('open');
+gymRenderAll();
+} catch (e) { $('gymGoalErr').textContent = e.message; }
+};
+
+// ---- Session composer wiring ----
+function gymRenderPlanGroupChips() {
+$('gymPlanGroupChips').innerHTML = GYM_MUSCLE_MAP.map((g) =>
+`<button type="button" data-g="${g.key}" class="${gymPlanGroups.includes(g.key) ? 'active' : ''}">${esc(g.label)}</button>`
+).join('');
+}
+$('gymPlanGroupChips').onclick = (e) => {
+const b = e.target.closest('button'); if (!b) return;
+const k = b.dataset.g;
+gymPlanGroups = gymPlanGroups.includes(k) ? gymPlanGroups.filter((x) => x !== k) : [...gymPlanGroups, k];
+gymRenderPlanGroupChips();
+gymRenderSessionPlanner();
+};
+function gymAddPlanExercise(name) {
+name = (name || '').trim();
+if (!name) return;
+if (!gymPlanExercises.some((x) => x.toLowerCase() === name.toLowerCase())) gymPlanExercises.push(name);
+$('gymPlanExInput').value = '';
+gymRenderSessionPlanner();
+}
+$('gymPlanAddBtn').onclick = () => gymAddPlanExercise($('gymPlanExInput').value);
+$('gymPlanExInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); gymAddPlanExercise($('gymPlanExInput').value); } });
+window.gymRemovePlanExercise = (name) => {
+gymPlanExercises = gymPlanExercises.filter((x) => x !== name);
+gymRenderSessionPlanner();
+};
+window.gymAddSuggested = (name) => gymAddPlanExercise(name);
+
+function gymRenderPlanList() {
+$('gymPlanList').innerHTML = gymPlanExercises.length
+? gymPlanExercises.map((n) => `<div class="plan-pill">${esc(n)}<button type="button" onclick="gymRemovePlanExercise('${esc(n).replace(/'/g, "\\'")}')">×</button></div>`).join('')
+: '<div class="plan-empty">Nog geen oefeningen toegevoegd.</div>';
+}
+
+// Builds the front-view body diagram once (element ids per visible region)
+// and re-colors it on every render — no need to rebuild the SVG shapes,
+// just swap fill/stroke classes.
+function gymBuildMzSvg() {
+const svg = $('gymMzSvg');
+if (svg.dataset.built) return;
+svg.innerHTML = `
+<circle cx="60" cy="20" r="15" class="mz-skin"/>
+<rect x="52" y="34" width="16" height="10" class="mz-skin"/>
+<rect x="26" y="44" width="68" height="6" rx="3" class="mz-skin"/>
+<circle id="mz-shoulder-l" class="mz-part" cx="28" cy="50" r="11"/>
+<circle id="mz-shoulder-r" class="mz-part" cx="92" cy="50" r="11"/>
+<rect id="mz-chest-upper" class="mz-part" x="40" y="46" width="40" height="12" rx="3"/>
+<rect id="mz-chest-mid" class="mz-part" x="40" y="59" width="40" height="12" rx="3"/>
+<rect id="mz-chest-lower" class="mz-part" x="40" y="72" width="40" height="10" rx="3"/>
+<rect id="mz-bicep-l" class="mz-part" x="14" y="58" width="14" height="34" rx="6"/>
+<rect id="mz-bicep-r" class="mz-part" x="92" y="58" width="14" height="34" rx="6"/>
+<rect x="14" y="92" width="14" height="26" rx="5" class="mz-skin"/>
+<rect x="92" y="92" width="14" height="26" rx="5" class="mz-skin"/>
+<rect id="mz-abs" class="mz-part" x="48" y="83" width="24" height="30" rx="4"/>
+<rect id="mz-oblique-l" class="mz-part" x="38" y="83" width="9" height="28" rx="3"/>
+<rect id="mz-oblique-r" class="mz-part" x="73" y="83" width="9" height="28" rx="3"/>
+<rect x="38" y="114" width="44" height="8" rx="3" class="mz-skin"/>
+<rect id="mz-quad-l" class="mz-part" x="39" y="123" width="18" height="46" rx="6"/>
+<rect id="mz-quad-r" class="mz-part" x="63" y="123" width="18" height="46" rx="6"/>
+<rect x="39" y="170" width="18" height="8" class="mz-skin"/>
+<rect x="63" y="170" width="18" height="8" class="mz-skin"/>
+<rect id="mz-calf-l" class="mz-part" x="41" y="179" width="14" height="38" rx="6"/>
+<rect id="mz-calf-r" class="mz-part" x="65" y="179" width="14" height="38" rx="6"/>
+<rect x="41" y="219" width="14" height="10" rx="2" class="mz-skin"/>
+<rect x="65" y="219" width="14" height="10" rx="2" class="mz-skin"/>
+`;
+svg.dataset.built = '1';
+}
+// Maps visible SVG zone ids to the (group, region) whose coverage score
+// should color them; shoulders/biceps are mirrored left/right so both
+// sides get the same value.
+const GYM_MZ_ZONES = {
+'mz-chest-upper': ['chest', 'chest_upper'], 'mz-chest-mid': ['chest', 'chest_mid'], 'mz-chest-lower': ['chest', 'chest_lower'],
+'mz-shoulder-l': ['shoulders', 'delt_front'], 'mz-shoulder-r': ['shoulders', 'delt_side'],
+'mz-bicep-l': ['biceps', 'biceps'], 'mz-bicep-r': ['biceps', 'biceps'],
+'mz-abs': ['core', 'abs'], 'mz-oblique-l': ['core', 'obliques'], 'mz-oblique-r': ['core', 'obliques'],
+'mz-quad-l': ['legs', 'quads'], 'mz-quad-r': ['legs', 'quads'],
+'mz-calf-l': ['legs', 'calves'], 'mz-calf-r': ['legs', 'calves'],
+};
+function gymRenderMzSvg(score) {
+gymBuildMzSvg();
+Object.entries(GYM_MZ_ZONES).forEach(([id, [g, r]]) => {
+const el = document.getElementById(id);
+if (!el) return;
+el.setAttribute('class', 'mz-part mz-' + gymCoverageLevel(score[`${g}:${r}`]));
+});
+}
+function gymRenderMzLegend(score) {
+const groups = gymPlanGroups.length ? GYM_MUSCLE_MAP.filter((g) => gymPlanGroups.includes(g.key)) : GYM_MUSCLE_MAP;
+if (!gymPlanGroups.length) {
+$('gymMzLegend').innerHTML = '<div class="plan-empty">Kies hierboven welke spiergroepen je vandaag traint om per spier te zien wat je nog mist.</div>';
+return;
+}
+$('gymMzLegend').innerHTML = groups.map((g) => {
+const rows = g.regions.map((r) => {
+const v = score[`${g.key}:${r.key}`] || 0;
+const level = gymCoverageLevel(v);
+let suggestHtml = '';
+if (level !== 'full') {
+const sug = gymSuggestExerciseFor(g.key, r.key, gymPlanExercises);
+if (sug) suggestHtml = `<span class="mz-suggest" onclick="gymAddSuggested('${sug.replace(/'/g, "\\'")}')">+ ${esc(sug)}</span>`;
+}
+return `<div class="mz-region"><span class="mz-dot mz-${level}"></span>${esc(r.label)}${suggestHtml}</div>`;
+}).join('');
+return `<div class="mz-group"><div class="mz-group-name">${esc(g.label)}</div>${rows}</div>`;
+}).join('');
+}
+function gymRenderSessionPlanner() {
+gymRenderPlanList();
+const score = gymComputeCoverage(gymPlanExercises);
+gymRenderMzSvg(score);
+gymRenderMzLegend(score);
+}
+
+function gymTmplRowHtml(tp) {
+return `<div class="tmpl-row">
+<div>
+<div class="tname">${esc(tp.name)}</div>
+<div class="tmeta">${tp.exercises.length} oefening(en)${tp.groups.length ? ' · ' + tp.groups.map((k) => (GYM_MUSCLE_MAP.find((g) => g.key === k) || {}).label || k).join(', ') : ''}</div>
+</div>
+<button class="btn-ghost" onclick="gymLoadTemplate('${tp.id}')">Laden</button>
+<button class="icon-btn" onclick="gymRemoveTemplate('${tp.id}')" title="Verwijderen">${IC.trash}</button>
+</div>`;
+}
+function gymRenderTemplates() {
+$('gymTmplList').innerHTML = gymSessionTemplates.length ? gymSessionTemplates.map(gymTmplRowHtml).join('') : '<div class="plan-empty">Nog geen opgeslagen sessies.</div>';
+}
+window.gymLoadTemplate = (id) => {
+const tp = gymSessionTemplates.find((x) => x.id === id);
+if (!tp) return;
+gymPlanGroups = [...(tp.groups || [])];
+gymPlanExercises = [...(tp.exercises || [])];
+gymRenderPlanGroupChips();
+gymRenderSessionPlanner();
+};
+window.gymRemoveTemplate = async (id) => {
+if (!confirm('Deze sjabloon verwijderen?')) return;
+const d = await api('/api/gym/sessions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'delete', id }) });
+gymSessionTemplates = d.sessions;
+gymRenderTemplates();
+};
+$('gymPlanSaveTmplBtn').onclick = async () => {
+const name = $('gymPlanNameInput').value.trim();
+if (!name) { flashSetMsg('Geef je sessie een naam.'); return; }
+if (!gymPlanExercises.length) { flashSetMsg('Voeg eerst een oefening toe.'); return; }
+try {
+const d = await api('/api/gym/sessions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'create', name, groups: gymPlanGroups, exercises: gymPlanExercises }) });
+gymSessionTemplates = d.sessions;
+$('gymPlanNameInput').value = '';
+gymRenderTemplates();
+flashSetMsg(t('set.saved'));
+} catch (e) { flashSetMsg(e.message); }
+};
+
+$('gymTabs').onclick = (e) => {
+const b = e.target.closest('button'); if (!b) return;
+gymActiveTab = b.dataset.gtab;
+document.querySelectorAll('#gymTabs button').forEach((x) => x.classList.toggle('active', x === b));
+document.querySelectorAll('.gym-sub').forEach((x) => { x.style.display = 'none'; });
+$('gtab-' + gymActiveTab).style.display = 'block';
+if (gymActiveTab === 'progress') gymRenderExercisesTab();
+if (gymActiveTab === 'session') gymRenderSessionPlanner();
+};
+
+async function gymSaveProfile(partial) {
+const d = await api('/api/gym/profile', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(partial) });
+gymProfile = d;
+gymRefreshUnitLabels();
+return d;
+}
+$('setGymUnit').onchange = async () => {
+try { await gymSaveProfile({ unit: $('setGymUnit').value }); gymRenderAll(); flashSetMsg(t('set.saved')); }
+catch (e) { flashSetMsg(e.message); }
+};
+$('setGymRestDays').onchange = async () => {
+try { await gymSaveProfile({ restDays: Number($('setGymRestDays').value) || 2 }); gymRenderAll(); flashSetMsg(t('set.saved')); }
+catch (e) { flashSetMsg(e.message); }
+};
+$('setShowGym').onchange = async () => {
+try { await saveProfile({ showGymCards: $('setShowGym').checked }); gymRenderHomeCard(); flashSetMsg(t('set.saved')); }
+catch (e) { flashSetMsg(e.message); }
+};
+
+function gymRenderAll() {
+gymFillExDatalist();
+gymRenderStats();
+gymRenderAdvice();
+gymRenderRecent();
+gymRenderLogList();
+gymRenderBc();
+gymRenderGoals();
+gymRenderHomeCard();
+gymRenderPlanGroupChips();
+gymRenderTemplates();
+if (gymActiveTab === 'progress') gymRenderExercisesTab();
+if (gymActiveTab === 'session') gymRenderSessionPlanner();
+}
+
+async function gymLoad() {
+try { gymProfile = await api('/api/gym/profile'); } catch (e) { /* opslag nog niet gekoppeld */ }
+$('setGymUnit').value = gymProfile.unit || 'kg';
+$('setGymRestDays').value = String(gymProfile.restDays || 2);
+$('setShowGym').checked = profile.showGymCards !== false;
+gymRefreshUnitLabels();
+try { gymCustomEx = await api('/api/gym/exercises'); } catch (e) { /* opslag nog niet gekoppeld */ }
+try { gymLog = await api('/api/gym/log'); } catch (e) { /* opslag nog niet gekoppeld */ }
+try { gymBodycomp = await api('/api/gym/bodycomp'); } catch (e) { /* opslag nog niet gekoppeld */ }
+try { gymGoals = await api('/api/gym/goals'); } catch (e) { /* opslag nog niet gekoppeld */ }
+try { gymSessionTemplates = await api('/api/gym/sessions'); } catch (e) { /* opslag nog niet gekoppeld */ }
+gymRenderAll();
+}
 
 applyLang();
 load();

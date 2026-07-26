@@ -1,4 +1,4 @@
-// VDK Business Services — website + 2FA admin panel (Base) + separate CRM service
+// VDK Business Services — website + 2FA admin panel (Base) + separate CRM service + Gym Assistant
 // Zero dependencies: runs with plain Node.js (v18+). Start with: node server.js
 'use strict';
 
@@ -1010,6 +1010,270 @@ setCookies.push(sessionCookie(otherRealm, otherCookie, SESSION_TTL));
 return json(res, 200, { ok: true }, { 'Set-Cookie': setCookies });
 }
 
+// ---------- Gym Coach: exercises, logged sets, body composition, goals ----------
+// Lives inside Base — same "admin" session as reminders/suggestions, just its
+// own KV namespace (gymex:/gymlog:/gymbc:/gymgoal:/gympref:<email>). Mirrors
+// the CRM's create/update/delete-by-action pattern used across the app.
+const GYM_DEFAULT_EXERCISES = [
+'Squat', 'Bench Press', 'Deadlift', 'Overhead Press', 'Barbell Row',
+'Pull-up', 'Dumbbell Curl', 'Leg Press', 'Lat Pulldown', 'Plank',
+'Incline Dumbbell Press', 'Romanian Deadlift', 'Leg Curl', 'Dips', 'Hip Thrust',
+];
+
+function gymExKey(email) { return `gymex:${email}`; }
+function gymLogKey(email) { return `gymlog:${email}`; }
+function gymBcKey(email) { return `gymbc:${email}`; }
+function gymGoalKey(email) { return `gymgoal:${email}`; }
+
+async function handleGymExercises(req, res) {
+const s = await getSession(req, 'admin');
+if (!s) return json(res, 401, { error: 'Not logged in' });
+const key = gymExKey(s.email);
+try {
+if (req.method === 'GET') return json(res, 200, (await kvGetJson(key)) || []);
+if (req.method === 'POST') {
+const body = await readBody(req);
+let list = (await kvGetJson(key)) || [];
+if (body.action === 'create') {
+const name = String(body.name || '').trim().slice(0, 100);
+if (!name) return json(res, 400, { error: 'Naam is verplicht' });
+if (!list.find((x) => x.name.toLowerCase() === name.toLowerCase()) &&
+!GYM_DEFAULT_EXERCISES.find((x) => x.toLowerCase() === name.toLowerCase())) {
+list.push({ id: crypto.randomUUID(), name, muscle: String(body.muscle || '').trim().slice(0, 60), createdAt: Date.now() });
+}
+} else if (body.action === 'delete') {
+list = list.filter((x) => x.id !== body.id);
+} else {
+return json(res, 400, { error: 'Onbekende actie' });
+}
+await kvSetJson(key, list);
+return json(res, 200, { ok: true, exercises: list });
+}
+} catch (e) {
+console.error('gym exercises API error:', e.message);
+return json(res, 500, { error: 'Opslag niet bereikbaar. Is Upstash gekoppeld?' });
+}
+}
+
+async function handleGymLog(req, res) {
+const s = await getSession(req, 'admin');
+if (!s) return json(res, 401, { error: 'Not logged in' });
+const key = gymLogKey(s.email);
+try {
+if (req.method === 'GET') return json(res, 200, (await kvGetJson(key)) || []);
+if (req.method === 'POST') {
+const body = await readBody(req);
+let list = (await kvGetJson(key)) || [];
+if (body.action === 'create') {
+const exercise = String(body.exercise || '').trim().slice(0, 100);
+if (!exercise) return json(res, 400, { error: 'Kies een oefening.' });
+const date = /^\d{4}-\d{2}-\d{2}$/.test(String(body.date || '')) ? String(body.date) : new Date().toISOString().slice(0, 10);
+const weight = Number(body.weight) || 0;
+const reps = Math.max(0, Math.min(200, Number(body.reps) || 0));
+if (!reps) return json(res, 400, { error: 'Vul het aantal reps in.' });
+const MUSCLE_GROUPS = ['Legs', 'Push', 'Pull', 'Core', 'Other'];
+list.push({
+id: crypto.randomUUID(),
+exercise, date, weight, reps,
+muscle: MUSCLE_GROUPS.includes(body.muscle) ? body.muscle : 'Other',
+rpe: body.rpe !== undefined && body.rpe !== '' ? Math.min(10, Math.max(1, Number(body.rpe) || 0)) : null,
+note: String(body.note || '').trim().slice(0, 500),
+createdAt: Date.now(),
+});
+} else if (body.action === 'update') {
+const it = list.find((x) => x.id === body.id);
+if (!it) return json(res, 404, { error: 'Niet gevonden' });
+const MUSCLE_GROUPS = ['Legs', 'Push', 'Pull', 'Core', 'Other'];
+if (body.exercise !== undefined) it.exercise = String(body.exercise).trim().slice(0, 100) || it.exercise;
+if (body.date !== undefined) it.date = /^\d{4}-\d{2}-\d{2}$/.test(String(body.date)) ? String(body.date) : it.date;
+if (body.weight !== undefined) it.weight = Number(body.weight) || 0;
+if (body.reps !== undefined) it.reps = Math.max(0, Math.min(200, Number(body.reps) || 0));
+if (body.muscle !== undefined) it.muscle = MUSCLE_GROUPS.includes(body.muscle) ? body.muscle : (it.muscle || 'Other');
+if (body.rpe !== undefined) it.rpe = body.rpe === '' ? null : Math.min(10, Math.max(1, Number(body.rpe) || 0));
+if (body.note !== undefined) it.note = String(body.note).trim().slice(0, 500);
+} else if (body.action === 'delete') {
+list = list.filter((x) => x.id !== body.id);
+} else {
+return json(res, 400, { error: 'Onbekende actie' });
+}
+await kvSetJson(key, list);
+return json(res, 200, { ok: true, log: list });
+}
+} catch (e) {
+console.error('gym log API error:', e.message);
+return json(res, 500, { error: 'Opslag niet bereikbaar. Is Upstash gekoppeld?' });
+}
+}
+
+async function handleGymBodycomp(req, res) {
+const s = await getSession(req, 'admin');
+if (!s) return json(res, 401, { error: 'Not logged in' });
+const key = gymBcKey(s.email);
+try {
+if (req.method === 'GET') return json(res, 200, (await kvGetJson(key)) || []);
+if (req.method === 'POST') {
+const body = await readBody(req);
+let list = (await kvGetJson(key)) || [];
+if (body.action === 'create') {
+const date = /^\d{4}-\d{2}-\d{2}$/.test(String(body.date || '')) ? String(body.date) : new Date().toISOString().slice(0, 10);
+const weight = Number(body.weight) || 0;
+if (!weight) return json(res, 400, { error: 'Vul je lichaamsgewicht in.' });
+list.push({
+id: crypto.randomUUID(), date, weight,
+bodyFat: body.bodyFat !== undefined && body.bodyFat !== '' ? Number(body.bodyFat) || null : null,
+muscleMass: body.muscleMass !== undefined && body.muscleMass !== '' ? Number(body.muscleMass) || null : null,
+note: String(body.note || '').trim().slice(0, 500),
+createdAt: Date.now(),
+});
+} else if (body.action === 'update') {
+const it = list.find((x) => x.id === body.id);
+if (!it) return json(res, 404, { error: 'Niet gevonden' });
+if (body.date !== undefined) it.date = /^\d{4}-\d{2}-\d{2}$/.test(String(body.date)) ? String(body.date) : it.date;
+if (body.weight !== undefined) it.weight = Number(body.weight) || it.weight;
+if (body.bodyFat !== undefined) it.bodyFat = body.bodyFat === '' ? null : Number(body.bodyFat) || null;
+if (body.muscleMass !== undefined) it.muscleMass = body.muscleMass === '' ? null : Number(body.muscleMass) || null;
+if (body.note !== undefined) it.note = String(body.note).trim().slice(0, 500);
+} else if (body.action === 'delete') {
+list = list.filter((x) => x.id !== body.id);
+} else {
+return json(res, 400, { error: 'Onbekende actie' });
+}
+await kvSetJson(key, list);
+return json(res, 200, { ok: true, entries: list });
+}
+} catch (e) {
+console.error('gym bodycomp API error:', e.message);
+return json(res, 500, { error: 'Opslag niet bereikbaar. Is Upstash gekoppeld?' });
+}
+}
+
+// General-goal categories (goals not tied to one specific exercise, e.g.
+// "5kg afvallen" or "algeheel sterker worden") — kept loose/free-text where
+// it matters (title, note) but the category is a small fixed enum so the
+// UI can show a consistent icon/label per goal.
+const GYM_GOAL_CATEGORIES = ['kracht', 'spiermassa', 'vetverlies', 'uithoudingsvermogen', 'algemeen'];
+
+async function handleGymGoals(req, res) {
+const s = await getSession(req, 'admin');
+if (!s) return json(res, 401, { error: 'Not logged in' });
+const key = gymGoalKey(s.email);
+try {
+if (req.method === 'GET') return json(res, 200, (await kvGetJson(key)) || []);
+if (req.method === 'POST') {
+const body = await readBody(req);
+let list = (await kvGetJson(key)) || [];
+if (body.action === 'create') {
+const kind = body.kind === 'general' ? 'general' : 'exercise';
+if (kind === 'exercise') {
+const exercise = String(body.exercise || '').trim().slice(0, 100);
+if (!exercise) return json(res, 400, { error: 'Kies een oefening.' });
+list = list.filter((x) => x.kind === 'general' || x.exercise.toLowerCase() !== exercise.toLowerCase()); // one active goal per exercise
+list.push({
+id: crypto.randomUUID(),
+kind: 'exercise',
+exercise,
+repMin: Math.max(1, Math.min(50, Number(body.repMin) || 8)),
+repMax: Math.max(1, Math.min(50, Number(body.repMax) || 12)),
+targetWeight: body.targetWeight !== undefined && body.targetWeight !== '' ? Number(body.targetWeight) || null : null,
+note: String(body.note || '').trim().slice(0, 300),
+done: false,
+doneAt: null,
+createdAt: Date.now(),
+});
+} else {
+// General goal — not tied to a single exercise, e.g. "vetpercentage
+// omlaag" or "algeheel sterker worden". Multiple can be active at once.
+const title = String(body.title || '').trim().slice(0, 150);
+if (!title) return json(res, 400, { error: 'Geef je doel een titel.' });
+const category = GYM_GOAL_CATEGORIES.includes(body.category) ? body.category : 'algemeen';
+list.push({
+id: crypto.randomUUID(),
+kind: 'general',
+title,
+category,
+targetValue: body.targetValue !== undefined && body.targetValue !== '' ? Number(body.targetValue) || null : null,
+targetUnit: String(body.targetUnit || '').trim().slice(0, 20),
+targetDate: body.targetDate ? String(body.targetDate).slice(0, 10) : null,
+note: String(body.note || '').trim().slice(0, 300),
+done: false,
+doneAt: null,
+createdAt: Date.now(),
+});
+}
+} else if (body.action === 'update') {
+const it = list.find((x) => x.id === body.id);
+if (!it) return json(res, 404, { error: 'Niet gevonden' });
+if (it.kind === 'general') {
+if (body.title !== undefined) it.title = String(body.title).trim().slice(0, 150) || it.title;
+if (body.category !== undefined) it.category = GYM_GOAL_CATEGORIES.includes(body.category) ? body.category : it.category;
+if (body.targetValue !== undefined) it.targetValue = body.targetValue === '' ? null : Number(body.targetValue) || null;
+if (body.targetUnit !== undefined) it.targetUnit = String(body.targetUnit).trim().slice(0, 20);
+if (body.targetDate !== undefined) it.targetDate = body.targetDate ? String(body.targetDate).slice(0, 10) : null;
+if (body.note !== undefined) it.note = String(body.note).trim().slice(0, 300);
+} else {
+if (body.repMin !== undefined) it.repMin = Math.max(1, Math.min(50, Number(body.repMin) || it.repMin));
+if (body.repMax !== undefined) it.repMax = Math.max(1, Math.min(50, Number(body.repMax) || it.repMax));
+if (body.targetWeight !== undefined) it.targetWeight = body.targetWeight === '' ? null : Number(body.targetWeight) || null;
+if (body.note !== undefined) it.note = String(body.note).trim().slice(0, 300);
+}
+if (body.done !== undefined) { it.done = !!body.done; it.doneAt = it.done ? Date.now() : null; }
+} else if (body.action === 'delete') {
+list = list.filter((x) => x.id !== body.id);
+} else {
+return json(res, 400, { error: 'Onbekende actie' });
+}
+await kvSetJson(key, list);
+return json(res, 200, { ok: true, goals: list });
+}
+} catch (e) {
+console.error('gym goals API error:', e.message);
+return json(res, 500, { error: 'Opslag niet bereikbaar. Is Upstash gekoppeld?' });
+}
+}
+
+// Session templates: a named, reusable "workout plan" (e.g. "Push dag",
+// "Chest & Tricep") the user composes from the muscle-coverage planner —
+// just a saved list of muscle groups + exercise names so it can be
+// reloaded next time instead of rebuilt from scratch. All the actual
+// coverage/suggestion logic lives client-side (it only needs the exercise
+// names, no new taxonomy data needs to live server-side).
+function gymSessionKey(email) { return `gymsessions:${email}`; }
+
+async function handleGymSessions(req, res) {
+const s = await getSession(req, 'admin');
+if (!s) return json(res, 401, { error: 'Not logged in' });
+const key = gymSessionKey(s.email);
+try {
+if (req.method === 'GET') return json(res, 200, (await kvGetJson(key)) || []);
+if (req.method === 'POST') {
+const body = await readBody(req);
+let list = (await kvGetJson(key)) || [];
+if (body.action === 'create') {
+const name = String(body.name || '').trim().slice(0, 100);
+if (!name) return json(res, 400, { error: 'Geef je sessie een naam.' });
+const groups = Array.isArray(body.groups) ? body.groups.map((g) => String(g).slice(0, 30)).slice(0, 10) : [];
+const exercises = Array.isArray(body.exercises) ? body.exercises.map((x) => String(x).trim().slice(0, 100)).filter(Boolean).slice(0, 30) : [];
+list.push({ id: crypto.randomUUID(), name, groups, exercises, createdAt: Date.now() });
+} else if (body.action === 'update') {
+const it = list.find((x) => x.id === body.id);
+if (!it) return json(res, 404, { error: 'Niet gevonden' });
+if (body.name !== undefined) it.name = String(body.name).trim().slice(0, 100) || it.name;
+if (body.groups !== undefined) it.groups = Array.isArray(body.groups) ? body.groups.map((g) => String(g).slice(0, 30)).slice(0, 10) : it.groups;
+if (body.exercises !== undefined) it.exercises = Array.isArray(body.exercises) ? body.exercises.map((x) => String(x).trim().slice(0, 100)).filter(Boolean).slice(0, 30) : it.exercises;
+} else if (body.action === 'delete') {
+list = list.filter((x) => x.id !== body.id);
+} else {
+return json(res, 400, { error: 'Onbekende actie' });
+}
+await kvSetJson(key, list);
+return json(res, 200, { ok: true, sessions: list });
+}
+} catch (e) {
+console.error('gym sessions API error:', e.message);
+return json(res, 500, { error: 'Opslag niet bereikbaar. Is Upstash gekoppeld?' });
+}
+}
+
 // ---------- Server ----------
 
 const server = http.createServer(async (req, res) => {
@@ -1021,8 +1285,7 @@ const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.r
 if (req.method === 'POST' && p === '/base/request-code') return handleRequestCode(req, res, 'admin');
 if (req.method === 'POST' && p === '/base/verify') return handleVerify(req, res, 'admin');
 if (req.method === 'POST' && p === '/base/logout') {
-const s = await getSession(req, 'admin');
-if (s) await destroySession('admin', s.id);
+const s = await getSession(req, 'admin');if (s) await destroySession('admin', s.id);
 return json(res, 200, { ok: true }, { 'Set-Cookie': sessionCookie('admin', '', 0) });
 }
 
@@ -1063,6 +1326,13 @@ const s = await getSession(req, 'crm');
 if (!s) return json(res, 401, { error: 'Not logged in' });
 return json(res, 200, { email: s.email, isAdmin: s.email === ADMIN_EMAIL });
 }
+
+// --- Gym Coach API (lives inside Base — same 'admin' session, no separate login) ---
+if (p === '/api/gym/exercises') return handleGymExercises(req, res);
+if (p === '/api/gym/log') return handleGymLog(req, res);
+if (p === '/api/gym/bodycomp') return handleGymBodycomp(req, res);
+if (p === '/api/gym/goals') return handleGymGoals(req, res);
+if (p === '/api/gym/sessions') return handleGymSessions(req, res);
 
 if (p === '/api/crm/companies') {
 const s = await getSession(req, 'crm');
@@ -1484,6 +1754,32 @@ return json(res, 200, pr);
 }
 } catch (e) {
 console.error('crm profile API error:', e.message);
+return json(res, 500, { error: 'Opslag niet bereikbaar. Is Upstash gekoppeld?' });
+}
+}
+
+// Gym Coach's own tiny preference (just the weight unit) — lives under the
+// same admin session as the rest of Base, no separate login/profile needed.
+if (p === '/api/gym/profile') {
+const s = await getSession(req, 'admin');
+if (!s) return json(res, 401, { error: 'Not logged in' });
+const key = `gympref:${s.email}`;
+const defaults = { unit: 'kg', restDays: 2 };
+try {
+if (req.method === 'GET') {
+const pr = (await kvGetJson(key)) || {};
+return json(res, 200, { ...defaults, ...pr });
+}
+if (req.method === 'POST') {
+const body = await readBody(req);
+const pr = { ...defaults, ...((await kvGetJson(key)) || {}) };
+if (body.unit !== undefined) pr.unit = ['kg', 'lb'].includes(body.unit) ? body.unit : 'kg';
+if (body.restDays !== undefined) pr.restDays = Math.min(7, Math.max(1, Number(body.restDays) || 2));
+await kvSetJson(key, pr);
+return json(res, 200, pr);
+}
+} catch (e) {
+console.error('gym profile API error:', e.message);
 return json(res, 500, { error: 'Opslag niet bereikbaar. Is Upstash gekoppeld?' });
 }
 }
