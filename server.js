@@ -567,7 +567,12 @@ const listBody = `<?xml version="1.0" encoding="utf-8"?>
 <A:prop><A:resourcetype/><A:displayname/><C:supported-calendar-component-set/></A:prop>
 </A:propfind>`;
 const rl = await caldavRequestFollow(homeUrl, { method: 'PROPFIND', headers: { Depth: '1' }, body: listBody, auth });
-const hrefs = xmlHrefs(rl.body).filter((h) => h !== new URL(homeUrl).pathname && h.endsWith('/'));
+// Exclude iCloud's internal CalDAV scheduling collections (inbox/outbox/
+// notification) — these show up alongside real calendars under the
+// home-set but aren't calendars at all; querying them for events just
+// returns 403/404 on every dashboard load for no benefit.
+const hrefs = xmlHrefs(rl.body).filter((h) => h !== new URL(homeUrl).pathname && h.endsWith('/')
+&& !/\/(inbox|outbox|notification|notifications)\/$/i.test(h));
 if (!hrefs.length) {
 // Surface the exact URL we queried and every candidate href seen in the
 // previous step, so a wrong homeHref pick (e.g. picking the request's
@@ -600,6 +605,42 @@ return String(s || '').replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g,
 function icalDate(due, time) {
 if (time) return due.replace(/-/g, '') + 'T' + time.replace(':', '') + '00';
 return due.replace(/-/g, '');
+}
+
+// Parses a raw DTSTART/DTEND line body (everything after "DTSTART"/"DTEND",
+// i.e. the optional ";PARAM=..." params plus the ":value") into a normal
+// "YYYY-MM-DDTHH:MM:SS" string (or a bare "YYYY-MM-DD" for all-day events),
+// so the front-end's existing `(ev.start || '').slice(11, 16)` time display
+// actually works. Previously the raw iCal value (e.g. "20260726T140000" or
+// "TZID=Europe/Amsterdam:20260726T140000") was passed straight through —
+// slicing that at [11,16] doesn't line up with hours/minutes at all, which
+// is why event times never showed up in the "Today's calendar" card.
+function parseIcalDt(rawLine) {
+// rawLine looks like ";TZID=Europe/Amsterdam:20260726T140000" or
+// ";VALUE=DATE:20260726" or ":20260726T140000Z" (floating/UTC, no params).
+const m = rawLine.match(/^([^:]*):(.+)$/);
+if (!m) return { allDay: false, iso: '' };
+const params = m[1] || '';
+const value = m[2].trim();
+const y = value.slice(0, 4), mo = value.slice(4, 6), d = value.slice(6, 8);
+if (/VALUE=DATE\b/.test(params) || value.length === 8) {
+return { allDay: true, iso: `${y}-${mo}-${d}` };
+}
+const hh = value.slice(9, 11), mi = value.slice(11, 13), ss = value.slice(13, 15) || '00';
+if (value.endsWith('Z')) {
+// UTC timestamp — convert to Europe/Amsterdam wall-clock time for display,
+// since that's the timezone the business (and its users) operate in.
+const utcMs = Date.UTC(+y, +mo - 1, +d, +hh, +mi, +ss);
+const parts = new Intl.DateTimeFormat('en-CA', {
+timeZone: 'Europe/Amsterdam', year: 'numeric', month: '2-digit', day: '2-digit',
+hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+}).formatToParts(new Date(utcMs)).reduce((o, p) => { o[p.type] = p.value; return o; }, {});
+return { allDay: false, iso: `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}` };
+}
+// Floating time or an explicit TZID — the digits already represent the
+// local wall-clock time in that zone, so use them as-is (no conversion
+// needed to show "what time does this say on the calendar").
+return { allDay: false, iso: `${y}-${mo}-${d}T${hh}:${mi}:${ss}` };
 }
 
 async function appleCreateEvent(cred, { title, note, due, time }) {
@@ -658,8 +699,11 @@ const blocks = r.body.split(/BEGIN:VEVENT/).slice(1);
 debug.blockCount = blocks.length;
 const events = blocks.map((b) => {
 const summary = (b.match(/SUMMARY:(.*)/) || [, ''])[1].trim();
-const dtstart = (b.match(/DTSTART[^:]*:(.*)/) || [, ''])[1].trim();
-return { source: 'apple', title: summary || '(geen titel)', start: dtstart, end: '', allDay: dtstart.length === 8 };
+const dtstartRaw = (b.match(/DTSTART([^\r\n]*)/) || [, ''])[1].trim();
+const dtendRaw = (b.match(/DTEND([^\r\n]*)/) || [, ''])[1].trim();
+const startInfo = parseIcalDt(dtstartRaw);
+const endInfo = dtendRaw ? parseIcalDt(dtendRaw) : { iso: '' };
+return { source: 'apple', title: summary || '(geen titel)', start: startInfo.iso, end: endInfo.iso, allDay: startInfo.allDay };
 });
 return { events, debug };
 }
@@ -671,7 +715,11 @@ const auth = { appleId: cred.appleId, appPassword: cred.appPassword };
 // Work, Birthdays, shared ones), and today's real events may live on one
 // the name-heuristic didn't pick. Older stored connections (from before
 // this fix) only have a single `calendarUrl`, so fall back to that.
-const calendarUrls = (cred.calendarUrls && cred.calendarUrls.length) ? cred.calendarUrls : [cred.calendarUrl];
+const rawCalendarUrls = (cred.calendarUrls && cred.calendarUrls.length) ? cred.calendarUrls : [cred.calendarUrl];
+// Filter out iCloud's internal scheduling collections here too (not just
+// at connect-time) so accounts that connected before that filter existed
+// stop querying them without needing to reconnect.
+const calendarUrls = rawCalendarUrls.filter((u) => !/\/(inbox|outbox|notification|notifications)\/$/i.test(u));
 const perCalendar = await Promise.all(
 calendarUrls.map((url) => appleListEventsForCalendar(url, auth, startDate, endDate)
 .catch((e) => ({ events: [], debug: { url, error: e.message } })))
