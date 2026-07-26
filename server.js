@@ -643,6 +643,48 @@ return { allDay: false, iso: `${parts.year}-${parts.month}-${parts.day}T${parts.
 return { allDay: false, iso: `${y}-${mo}-${d}T${hh}:${mi}:${ss}` };
 }
 
+// --- Timezone-safe date helpers (Europe/Amsterdam) ---------------------
+// The server process itself runs in UTC (confirmed via `date` /
+// Intl.DateTimeFormat().resolvedOptions().timeZone on the hosting
+// platform), but the business and its calendar operate in Europe/Amsterdam
+// local time. These helpers compute the exact UTC instant corresponding to
+// midnight in Amsterdam on a given calendar date, so "today"/"tomorrow"/
+// "week"/"month" query windows line up with Amsterdam wall-clock days
+// instead of UTC days (which would shift the boundary by 1-2 hours and
+// could pull an event from the next day into "today", or vice versa).
+
+function zonedOffsetMinutes(utcDate, timeZone) {
+const dtf = new Intl.DateTimeFormat('en-US', {
+timeZone, hour12: false, year: 'numeric', month: '2-digit', day: '2-digit',
+hour: '2-digit', minute: '2-digit', second: '2-digit',
+});
+const parts = dtf.formatToParts(utcDate).reduce((o, p) => { if (p.type !== 'literal') o[p.type] = p.value; return o; }, {});
+const asUTC = Date.UTC(+parts.year, +parts.month - 1, +parts.day, +parts.hour === 24 ? 0 : +parts.hour, +parts.minute, +parts.second);
+return Math.round((asUTC - utcDate.getTime()) / 60000);
+}
+
+function zonedTodayYMD(timeZone) {
+const parts = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' })
+.formatToParts(new Date()).reduce((o, p) => { o[p.type] = p.value; return o; }, {});
+return { y: +parts.year, m: +parts.month, d: +parts.day };
+}
+
+function zonedMidnightUTC(ymd, timeZone) {
+const guess = new Date(Date.UTC(ymd.y, ymd.m - 1, ymd.d, 0, 0, 0));
+const offsetMin = zonedOffsetMinutes(guess, timeZone);
+return new Date(guess.getTime() - offsetMin * 60000);
+}
+
+function addDaysToYMD(ymd, days) {
+const dt = new Date(Date.UTC(ymd.y, ymd.m - 1, ymd.d));
+dt.setUTCDate(dt.getUTCDate() + days);
+return { y: dt.getUTCFullYear(), m: dt.getUTCMonth() + 1, d: dt.getUTCDate() };
+}
+
+function icalUTCStamp(date) {
+return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+}
+
 async function appleCreateEvent(cred, { title, note, due, time }) {
 const uid = `${crypto.randomUUID()}@vdkbusiness-services.nl`;
 const dtstamp = new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
@@ -673,12 +715,17 @@ if (r.status >= 400) throw new Error(`Apple Agenda gaf een fout (status ${r.stat
 return { ok: true, uid };
 }
 
-async function appleListEventsForCalendar(calendarUrl, auth, startDate, endDate) {
+// startStamp/endStamp are full "YYYYMMDDTHHMMSSZ" UTC instants (built by
+// `zonedMidnightUTC` below) — NOT bare calendar dates. Passing exact UTC
+// instants (rather than assuming a date's UTC midnight lines up with the
+// business's actual local midnight) is what makes "today"/"tomorrow"/etc.
+// line up with Europe/Amsterdam wall-clock days instead of UTC days.
+async function appleListEventsForCalendar(calendarUrl, auth, startStamp, endStamp) {
 const reportBody = `<?xml version="1.0" encoding="utf-8"?>
 <C:calendar-query xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
 <D:prop><D:getetag/><C:calendar-data/></D:prop>
 <C:filter><C:comp-filter name="VCALENDAR"><C:comp-filter name="VEVENT">
-<C:time-range start="${startDate}T000000Z" end="${endDate}T000000Z"/>
+<C:time-range start="${startStamp}" end="${endStamp}"/>
 </C:comp-filter></C:comp-filter></C:filter>
 </C:calendar-query>`;
 const r = await caldavRequestFollow(calendarUrl, {
@@ -773,18 +820,26 @@ async function handleCalendarEvents(req, res, realm, url) {
 const s = await getSession(req, realm);
 if (!s) return json(res, 401, { error: 'Not logged in' });
 const range = url.searchParams.get('range') || 'today';
-const start = new Date(); start.setHours(0, 0, 0, 0);
-if (range === 'tomorrow') start.setDate(start.getDate() + 1);
-const end = new Date(start);
-if (range === 'week') end.setDate(end.getDate() + 7);
-else if (range === 'month') end.setDate(end.getDate() + 30);
-else end.setDate(end.getDate() + 1); // 'today' and 'tomorrow' both cover a single day
+const TZ = 'Europe/Amsterdam';
+const today = zonedTodayYMD(TZ);
+const startOffsetDays = range === 'tomorrow' ? 1 : 0;
+const spanDays = range === 'week' ? 7 : range === 'month' ? 30 : 1; // 'today'/'tomorrow' both span 1 day
+const startYMD = addDaysToYMD(today, startOffsetDays);
+const endYMD = addDaysToYMD(today, startOffsetDays + spanDays);
+// Build the exact UTC instants for Amsterdam-local midnight of these two
+// calendar dates — NOT the server process's own midnight (Render runs in
+// UTC, and Amsterdam is 1-2 hours ahead, so naively using UTC midnight
+// shifted the query window by that much and could pull in the first
+// couple hours of the next day, e.g. showing a booking that only starts
+// tomorrow under "today").
+const startStamp = icalUTCStamp(zonedMidnightUTC(startYMD, TZ));
+const endStamp = icalUTCStamp(zonedMidnightUTC(endYMD, TZ));
 const events = [];
 let debug = null;
 try {
 const a = await kvGetJson(calAppleKey(realm, s.email));
 if (a) {
-const result = await appleListEvents(a, start.toISOString().slice(0, 10).replace(/-/g, ''), end.toISOString().slice(0, 10).replace(/-/g, ''));
+const result = await appleListEvents(a, startStamp, endStamp);
 events.push(...result.events);
 debug = result.debug;
 }
