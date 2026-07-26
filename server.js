@@ -39,6 +39,12 @@ const CRM_SECTORS = [
 // CRM: sales-temperature scale for company status, matching the BCR spreadsheet.
 const CRM_SALES_STATUSES = ['frozen', 'cold', 'lukewarm', 'warm', 'hot'];
 
+// Base: fixed icon set for reminders, shown on the Timeline view (and the
+// regular reminders list) — matches the icon ids the frontend's icon
+// picker offers, so an unrecognized/missing value just falls back to no
+// icon rather than breaking anything.
+const REMINDER_ICONS = ['alarm', 'bed', 'dumbbell', 'coffee', 'briefcase', 'book', 'heart', 'car', 'home', 'bell'];
+
 // ---------- Minimal SMTP client (STARTTLS on 587 or implicit TLS on 465) ----------
 function smtpConfigured() {
 return !!process.env.RESEND_API_KEY ||
@@ -685,13 +691,14 @@ function icalUTCStamp(date) {
 return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
 }
 
-async function appleCreateEvent(cred, { title, note, due, time }) {
+async function appleCreateEvent(cred, { title, note, due, time, duration }) {
 const uid = `${crypto.randomUUID()}@vdkbusiness-services.nl`;
 const dtstamp = new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
 let dtStart, dtEnd, allDayLines = '';
 if (time) {
 dtStart = `DTSTART;TZID=Europe/Amsterdam:${icalDate(due, time)}`;
-const end = new Date(`${due}T${time}:00`); end.setHours(end.getHours() + 1);
+const durationMin = Math.min(480, Math.max(1, Number(duration) || 60)); // default 1h, matches the timeline's own default
+const end = new Date(`${due}T${time}:00`); end.setMinutes(end.getMinutes() + durationMin);
 const endTime = `${String(end.getHours()).padStart(2, '0')}:${String(end.getMinutes()).padStart(2, '0')}`;
 dtEnd = `DTEND;TZID=Europe/Amsterdam:${icalDate(due, endTime)}`;
 } else {
@@ -866,6 +873,7 @@ const title = String(body.title || '').trim().slice(0, 200);
 const note = String(body.note || '').trim().slice(0, 2000);
 const due = String(body.due || '').slice(0, 10);
 const time = /^\d{2}:\d{2}$/.test(String(body.time || '')) ? String(body.time) : '';
+const duration = Math.min(480, Math.max(0, Number(body.duration) || 0));
 const calendars = Array.isArray(body.calendars) ? body.calendars : [];
 if (!title) return json(res, 400, { error: 'Titel ontbreekt.' });
 if (!due) return json(res, 400, { error: 'Zonder datum kan er niets naar de agenda gepusht worden.' });
@@ -875,7 +883,7 @@ if (calendars.includes('apple')) {
 try {
 const cred = await kvGetJson(calAppleKey(realm, s.email));
 if (!cred) throw new Error('Apple Agenda niet gekoppeld');
-await appleCreateEvent(cred, { title, note, due, time });
+await appleCreateEvent(cred, { title, note, due, time, duration });
 results.apple = 'ok';
 } catch (e) { results.apple = e.message; }
 }
@@ -1267,6 +1275,8 @@ note: String(body.note || '').trim().slice(0, 2000),
 due: String(body.due || '').slice(0, 10),
 time: /^\d{2}:\d{2}$/.test(String(body.time || '')) ? String(body.time) : '',
 prio: Math.min(4, Math.max(1, Number(body.prio) || 4)),
+icon: REMINDER_ICONS.includes(body.icon) ? body.icon : '',
+duration: Math.min(480, Math.max(0, Number(body.duration) || 0)), // minutes; 0 = unspecified (timeline defaults to 1h)
 done: false,
 createdAt: Date.now(),
 });
@@ -1279,6 +1289,8 @@ if (body.note !== undefined) r.note = String(body.note).trim().slice(0, 2000);
 if (body.due !== undefined) r.due = String(body.due).slice(0, 10);
 if (body.time !== undefined) r.time = /^\d{2}:\d{2}$/.test(String(body.time)) ? String(body.time) : '';
 if (body.prio !== undefined) r.prio = Math.min(4, Math.max(1, Number(body.prio) || 4));
+if (body.icon !== undefined) r.icon = REMINDER_ICONS.includes(body.icon) ? body.icon : '';
+if (body.duration !== undefined) r.duration = Math.min(480, Math.max(0, Number(body.duration) || 0));
 if (body.done !== undefined) {
 if (body.done && !r.done) bump('rd');
 r.done = !!body.done;
