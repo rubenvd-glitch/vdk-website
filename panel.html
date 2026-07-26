@@ -261,6 +261,41 @@ background: #fff; top: 3px; left: 3px; transition: .15s;
 cursor: pointer; padding: 6px 12px; border-radius: 999px; font-family: inherit; }
 .cal-range button:hover { color: #e6e9ed; border-color: #2e3844; }
 .cal-range button.active { background: #1c222b; color: #e6e9ed; border-color: #7fb4f0; }
+
+/* --- Timeline view (Structured-style day view) --- */
+.tl-nav { display: flex; align-items: center; gap: 12px; margin: 14px 0 12px; }
+.tl-nav button { background: #151a21; border: 1px solid #232a33; color: #e6e9ed; font-size: 14px;
+cursor: pointer; padding: 7px 14px; border-radius: 9px; font-family: inherit; }
+.tl-nav button:hover { background: #1c222b; border-color: #2e3844; }
+#tlPrevBtn, #tlNextBtn { width: 38px; padding: 7px 0; font-size: 17px; line-height: 1; }
+.tl-date { flex: 1; text-align: center; font-size: 15px; font-weight: 700; }
+.tl-allday { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.tl-allday-item {
+display: flex; align-items: center; gap: 8px; background: #151a21; border: 1px solid #232a33;
+border-left: 4px solid #7fb4f0; border-radius: 9px; padding: 8px 12px; font-size: 13.5px; cursor: pointer;
+}
+.tl-allday-item.p1 { border-left-color: #f28b8b; } .tl-allday-item.p2 { border-left-color: #f0b45c; }
+.tl-allday-item.p3 { border-left-color: #e8e05c; } .tl-allday-item.p4 { border-left-color: #7fd68f; }
+.tl-allday-item.apple { border-left-color: #7fb4f0; cursor: default; }
+.tl-grid-wrap { position: relative; max-height: 620px; overflow-y: auto; border: 1px solid #232a33; border-radius: 12px; background: #151a21; }
+.tl-grid { position: relative; }
+.tl-hour { position: relative; height: 60px; border-bottom: 1px solid #1c222b; display: flex; }
+.tl-hour:last-child { border-bottom: none; }
+.tl-hour-label { flex: 0 0 52px; font-size: 11.5px; color: #5a6472; padding: 4px 8px; box-sizing: border-box; }
+.tl-hour-slot { flex: 1; cursor: pointer; }
+.tl-hour-slot:hover { background: #171d25; }
+.tl-block {
+position: absolute; left: 60px; right: 8px; border-radius: 8px; padding: 5px 9px;
+font-size: 12.5px; color: #e6e9ed; overflow: hidden; cursor: pointer;
+background: #1c222b; border: 1px solid #232a33; border-left: 4px solid #7fb4f0; box-sizing: border-box;
+}
+.tl-block.p1 { border-left-color: #f28b8b; } .tl-block.p2 { border-left-color: #f0b45c; }
+.tl-block.p3 { border-left-color: #e8e05c; } .tl-block.p4 { border-left-color: #7fd68f; }
+.tl-block.apple { border-left-color: #7fb4f0; cursor: default; }
+.tl-block .tl-block-title { font-weight: 700; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tl-block .tl-block-time { font-size: 11px; color: #8b94a1; display: block; }
+.tl-nowline { position: absolute; left: 60px; right: 8px; height: 2px; background: #e5484d; z-index: 5; pointer-events: none; }
+.tl-nowline::before { content: ''; position: absolute; left: -5px; top: -4px; width: 10px; height: 10px; border-radius: 50%; background: #e5484d; }
 </style>
 </head>
 <body>
@@ -283,6 +318,7 @@ cursor: pointer; padding: 6px 12px; border-radius: 999px; font-family: inherit; 
 <nav class="drawer" id="drawer">
 <button data-i18n="nav.home" onclick="showView('home')">Dashboard</button>
 <button data-i18n="nav.rem" onclick="showView('reminders')">Herinneringen</button>
+<button data-i18n="nav.timeline" onclick="showView('timeline')">Tijdlijn</button>
 <button data-i18n="nav.sug" onclick="showView('sugs')">Suggesties</button>
 <button data-i18n="nav.idea" onclick="showView('ideas')">Ideeënbox</button>
 <button data-i18n="nav.log" onclick="showView('log')" id="logMenuBtn" style="display:none;">Logboek</button>
@@ -352,6 +388,24 @@ cursor: pointer; padding: 6px 12px; border-radius: 999px; font-family: inherit; 
 </select>
 </div>
 <div id="list"></div>
+</div>
+
+<div id="view-timeline" style="display:none;">
+<div class="section-head">
+<h2 data-i18n="tl.title">Tijdlijn</h2>
+<button class="btn-primary" id="tlAddBtn" data-i18n="tl.add">+ Nieuw item</button>
+</div>
+<div class="section-sub" data-i18n="tl.sub">Een visueel dagoverzicht van je herinneringen en agenda, met de optie om nieuwe items direct naar je Apple Calendar te pushen.</div>
+<div class="tl-nav">
+<button type="button" id="tlPrevBtn" aria-label="Vorige dag">‹</button>
+<button type="button" id="tlTodayBtn" data-i18n="tl.today">Vandaag</button>
+<div class="tl-date" id="tlDateLabel"></div>
+<button type="button" id="tlNextBtn" aria-label="Volgende dag">›</button>
+</div>
+<div class="tl-allday" id="tlAllDay"></div>
+<div class="tl-grid-wrap" id="tlGridWrap">
+<div class="tl-grid" id="tlGrid"></div>
+</div>
 </div>
 
 <div id="view-sugs" style="display:none;">
@@ -579,8 +633,10 @@ cursor: pointer; padding: 6px 12px; border-radius: 999px; font-family: inherit; 
 
 const I18N = {
 en: {
-'nav.home':'Dashboard','nav.rem':'Reminders','nav.sug':'Suggestions','nav.idea':'Idea box','nav.log':'Log',
+'nav.home':'Dashboard','nav.rem':'Reminders','nav.timeline':'Timeline','nav.sug':'Suggestions','nav.idea':'Idea box','nav.log':'Log',
 'save':'Save','cancel':'Cancel',
+'tl.title':'Timeline','tl.add':'+ New item','tl.today':'Today',
+'tl.sub':'A visual day overview of your reminders and calendar, with the option to push new items straight to Apple Calendar.',
 'name.ask':'What should I call you?',
 'home.week':'This coming week','home.weekSub':'Your reminders for the next 7 days.',
 'home.weekEmpty':'Nothing planned for the coming week.',
@@ -652,8 +708,10 @@ en: {
 'locale':'en-GB'
 },
 nl: {
-'nav.home':'Dashboard','nav.rem':'Herinneringen','nav.sug':'Suggesties','nav.idea':'Ideeënbox','nav.log':'Logboek',
+'nav.home':'Dashboard','nav.rem':'Herinneringen','nav.timeline':'Tijdlijn','nav.sug':'Suggesties','nav.idea':'Ideeënbox','nav.log':'Logboek',
 'save':'Opslaan','cancel':'Annuleren',
+'tl.title':'Tijdlijn','tl.add':'+ Nieuw item','tl.today':'Vandaag',
+'tl.sub':'Een visueel dagoverzicht van je herinneringen en agenda, met de optie om nieuwe items direct naar je Apple Calendar te pushen.',
 'name.ask':'Hoe mag ik je noemen?',
 'home.week':'Komende week','home.weekSub':'Je herinneringen voor de komende 7 dagen.',
 'home.weekEmpty':'Niets gepland voor de komende week.',
@@ -999,6 +1057,25 @@ if (ev.allDay || !timePart) return dateStr;
 return `${dateStr} ${timePart.slice(0, 5)}`;
 }
 
+// For an all-day event spanning more than one calendar day (e.g. a
+// multi-day booking), adds a "(van maandag tot vrijdag)" suffix so it's
+// clear at a glance which days it actually covers — this only applies to
+// the dashboard agenda list, not the timeline view (which shows multi-day
+// items as a spanning bar instead).
+function fmtMultiDayLabel(ev) {
+if (!ev.allDay || !ev.start || !ev.end) return '';
+const start = new Date(ev.start + 'T00:00:00Z');
+const endEx = new Date(ev.end + 'T00:00:00Z'); // iCal all-day DTEND is exclusive
+const days = Math.round((endEx - start) / 86400000);
+if (days <= 1) return '';
+const last = new Date(endEx.getTime() - 86400000);
+const namesNl = ['zondag', 'maandag', 'dinsdag', 'woensdag', 'donderdag', 'vrijdag', 'zaterdag'];
+const namesEn = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const names = (LANG === 'nl') ? namesNl : namesEn;
+const from = names[start.getUTCDay()], to = names[last.getUTCDay()];
+return (LANG === 'nl') ? ` (van ${from} tot ${to})` : ` (from ${from} to ${to})`;
+}
+
 async function loadCalToday() {
 if (!calStatus.apple) { $('calTodayCard').style.display = 'none'; return; }
 try {
@@ -1008,11 +1085,129 @@ $('calTodayList').innerHTML = (d.events.length
 ? d.events.map((ev) => `
 <div class="cal-event">
 <span class="cal-time">${fmtEventWhen(ev)}</span>
-<span>${esc(ev.title)}</span>
+<span>${esc(ev.title)}${fmtMultiDayLabel(ev)}</span>
 </div>`).join('')
 : `<div class="empty" style="padding:4px 0;">${t('cal.empty')}</div>`);
 } catch (e) { /* niet ingelogd of storing niet bereikbaar */ }
 }
+
+// --- Timeline view (Structured-style day view) --------------------------
+// Shows a single day at a time: an all-day strip at the top, and an
+// hour-by-hour grid below with colored blocks for reminders (colored by
+// priority, same palette as the rest of the app) and Apple Calendar events
+// (blue). Clicking an empty slot opens the normal reminder modal pre-filled
+// with that date/time — saving it (optionally with "only send to
+// calendar" checked) is how a new item gets pushed to Apple Calendar,
+// reusing the existing push flow rather than a separate mechanism.
+let tlDate = iso(new Date());
+const TL_START_HOUR = 6, TL_END_HOUR = 23, TL_HOUR_PX = 60;
+
+function tlMinutesFromMidnight(hhmm) {
+const [h, m] = hhmm.split(':').map(Number);
+return h * 60 + m;
+}
+
+function tlBuildGrid() {
+const grid = $('tlGrid');
+let html = '';
+for (let h = TL_START_HOUR; h <= TL_END_HOUR; h++) {
+html += `<div class="tl-hour">
+<div class="tl-hour-label">${String(h).padStart(2, '0')}:00</div>
+<div class="tl-hour-slot" data-hour="${h}"></div>
+</div>`;
+}
+grid.innerHTML = html;
+grid.style.height = `${(TL_END_HOUR - TL_START_HOUR + 1) * TL_HOUR_PX}px`;
+grid.querySelectorAll('.tl-hour-slot').forEach((slot) => {
+slot.onclick = (e) => {
+const rect = slot.getBoundingClientRect();
+const minute = (e.clientY - rect.top) < (TL_HOUR_PX / 2) ? 0 : 30;
+const hour = Number(slot.dataset.hour);
+openModal(null, { due: tlDate, time: `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}` });
+};
+});
+}
+
+function tlRenderNowLine() {
+const old = $('tlGrid').querySelector('.tl-nowline');
+if (old) old.remove();
+const now = new Date();
+if (iso(now) !== tlDate) return;
+const minutes = now.getHours() * 60 + now.getMinutes();
+const gridTopMinutes = TL_START_HOUR * 60, gridBottomMinutes = (TL_END_HOUR + 1) * 60;
+if (minutes < gridTopMinutes || minutes > gridBottomMinutes) return;
+const line = document.createElement('div');
+line.className = 'tl-nowline';
+line.style.top = `${((minutes - gridTopMinutes) / 60) * TL_HOUR_PX}px`;
+$('tlGrid').appendChild(line);
+}
+
+function renderTlAllDay(items) {
+const el = $('tlAllDay');
+el.innerHTML = items.map((it) => {
+const cls = it.kind === 'apple' ? 'apple' : `p${it.prio}`;
+return `<div class="tl-allday-item ${cls}"${it.kind === 'reminder' ? ` onclick="openModal('${it.id}')"` : ''}>
+<span>${esc(it.title)}</span>
+</div>`;
+}).join('');
+}
+
+function renderTlBlocks(blocks) {
+$('tlGrid').querySelectorAll('.tl-block').forEach((b) => b.remove());
+const gridTopMinutes = TL_START_HOUR * 60;
+const gridHeight = (TL_END_HOUR - TL_START_HOUR + 1) * TL_HOUR_PX;
+blocks.forEach((b) => {
+const startMin = tlMinutesFromMidnight(b.time);
+const endMin = b.endTime ? tlMinutesFromMidnight(b.endTime) : startMin + 60;
+const rawTop = ((startMin - gridTopMinutes) / 60) * TL_HOUR_PX;
+const rawHeight = Math.max(((endMin - startMin) / 60) * TL_HOUR_PX, 22);
+if (rawTop + rawHeight < 0 || rawTop > gridHeight) return; // falls outside the visible hour range
+const div = document.createElement('div');
+div.className = `tl-block ${b.kind === 'apple' ? 'apple' : `p${b.prio}`}`;
+div.style.top = `${Math.max(rawTop, 0)}px`;
+div.style.height = `${rawHeight}px`;
+div.innerHTML = `<span class="tl-block-title">${esc(b.title)}</span><span class="tl-block-time">${b.time}${b.endTime ? '–' + b.endTime : ''}</span>`;
+if (b.kind === 'reminder') div.onclick = () => openModal(b.id);
+$('tlGrid').appendChild(div);
+});
+}
+
+async function loadTimeline() {
+$('tlDateLabel').textContent = fmt(new Date(tlDate + 'T00:00:00'));
+tlBuildGrid();
+const allDayItems = [], timedBlocks = [];
+reminders.filter((r) => !r.done && r.due === tlDate).forEach((r) => {
+if (r.time) timedBlocks.push({ kind: 'reminder', id: r.id, title: r.title, time: r.time, prio: r.prio });
+else allDayItems.push({ kind: 'reminder', id: r.id, title: r.title, prio: r.prio });
+});
+if (calStatus.apple) {
+try {
+const d = await api(`/api/calendar/events?range=day&date=${tlDate}`);
+d.events.forEach((ev) => {
+if (ev.allDay) {
+allDayItems.push({ kind: 'apple', title: ev.title });
+return;
+}
+const [datePart, timePart] = (ev.start || '').split('T');
+if (datePart !== tlDate || !timePart) return;
+let endTime = null;
+if (ev.end) {
+const [endDatePart, endTimePart] = ev.end.split('T');
+if (endDatePart === tlDate && endTimePart) endTime = endTimePart.slice(0, 5);
+}
+timedBlocks.push({ kind: 'apple', title: ev.title, time: timePart.slice(0, 5), endTime });
+});
+} catch (e) { /* niet gekoppeld of niet bereikbaar — toon dan alleen de herinneringen */ }
+}
+renderTlAllDay(allDayItems);
+renderTlBlocks(timedBlocks);
+tlRenderNowLine();
+}
+
+$('tlPrevBtn').onclick = () => { tlDate = iso(new Date(new Date(tlDate + 'T00:00:00').getTime() - 86400000)); loadTimeline(); };
+$('tlNextBtn').onclick = () => { tlDate = iso(new Date(new Date(tlDate + 'T00:00:00').getTime() + 86400000)); loadTimeline(); };
+$('tlTodayBtn').onclick = () => { tlDate = iso(new Date()); loadTimeline(); };
+$('tlAddBtn').onclick = () => openModal(null, { due: tlDate });
 
 function maybeOfferPush(rem) {
 if (!rem.due) return;
@@ -1264,12 +1459,13 @@ flashSetMsg(t('set.tgSent'));
 } catch (e) { flashSetMsg(e.message); }
 };
 
-const views = { home: 'view-home', reminders: 'view-reminders', sugs: 'view-sugs', ideas: 'view-ideas', settings: 'view-settings', log: 'view-log' };
+const views = { home: 'view-home', reminders: 'view-reminders', timeline: 'view-timeline', sugs: 'view-sugs', ideas: 'view-ideas', settings: 'view-settings', log: 'view-log' };
 function closeDrawer() { $('drawer').classList.remove('open'); $('backdrop').classList.remove('show'); }
 window.showView = (v) => {
 if (v === 'log' && !(me && me.isAdmin)) v = 'home';
 for (const k in views) $(views[k]).style.display = k === v ? 'block' : 'none';
 if (v === 'log') loadLog();
+if (v === 'timeline') loadTimeline();
 const el = $(views[v]);
 el.classList.remove('view-anim');
 void el.offsetWidth;
@@ -1382,7 +1578,7 @@ body: JSON.stringify({ lockedCrmToAdmin: $('lockCrmToggle').checked }),
 updateLockCrmTxt();
 };
 
-window.openModal = (id) => {
+window.openModal = (id, prefill) => {
 editing = id || null;
 const r = id ? reminders.find((x) => x.id === id) : null;
 $('modalTitle').textContent = r ? t('rem.modalEdit') : t('rem.modalNew');
@@ -1391,10 +1587,13 @@ $('fNote').value = r ? r.note : '';
 selPrio = r ? r.prio : 4;
 selDays = 0;
 noDate = r ? !r.due : false;
-pickedDate = r && r.due ? r.due : null;
+// `prefill` (used by the timeline view when adding a new item at a
+// specific date/time slot) only applies to a brand-new reminder — an
+// existing reminder's own due/time always wins.
+pickedDate = r && r.due ? r.due : (!r && prefill && prefill.due ? prefill.due : null);
 $('fDate').style.display = pickedDate ? 'block' : 'none';
 $('fDate').value = pickedDate || '';
-$('fTime').value = r && r.time ? r.time : '';
+$('fTime').value = r && r.time ? r.time : (!r && prefill && prefill.time ? prefill.time : '');
 $('modalErr').textContent = '';
 $('fCalOnly').checked = false;
 paintChips();

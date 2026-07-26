@@ -650,6 +650,20 @@ if (ev.allDay || !timePart) return dateStr;
 return `${dateStr} ${timePart.slice(0, 5)}`;
 }
 
+// For an all-day event spanning more than one calendar day, adds a
+// "(van maandag tot vrijdag)" suffix — dashboard agenda list only.
+function fmtMultiDayLabel(ev) {
+if (!ev.allDay || !ev.start || !ev.end) return '';
+const start = new Date(ev.start + 'T00:00:00Z');
+const endEx = new Date(ev.end + 'T00:00:00Z'); // iCal all-day DTEND is exclusive
+const days = Math.round((endEx - start) / 86400000);
+if (days <= 1) return '';
+const last = new Date(endEx.getTime() - 86400000);
+const names = ['zondag', 'maandag', 'dinsdag', 'woensdag', 'donderdag', 'vrijdag', 'zaterdag'];
+const from = names[start.getUTCDay()], to = names[last.getUTCDay()];
+return ` (van ${from} tot ${to})`;
+}
+
 async function loadCalToday() {
 if (!calStatus.apple) { $('calTodayCard').style.display = 'none'; return; }
 try {
@@ -659,7 +673,7 @@ $('calTodayList').innerHTML = (d.events.length
 ? d.events.map((ev) => `
 <div class="cal-event">
 <span class="cal-time">${fmtEventWhen(ev)}</span>
-<span>${esc(ev.title)}</span>
+<span>${esc(ev.title)}${fmtMultiDayLabel(ev)}</span>
 </div>`).join('')
 : `<div class="empty" style="padding:4px 0;">Niets gepland in deze periode.</div>`);
 } catch (e) { /* niet ingelogd of storing niet bereikbaar */ }

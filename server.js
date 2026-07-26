@@ -821,9 +821,16 @@ const s = await getSession(req, realm);
 if (!s) return json(res, 401, { error: 'Not logged in' });
 const range = url.searchParams.get('range') || 'today';
 const TZ = 'Europe/Amsterdam';
-const today = zonedTodayYMD(TZ);
+// `date` (YYYY-MM-DD) optionally overrides "today" as the base day — used
+// by the timeline view to fetch a single arbitrary day (past or future)
+// instead of being anchored to whatever day it is right now.
+const dateParam = url.searchParams.get('date');
+const dateMatch = dateParam && /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateParam);
+const today = dateMatch
+? { y: +dateMatch[1], m: +dateMatch[2], d: +dateMatch[3] }
+: zonedTodayYMD(TZ);
 const startOffsetDays = range === 'tomorrow' ? 1 : 0;
-const spanDays = range === 'week' ? 7 : range === 'month' ? 30 : 1; // 'today'/'tomorrow' both span 1 day
+const spanDays = range === 'day' ? 1 : range === 'week' ? 7 : range === 'month' ? 30 : 1; // 'today'/'tomorrow'/'day' all span 1 day
 const startYMD = addDaysToYMD(today, startOffsetDays);
 const endYMD = addDaysToYMD(today, startOffsetDays + spanDays);
 // Build the exact UTC instants for Amsterdam-local midnight of these two
