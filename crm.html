@@ -166,9 +166,7 @@ border-radius: 8px; background: #0e1116; color: #e6e9ed; font-family: inherit;
 .modal-err { color: #f28b8b; font-size: 13px; margin-top: 10px; min-height: 16px; }
 .cal-event { display: flex; gap: 10px; align-items: baseline; padding: 8px 2px; border-bottom: 1px solid #1c222b; font-size: 13.5px; }
 .cal-event:last-child { border-bottom: none; }
-.cal-event .cal-time { color: #5a6472; font-size: 12.5px; flex: 0 0 70px; }
-.cal-event .cal-src { font-size: 11px; padding: 2px 7px; border-radius: 999px; flex: 0 0 auto; font-weight: 700; }
-.cal-src.apple { background: #232a33; color: #cfd6de; }
+.cal-event .cal-time { color: #5a6472; font-size: 12.5px; flex: 0 0 90px; }
 .cal-range { display: flex; gap: 6px; margin: 8px 0 12px; flex-wrap: wrap; }
 .cal-range button { background: #151a21; border: 1px solid #232a33; color: #8b94a1; font-size: 12.5px;
 cursor: pointer; padding: 6px 12px; border-radius: 999px; font-family: inherit; }
@@ -642,6 +640,16 @@ loadCalToday();
 };
 });
 
+function fmtEventWhen(ev) {
+if (!ev.start) return '';
+const [datePart, timePart] = ev.start.split('T');
+const [, m, d] = datePart.split('-').map(Number);
+const months = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec'];
+const dateStr = `${d} ${months[m - 1]}`;
+if (ev.allDay || !timePart) return dateStr;
+return `${dateStr} ${timePart.slice(0, 5)}`;
+}
+
 async function loadCalToday() {
 if (!calStatus.apple) { $('calTodayCard').style.display = 'none'; return; }
 try {
@@ -650,9 +658,8 @@ $('calTodayCard').style.display = 'block';
 $('calTodayList').innerHTML = (d.events.length
 ? d.events.map((ev) => `
 <div class="cal-event">
-<span class="cal-time">${ev.allDay ? '' : (ev.start || '').slice(11, 16)}</span>
+<span class="cal-time">${fmtEventWhen(ev)}</span>
 <span>${esc(ev.title)}</span>
-<span class="cal-src ${ev.source}">Apple</span>
 </div>`).join('')
 : `<div class="empty" style="padding:4px 0;">Niets gepland in deze periode.</div>`);
 } catch (e) { /* niet ingelogd of storing niet bereikbaar */ }
