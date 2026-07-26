@@ -643,13 +643,25 @@ const reportBody = `<?xml version="1.0" encoding="utf-8"?>
 const r = await caldavRequestFollow(calendarUrl, {
 method: 'REPORT', headers: { Depth: '1' }, body: reportBody, auth,
 });
-if (r.status >= 300) return [];
+// Debug metadata travels alongside the events so the front-end can show
+// real diagnostics (status code, raw block count, body snippet) instead
+// of a bare "nothing scheduled" when something actually went wrong —
+// errors here were previously swallowed silently, making it impossible
+// to tell "genuinely zero events" apart from "the request failed".
+const debug = { url: calendarUrl, status: r.status };
+if (r.status >= 300) {
+debug.note = 'non-2xx status';
+debug.bodySnippet = String(r.body || '').replace(/\s+/g, ' ').trim().slice(0, 150);
+return { events: [], debug };
+}
 const blocks = r.body.split(/BEGIN:VEVENT/).slice(1);
-return blocks.map((b) => {
+debug.blockCount = blocks.length;
+const events = blocks.map((b) => {
 const summary = (b.match(/SUMMARY:(.*)/) || [, ''])[1].trim();
 const dtstart = (b.match(/DTSTART[^:]*:(.*)/) || [, ''])[1].trim();
 return { source: 'apple', title: summary || '(geen titel)', start: dtstart, end: '', allDay: dtstart.length === 8 };
 });
+return { events, debug };
 }
 
 async function appleListEvents(cred, startDate, endDate) {
@@ -661,9 +673,13 @@ const auth = { appleId: cred.appleId, appPassword: cred.appPassword };
 // this fix) only have a single `calendarUrl`, so fall back to that.
 const calendarUrls = (cred.calendarUrls && cred.calendarUrls.length) ? cred.calendarUrls : [cred.calendarUrl];
 const perCalendar = await Promise.all(
-calendarUrls.map((url) => appleListEventsForCalendar(url, auth, startDate, endDate).catch(() => []))
+calendarUrls.map((url) => appleListEventsForCalendar(url, auth, startDate, endDate)
+.catch((e) => ({ events: [], debug: { url, error: e.message } })))
 );
-return perCalendar.flat();
+return {
+events: perCalendar.flatMap((r) => r.events),
+debug: { calendarUrls, usingFallbackSingle: !(cred.calendarUrls && cred.calendarUrls.length), perCalendar: perCalendar.map((r) => r.debug) },
+};
 }
 
 // Realm-aware handlers, mirroring the handleRequestCode/handleVerify pattern
@@ -713,15 +729,17 @@ const start = new Date(); start.setHours(0, 0, 0, 0);
 const end = new Date(start);
 end.setDate(end.getDate() + (range === 'week' ? 7 : 1));
 const events = [];
+let debug = null;
 try {
 const a = await kvGetJson(calAppleKey(realm, s.email));
 if (a) {
-const items = await appleListEvents(a, start.toISOString().slice(0, 10).replace(/-/g, ''), end.toISOString().slice(0, 10).replace(/-/g, ''));
-events.push(...items);
+const result = await appleListEvents(a, start.toISOString().slice(0, 10).replace(/-/g, ''), end.toISOString().slice(0, 10).replace(/-/g, ''));
+events.push(...result.events);
+debug = result.debug;
 }
-} catch (e) { console.error('apple events error:', e.message); }
+} catch (e) { console.error('apple events error:', e.message); debug = { error: e.message }; }
 events.sort((x, y) => String(x.start).localeCompare(String(y.start)));
-return json(res, 200, { events });
+return json(res, 200, { events, debug });
 }
 
 // Pushes an existing reminder (Base) or action (CRM) to the connected

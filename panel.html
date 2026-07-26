@@ -967,14 +967,18 @@ if (!calStatus.apple) { $('calTodayCard').style.display = 'none'; return; }
 try {
 const d = await api('/api/calendar/events?range=today');
 $('calTodayCard').style.display = 'block';
-$('calTodayList').innerHTML = d.events.length
+// Temporary debug line under the empty state (2026-07-25): shows exactly
+// what the CalDAV query saw (status/blockCount per calendar) instead of
+// a silent "nothing scheduled" — remove once sync is confirmed reliable.
+const debugLine = d.debug ? `<div class="empty" style="padding:2px 0; font-size:11px; opacity:.6;">debug: ${esc(JSON.stringify(d.debug))}</div>` : '';
+$('calTodayList').innerHTML = (d.events.length
 ? d.events.map((ev) => `
 <div class="cal-event">
 <span class="cal-time">${ev.allDay ? '' : (ev.start || '').slice(11, 16)}</span>
 <span>${esc(ev.title)}</span>
 <span class="cal-src ${ev.source}">Apple</span>
 </div>`).join('')
-: `<div class="empty" style="padding:4px 0;">${t('cal.empty')}</div>`;
+: `<div class="empty" style="padding:4px 0;">${t('cal.empty')}</div>`) + debugLine;
 } catch (e) { /* niet ingelogd of storing niet bereikbaar */ }
 }
 
