@@ -258,6 +258,11 @@ background: #fff; top: 3px; left: 3px; transition: .15s;
 .cal-event .cal-time { color: #8b94a1; font-size: 12.5px; flex: 0 0 70px; }
 .cal-event .cal-src { font-size: 11px; padding: 2px 7px; border-radius: 999px; flex: 0 0 auto; font-weight: 700; }
 .cal-src.apple { background: #232a33; color: #cfd6de; }
+.cal-range { display: flex; gap: 6px; margin: 8px 0 12px; flex-wrap: wrap; }
+.cal-range button { background: #151a21; border: 1px solid #232a33; color: #8b94a1; font-size: 12.5px;
+cursor: pointer; padding: 6px 12px; border-radius: 999px; font-family: inherit; }
+.cal-range button:hover { color: #e6e9ed; border-color: #2e3844; }
+.cal-range button.active { background: #1c222b; color: #e6e9ed; border-color: #7fb4f0; }
 </style>
 </head>
 <body>
@@ -316,6 +321,12 @@ background: #fff; top: 3px; left: 3px; transition: .15s;
 
 <div id="calTodayCard" style="display:none;">
 <h2 data-i18n="cal.today" style="font-size:19px; margin:26px 0 10px;">Agenda vandaag</h2>
+<div class="cal-range" id="calRangeTabs">
+<button type="button" data-range="today" class="active" data-i18n="cal.rangeToday">Vandaag</button>
+<button type="button" data-range="tomorrow" data-i18n="cal.rangeTomorrow">Morgen</button>
+<button type="button" data-range="week" data-i18n="cal.rangeWeek">Komende 7 dagen</button>
+<button type="button" data-range="month" data-i18n="cal.rangeMonth">Komende maand</button>
+</div>
 <div class="rem" id="calTodayList" style="display:block;"></div>
 </div>
 
@@ -631,7 +642,8 @@ en: {
 'tg.none':'No bot token set in Render yet.','tg.ready':'Token is ready; not linked yet.','tg.linked':'Linked and active.','tg.linking':'Linking…','tg.checking':'Checking…',
 'cal.notConnected':'Not connected.','cal.connected':'Connected as {v}.','cal.connecting':'Connecting…','cal.disconnected':'Disconnected.',
 'cal.errConnect':'Could not connect. Check your details.',
-'cal.today':"Today's calendar",'cal.empty':'Nothing on your calendar today.',
+'cal.today':"Calendar",'cal.empty':'Nothing scheduled in this period.',
+'cal.rangeToday':'Today','cal.rangeTomorrow':'Tomorrow','cal.rangeWeek':'Next 7 days','cal.rangeMonth':'Next month',
 'cal.pushTitle':'Push to your calendar?','cal.pushSub':'"{title}" has a date. Want to add it to your connected calendar(s)?',
 'cal.pushYes':'Yes, push','cal.pushSkip':'No thanks','cal.pushDone':'Pushed to your calendar.','cal.pushErr':'Could not push to the calendar.',
 'lock.on':'<strong>Locked:</strong> only your email can sign in','lock.off':'<strong>Open:</strong> others can create an account with their email',
@@ -703,7 +715,8 @@ nl: {
 'tg.none':'Nog geen bot-token ingesteld in Render.','tg.ready':'Token staat klaar; nog niet gekoppeld.','tg.linked':'Gekoppeld en actief.','tg.linking':'Koppelen…','tg.checking':'Controleren…',
 'cal.notConnected':'Niet gekoppeld.','cal.connected':'Gekoppeld als {v}.','cal.connecting':'Koppelen…','cal.disconnected':'Ontkoppeld.',
 'cal.errConnect':'Koppelen mislukt. Controleer je gegevens.',
-'cal.today':'Agenda vandaag','cal.empty':'Niets in je agenda vandaag.',
+'cal.today':'Agenda','cal.empty':'Niets gepland in deze periode.',
+'cal.rangeToday':'Vandaag','cal.rangeTomorrow':'Morgen','cal.rangeWeek':'Komende 7 dagen','cal.rangeMonth':'Komende maand',
 'cal.pushTitle':'Push naar je agenda?','cal.pushSub':'"{title}" heeft een datum. Wil je deze toevoegen aan je gekoppelde agenda(\'s)?',
 'cal.pushYes':'Ja, push','cal.pushSkip':'Nee, bedankt','cal.pushDone':'Gepusht naar je agenda.','cal.pushErr':'Kon niet pushen naar de agenda.',
 'lock.on':'<strong>Vergrendeld:</strong> alleen jouw e-mail kan inloggen','lock.off':'<strong>Open:</strong> anderen kunnen een account aanmaken met hun e-mail',
@@ -967,10 +980,19 @@ try { await api('/api/calendar/apple/disconnect', { method: 'POST' }); calStatus
 catch (e) { flashSetMsg(e.message); }
 };
 
+let calRange = 'today';
+$('calRangeTabs').querySelectorAll('button').forEach((btn) => {
+btn.onclick = () => {
+calRange = btn.dataset.range;
+$('calRangeTabs').querySelectorAll('button').forEach((b) => b.classList.toggle('active', b === btn));
+loadCalToday();
+};
+});
+
 async function loadCalToday() {
 if (!calStatus.apple) { $('calTodayCard').style.display = 'none'; return; }
 try {
-const d = await api('/api/calendar/events?range=today');
+const d = await api(`/api/calendar/events?range=${calRange}`);
 $('calTodayCard').style.display = 'block';
 $('calTodayList').innerHTML = (d.events.length
 ? d.events.map((ev) => `

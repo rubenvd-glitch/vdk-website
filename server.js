@@ -774,8 +774,11 @@ const s = await getSession(req, realm);
 if (!s) return json(res, 401, { error: 'Not logged in' });
 const range = url.searchParams.get('range') || 'today';
 const start = new Date(); start.setHours(0, 0, 0, 0);
+if (range === 'tomorrow') start.setDate(start.getDate() + 1);
 const end = new Date(start);
-end.setDate(end.getDate() + (range === 'week' ? 7 : 1));
+if (range === 'week') end.setDate(end.getDate() + 7);
+else if (range === 'month') end.setDate(end.getDate() + 30);
+else end.setDate(end.getDate() + 1); // 'today' and 'tomorrow' both cover a single day
 const events = [];
 let debug = null;
 try {
