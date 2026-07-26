@@ -43,7 +43,8 @@ const CRM_SALES_STATUSES = ['frozen', 'cold', 'lukewarm', 'warm', 'hot'];
 // regular reminders list) — matches the icon ids the frontend's icon
 // picker offers, so an unrecognized/missing value just falls back to no
 // icon rather than breaking anything.
-const REMINDER_ICONS = ['alarm', 'bed', 'dumbbell', 'coffee', 'briefcase', 'book', 'heart', 'car', 'home', 'bell'];
+const REMINDER_ICONS = ['alarm', 'bed', 'dumbbell', 'coffee', 'briefcase', 'book', 'heart', 'car', 'home', 'bell', 'phone', 'mail', 'calendar', 'cart', 'gift', 'music', 'plane', 'utensils', 'pill', 'wrench'];
+const isHexColor = (c) => /^#[0-9a-fA-F]{6}$/.test(String(c || ''));
 
 // ---------- Minimal SMTP client (STARTTLS on 587 or implicit TLS on 465) ----------
 function smtpConfigured() {
@@ -1276,6 +1277,7 @@ due: String(body.due || '').slice(0, 10),
 time: /^\d{2}:\d{2}$/.test(String(body.time || '')) ? String(body.time) : '',
 prio: Math.min(4, Math.max(1, Number(body.prio) || 4)),
 icon: REMINDER_ICONS.includes(body.icon) ? body.icon : '',
+color: isHexColor(body.color) ? String(body.color).toLowerCase() : '',
 duration: Math.min(480, Math.max(0, Number(body.duration) || 0)), // minutes; 0 = unspecified (timeline defaults to 1h)
 done: false,
 createdAt: Date.now(),
@@ -1290,6 +1292,7 @@ if (body.due !== undefined) r.due = String(body.due).slice(0, 10);
 if (body.time !== undefined) r.time = /^\d{2}:\d{2}$/.test(String(body.time)) ? String(body.time) : '';
 if (body.prio !== undefined) r.prio = Math.min(4, Math.max(1, Number(body.prio) || 4));
 if (body.icon !== undefined) r.icon = REMINDER_ICONS.includes(body.icon) ? body.icon : '';
+if (body.color !== undefined) r.color = isHexColor(body.color) ? String(body.color).toLowerCase() : '';
 if (body.duration !== undefined) r.duration = Math.min(480, Math.max(0, Number(body.duration) || 0));
 if (body.done !== undefined) {
 if (body.done && !r.done) bump('rd');

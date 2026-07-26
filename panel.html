@@ -317,6 +317,17 @@ color: #8b94a1; cursor: pointer; display: flex; align-items: center; justify-con
 .icon-chips button svg { width: 18px; height: 18px; }
 .icon-chips button:hover { border-color: #2e3844; color: #e6e9ed; }
 .icon-chips button.sel { background: #1c222b; color: #7fb4f0; border-color: #7fb4f0; }
+#iconSearch { margin: 4px 0 2px; }
+.color-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 4px; }
+.color-chips button {
+width: 30px; height: 30px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; padding: 0;
+}
+.color-chips button.tl-color-none {
+background: #151a21; border: 1px solid #232a33; color: #8b94a1; font-size: 16px; line-height: 1;
+display: flex; align-items: center; justify-content: center;
+}
+.color-chips button:hover { transform: scale(1.08); }
+.color-chips button.sel { border-color: #e6e9ed; }
 </style>
 </head>
 <body>
@@ -555,19 +566,16 @@ color: #8b94a1; cursor: pointer; display: flex; align-items: center; justify-con
 <div class="date-preview" id="datePreview"></div>
 
 <div id="durationRow" style="display:none;">
-<label data-i18n="l.duration">Duur</label>
-<div class="chips" id="durationChips">
-<button data-min="15">15m</button>
-<button data-min="30">30m</button>
-<button data-min="45">45m</button>
-<button data-min="60">1u</button>
-<button data-min="90">1,5u</button>
-<button data-min="120">2u</button>
-</div>
+<label data-i18n="l.endTime">Tot (optioneel)</label>
+<input type="time" id="fEndTime">
 </div>
 
 <label data-i18n="l.icon">Icoon</label>
+<input type="text" id="iconSearch" data-i18n-ph="l.iconSearch" placeholder="Zoek icoon...">
 <div class="icon-chips" id="iconChips"></div>
+
+<label data-i18n="l.color">Kleur</label>
+<div class="color-chips" id="colorChips"></div>
 
 <label data-i18n="l.prio">Prioriteit</label>
 <div class="chips" id="prioChips">
@@ -678,7 +686,7 @@ en: {
 'f.all':'All','f.today':'Today','f.week':'This week','f.month':'Next 30 days','f.late':'Overdue','f.nodate':'No date',
 'empty.active':'No active reminders. Nice and quiet!','empty.done':'Nothing completed yet.',
 'l.title':'Title *','l.note':'Note (optional)','l.when':'When?','l.time':'Time (optional)','l.prio':'Priority',
-'l.duration':'Duration','l.icon':'Icon',
+'l.duration':'Duration','l.icon':'Icon','l.endTime':'Until (optional)','l.iconSearch':'Search icon...','l.color':'Color','l.colorDefault':'Default (priority)','tl.iconNone':'No icons found.',
 'l.desc':'Description (optional)','l.sug':'Suggestion *','l.freq':'How often?',
 'l.dayOfMonth':'On which day of the month?','l.numDays':'Number of days','l.firstOn':'First time on',
 'w.now':'Now','w.tom':'Tomorrow','w.d7':'7 days','w.d14':'14 days','w.d30':'30 days','w.pick':'Pick a date','w.none':'No date',
@@ -754,7 +762,7 @@ nl: {
 'f.all':'Alles','f.today':'Vandaag','f.week':'Komende week','f.month':'Komende 30 dagen','f.late':'Te laat','f.nodate':'Geen datum',
 'empty.active':'Geen actieve herinneringen. Lekker rustig!','empty.done':'Nog niets afgerond.',
 'l.title':'Titel *','l.note':'Notitie (optioneel)','l.when':'Wanneer?','l.time':'Tijd (optioneel)','l.prio':'Prioriteit',
-'l.duration':'Duur','l.icon':'Icoon',
+'l.duration':'Duur','l.icon':'Icoon','l.endTime':'Tot (optioneel)','l.iconSearch':'Zoek icoon...','l.color':'Kleur','l.colorDefault':'Standaard (prioriteit)','tl.iconNone':'Geen iconen gevonden.',
 'l.desc':'Omschrijving (optioneel)','l.sug':'Suggestie *','l.freq':'Hoe vaak?',
 'l.dayOfMonth':'Op welke dag van de maand?','l.numDays':'Aantal dagen','l.firstOn':'Eerste keer op',
 'w.now':'Nu','w.tom':'Morgen','w.d7':'7 dagen','w.d14':'14 dagen','w.d30':'30 dagen','w.pick':'Kies datum','w.none':'Geen datum',
@@ -825,6 +833,9 @@ document.documentElement.lang = LANG;
 document.querySelectorAll('[data-i18n]').forEach((el) => {
 el.textContent = t(el.dataset.i18n);
 });
+document.querySelectorAll('[data-i18n-ph]').forEach((el) => {
+el.placeholder = t(el.dataset.i18nPh);
+});
 $('setLang').value = LANG;
 }
 
@@ -833,7 +844,7 @@ let profile = { name: '', sugSnoozeDays: 3, showSugCards: true, showIdeaCards: t
 let profileLoaded = false;
 let editing = null, sugEditing = null, ideaEditing = null, sugFreq = 'm1';
 let pendingConvert = null, pendingIdeaConvert = null;
-let selDays = 0, selPrio = 4, pickedDate = null, noDate = false, selIcon = '', selDuration = 60;
+let selDays = 0, selPrio = 4, pickedDate = null, noDate = false, selIcon = '', selColor = '';
 let calStatus = { apple: false };
 let pendingPushReminder = null;
 
@@ -1147,27 +1158,93 @@ heart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width=
 car: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 11l1.5-4.5A2 2 0 0 1 8.4 5h7.2a2 2 0 0 1 1.9 1.5L19 11"/><rect x="2" y="11" width="20" height="6" rx="2"/><circle cx="7" cy="18" r="1.5"/><circle cx="17" cy="18" r="1.5"/></svg>',
 home: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>',
 bell: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>',
+phone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.3 1.8.6 2.7a2 2 0 0 1-.5 2.1L8 9.7a16 16 0 0 0 6 6l1.2-1.2a2 2 0 0 1 2.1-.5c.9.3 1.8.5 2.7.6a2 2 0 0 1 1.7 2Z"/></svg>',
+mail: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 6 10 7L22 6"/></svg>',
+calendar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4"/><path d="M16 3v4"/><path d="M3 10h18"/></svg>',
+cart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2 3h2l2.6 12.6a2 2 0 0 0 2 1.6h8.8a2 2 0 0 0 2-1.6L21 7H6"/></svg>',
+gift: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="9" width="18" height="12" rx="1"/><path d="M3 9V6a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v3"/><path d="M12 5v16"/><path d="M12 5c-1.5-3-6-3-6 0 0 2 2 2 6 0 4 2 6 2 6 0 0-3-4.5-3-6 0Z"/></svg>',
+music: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>',
+plane: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4 20-7Z"/></svg>',
+utensils: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 2v7a2 2 0 0 0 2 2v11"/><path d="M7 2v7"/><path d="M11 2v7"/><path d="M17 2c-1.5 0-3 1.5-3 5v4c0 1 .5 2 2 2v9"/></svg>',
+pill: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="8" rx="4" transform="rotate(45 12 12)"/><line x1="8.5" y1="8.5" x2="15.5" y2="15.5"/></svg>',
+wrench: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.8 2.8-2-2Z"/></svg>',
 };
-const TL_ICON_ORDER = ['bell', 'alarm', 'bed', 'dumbbell', 'coffee', 'briefcase', 'book', 'heart', 'car', 'home'];
+// Search keywords per icon (Dutch + English) so the icon picker's search
+// box can match on more than just the literal id.
+const TL_ICON_KEYWORDS = {
+bell: ['bell', 'reminder', 'herinnering', 'algemeen', 'default'],
+alarm: ['alarm', 'wekker', 'klok', 'clock', 'ochtend'],
+bed: ['bed', 'slapen', 'sleep', 'rust'],
+dumbbell: ['dumbbell', 'gym', 'sport', 'fitness', 'training', 'sporten'],
+coffee: ['coffee', 'koffie', 'pauze', 'break', 'thee'],
+briefcase: ['briefcase', 'werk', 'work', 'kantoor', 'office', 'zakelijk', 'business'],
+book: ['book', 'boek', 'lezen', 'read', 'studie', 'study', 'school', 'leren'],
+heart: ['heart', 'hart', 'gezondheid', 'health', 'liefde', 'love', 'favoriet'],
+car: ['car', 'auto', 'rijden', 'drive', 'transport', 'reizen'],
+home: ['home', 'huis', 'thuis'],
+phone: ['phone', 'telefoon', 'bellen', 'call'],
+mail: ['mail', 'email', 'post', 'bericht', 'message'],
+calendar: ['calendar', 'agenda', 'planning', 'datum', 'date'],
+cart: ['cart', 'winkelen', 'boodschappen', 'shopping', 'winkel'],
+gift: ['gift', 'cadeau', 'verjaardag', 'birthday', 'feest', 'party'],
+music: ['music', 'muziek', 'luisteren', 'listen'],
+plane: ['plane', 'vliegen', 'vliegtuig', 'vakantie', 'vacation', 'travel', 'reizen'],
+utensils: ['utensils', 'eten', 'food', 'lunch', 'diner', 'dinner', 'koken', 'cook'],
+pill: ['pill', 'medicijn', 'medicine', 'dokter', 'doctor', 'gezondheid'],
+wrench: ['wrench', 'repareren', 'repair', 'klussen', 'onderhoud', 'maintenance', 'tools'],
+};
+const TL_ICON_ORDER = Object.keys(TL_ICONS);
 const tlIcon = (id) => TL_ICONS[id] || TL_ICONS.bell;
 
-// One-time build of the icon-picker row in the reminder modal (used both
-// from the regular "+ Nieuwe herinnering" flow and from the timeline's FAB).
-$('iconChips').innerHTML = TL_ICON_ORDER.map((id) => `<button type="button" data-icon="${id}">${TL_ICONS[id]}</button>`).join('');
+// Icon picker: renders the (optionally search-filtered) icon grid, keeping
+// the current selection highlighted. Re-run on every keystroke in the
+// search box, and once up front to populate the full list.
+function tlRenderIconChips(query) {
+const q = (query || '').trim().toLowerCase();
+const ids = q
+? TL_ICON_ORDER.filter((id) => id.includes(q) || (TL_ICON_KEYWORDS[id] || []).some((k) => k.includes(q)))
+: TL_ICON_ORDER;
+$('iconChips').innerHTML = ids.length
+? ids.map((id) => `<button type="button" data-icon="${id}" class="${id === selIcon ? 'sel' : ''}">${TL_ICONS[id]}</button>`).join('')
+: `<div class="tl-empty" style="padding:6px 0;">${t('tl.iconNone')}</div>`;
+}
+tlRenderIconChips('');
+$('iconSearch').oninput = () => tlRenderIconChips($('iconSearch').value);
 $('iconChips').onclick = (e) => {
 const b = e.target.closest('button'); if (!b) return;
 selIcon = (selIcon === b.dataset.icon) ? '' : b.dataset.icon; // click again to clear
 paintChips();
 };
-$('durationChips').onclick = (e) => {
-const b = e.target.closest('button'); if (!b) return;
-selDuration = Number(b.dataset.min);
-paintChips();
-};
 
+// Color picker: a curated swatch palette (independent of priority) a
+// reminder can optionally be tagged with — overrides the priority-based
+// color everywhere it's shown (timeline avatar, all-day strip).
+const TL_COLORS = ['#f28b8b', '#f0b45c', '#e8e05c', '#7fd68f', '#4dd0e1', '#7fb4f0', '#c792ea', '#f48fb1', '#b0bec5'];
+$('colorChips').innerHTML = `<button type="button" class="tl-color-none" data-color="" title="${t('l.colorDefault')}">×</button>`
++ TL_COLORS.map((c) => `<button type="button" data-color="${c}" style="background:${c};"></button>`).join('');
+$('colorChips').onclick = (e) => {
+const b = e.target.closest('button'); if (!b) return;
+selColor = b.dataset.color; paintChips();
+};
+// Sanitizes a color value before it ever reaches a `style` attribute —
+// belt-and-braces on top of the server-side hex validation, since this
+// value flows from stored reminder data back into rendered HTML.
+function tlSafeColor(c) { return /^#[0-9a-fA-F]{6}$/.test(c || '') ? c : ''; }
 function tlMinutesFromMidnight(hhmm) {
 const [h, m] = hhmm.split(':').map(Number);
 return h * 60 + m;
+}
+
+// Derives a reminder's duration (minutes) from its start/end time fields —
+// used instead of fixed duration presets so the user can type an exact end
+// time (e.g. "14:00 tot 16:00") the same way Structured's own time picker
+// works. Falls back to 0 (unspecified) if no valid end time is set.
+function computeDurationMinutes() {
+const start = $('fTime').value, end = $('fEndTime').value;
+if (!start || !end) return 0;
+let diff = tlMinutesFromMidnight(end) - tlMinutesFromMidnight(start);
+if (diff <= 0) diff += 24 * 60; // end time past midnight
+return Math.min(480, diff);
 }
 
 function tlWeekDates() {
@@ -1195,8 +1272,10 @@ $('tlWeek').querySelectorAll('button').forEach((b) => { b.onclick = () => { tlDa
 function renderTlAllDay(items) {
 $('tlAllDay').innerHTML = items.map((it) => {
 const cls = it.kind === 'apple' ? 'apple' : `p${it.prio}`;
-return `<div class="tl-allday-item ${cls}"${it.kind === 'reminder' ? ` onclick="openModal('${it.id}')"` : ''}>
-<span class="tl-ic">${tlIcon(it.icon)}</span><span>${esc(it.title)}</span>
+const custom = tlSafeColor(it.color);
+const style = custom ? ` style="border-left-color:${custom};"` : '';
+return `<div class="tl-allday-item ${cls}"${style}${it.kind === 'reminder' ? ` onclick="openModal('${it.id}')"` : ''}>
+<span class="tl-ic"${custom ? ` style="color:${custom};"` : ''}>${tlIcon(it.icon)}</span><span>${esc(it.title)}</span>
 </div>`;
 }).join('');
 }
@@ -1224,10 +1303,11 @@ const gap = tlMinutesFromMidnight(b.time) - prevEnd;
 if (gap > 15) html += `<div class="tl-gap"><div class="tl-gap-line"></div><span class="tl-gap-text">${tlFmtGap(gap)}</span></div>`;
 }
 const cls = b.kind === 'apple' ? 'apple' : `p${b.prio}`;
+const custom = tlSafeColor(b.color);
 const sub = b.endTime ? `${b.time}–${b.endTime}` : b.time;
 html += `<div class="tl-row">
 <div class="tl-row-time">${b.time}</div>
-<div class="tl-avatar ${cls}">${tlIcon(b.icon)}</div>
+<div class="tl-avatar ${cls}"${custom ? ` style="background:${custom}22;color:${custom};border-color:${custom};"` : ''}>${tlIcon(b.icon)}</div>
 <div class="tl-row-body"${b.kind === 'reminder' ? ` onclick="openModal('${b.id}')" style="cursor:pointer;"` : ''}>
 <div class="tl-row-title">${esc(b.title)}</div>
 <div class="tl-row-sub">${sub}</div>
@@ -1242,8 +1322,8 @@ async function loadTimeline() {
 tlRenderWeek();
 const allDayItems = [], timedBlocks = [];
 reminders.filter((r) => !r.done && r.due === tlDate).forEach((r) => {
-if (r.time) timedBlocks.push({ kind: 'reminder', id: r.id, title: r.title, time: r.time, prio: r.prio, icon: r.icon, endTime: r.duration ? tlAddMinutes(r.time, r.duration) : null });
-else allDayItems.push({ kind: 'reminder', id: r.id, title: r.title, prio: r.prio, icon: r.icon });
+if (r.time) timedBlocks.push({ kind: 'reminder', id: r.id, title: r.title, time: r.time, prio: r.prio, icon: r.icon, color: r.color, endTime: r.duration ? tlAddMinutes(r.time, r.duration) : null });
+else allDayItems.push({ kind: 'reminder', id: r.id, title: r.title, prio: r.prio, icon: r.icon, color: r.color });
 });
 if (calStatus.apple) {
 try {
@@ -1653,7 +1733,9 @@ $('fTitle').value = r ? r.title : '';
 $('fNote').value = r ? r.note : '';
 selPrio = r ? r.prio : 4;
 selIcon = r ? (r.icon || '') : '';
-selDuration = r && r.duration ? r.duration : 60;
+selColor = r ? (r.color || '') : '';
+$('iconSearch').value = '';
+tlRenderIconChips('');
 selDays = 0;
 noDate = r ? !r.due : false;
 // `prefill` (used by the timeline view when adding a new item at a
@@ -1663,6 +1745,9 @@ pickedDate = r && r.due ? r.due : (!r && prefill && prefill.due ? prefill.due : 
 $('fDate').style.display = pickedDate ? 'block' : 'none';
 $('fDate').value = pickedDate || '';
 $('fTime').value = r && r.time ? r.time : (!r && prefill && prefill.time ? prefill.time : '');
+// End time is derived from the stored duration (in minutes) so editing an
+// existing reminder shows its actual end time, not a re-guessed default.
+$('fEndTime').value = (r && r.time && r.duration) ? tlAddMinutes(r.time, r.duration) : '';
 $('modalErr').textContent = '';
 $('fCalOnly').checked = false;
 paintChips();
@@ -1683,8 +1768,8 @@ b.classList.toggle('sel', Number(b.dataset.p) === selPrio);
 document.querySelectorAll('#iconChips button').forEach((b) => {
 b.classList.toggle('sel', b.dataset.icon === selIcon);
 });
-document.querySelectorAll('#durationChips button').forEach((b) => {
-b.classList.toggle('sel', Number(b.dataset.min) === selDuration);
+document.querySelectorAll('#colorChips button').forEach((b) => {
+b.classList.toggle('sel', b.dataset.color === selColor);
 });
 const d = targetDate();
 const tv = $('fTime').value;
@@ -1724,7 +1809,14 @@ $('fDate').style.display = 'none';
 paintChips();
 };
 $('fDate').onchange = () => { pickedDate = $('fDate').value; paintChips(); };
-$('fTime').onchange = paintChips;
+$('fTime').onchange = () => {
+// Default the end time to +1h so the field isn't left empty, but only
+// when it hasn't been set yet — never overwrite a value the user (or an
+// edited reminder) already has.
+if ($('fTime').value && !$('fEndTime').value) $('fEndTime').value = tlAddMinutes($('fTime').value, 60);
+paintChips();
+};
+$('fEndTime').onchange = paintChips;
 $('prioChips').onclick = (e) => {
 const b = e.target.closest('button'); if (!b) return;
 selPrio = Number(b.dataset.p); paintChips();
@@ -1743,7 +1835,8 @@ due: targetDate(),
 time: $('fTime').value || '',
 prio: selPrio,
 icon: selIcon,
-duration: $('fTime').value ? selDuration : 0,
+color: selColor,
+duration: computeDurationMinutes(),
 };
 if (!payload.title.trim()) { $('modalErr').textContent = t('err.title'); return; }
 // "Only send to calendar" — checking this box IS the confirmation the
