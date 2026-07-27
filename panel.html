@@ -407,6 +407,21 @@ padding: 2px; font-family: inherit;
 .mz-suggest-list{margin:6px 0 10px 18px;display:flex;flex-wrap:wrap;gap:6px;}
 .mz-suggest-item{display:inline-block;padding:3px 9px;border-radius:8px;background:#f0b45c22;color:#8a5a12;border:1px solid #f0b45c66;font-size:12px;cursor:pointer;transition:background .12s ease,transform .12s ease;}
 .mz-suggest-item:hover{background:#f0b45c44;transform:translateY(-1px);}
+.tmpl-row .btn-start{margin-right:6px;}
+.session-overlay .modal{max-width:560px;max-height:86vh;overflow-y:auto;}
+.sess-ex-card{border:1px solid #e2e6ec;border-radius:10px;padding:10px 12px;margin-bottom:10px;}
+.sess-ex-card h5{margin:0 8px 4px 0;font-size:14px;display:inline-block;}
+.sess-ex-meta{font-size:12px;color:#8b94a1;margin-bottom:8px;}
+.sess-ex-row{display:flex;gap:8px;align-items:flex-end;}
+.sess-ex-row label{font-size:11px;color:#8b94a1;display:block;margin-bottom:2px;}
+.sess-ex-row input{width:80px;}
+.sess-progress{font-size:12px;color:#2f3855;font-weight:600;margin-left:auto;}
+.sess-rest-bar{position:sticky;bottom:0;background:#eef2f6;border-radius:10px;padding:10px 12px;display:flex;align-items:center;gap:10px;margin-top:6px;}
+.sess-rest-time{font-weight:700;font-size:16px;min-width:48px;}
+.plan-target-row{display:flex;gap:6px;align-items:center;margin:4px 0 8px;font-size:12px;flex-wrap:wrap;}
+.plan-target-row input{width:56px;padding:2px 4px;font-size:12px;}
+.plan-target-row label{color:#8b94a1;}
+.plan-pill-wrap{margin-bottom:4px;}
 .group-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
 .group-chips button {
 background: #151a21; border: 1px solid #232a33; color: #cfd6de;
@@ -940,6 +955,24 @@ padding: 9px; border-radius: 8px; font-size: 13px; cursor: pointer; font-family:
 <div class="modal-actions">
 <button class="btn-ghost" id="gymLogCancelBtn">Annuleren</button>
 <button class="btn-primary" id="gymLogSaveBtn">Opslaan</button>
+</div>
+</div>
+</div>
+
+<div class="overlay session-overlay" id="gymActiveOverlay">
+<div class="modal">
+<h3 id="gymActiveTitle">Sessie</h3>
+<div class="sub">Vul per oefening gewicht en reps in, log elke set, en check je rust hieronder.</div>
+<div id="gymActiveList"></div>
+<div class="sess-rest-bar" id="gymRestBar" style="display:none;">
+<span>Rust:</span>
+<span class="sess-rest-time" id="gymRestTime">1:30</span>
+<button class="btn-ghost" onclick="gymAdjustRest(-15)">-15s</button>
+<button class="btn-ghost" onclick="gymAdjustRest(15)">+15s</button>
+<button class="btn-ghost" onclick="gymSkipRest()">Overslaan</button>
+</div>
+<div class="modal-actions">
+<button class="btn-primary" onclick="gymCloseActiveSession()">Sessie afronden</button>
 </div>
 </div>
 </div>
@@ -2626,6 +2659,8 @@ let gymSelectedExercise = null;
 let gymActiveTab = 'overview';
 let gymGoalKind = 'exercise';
 let gymPlanGroups = [], gymPlanExercises = [];
+let gymPlanTargets = {};
+let gymActiveSession = null;
 const GYM_PLAN_GROUP_OPTIONS = GYM_MUSCLE_MAP.map((g) => g.key);
 
 function gymUnit() { return gymProfile.unit || 'kg'; }
@@ -3097,9 +3132,19 @@ window.gymAddSuggested = (name) => gymAddPlanExercise(name);
 
 function gymRenderPlanList() {
 $('gymPlanList').innerHTML = gymPlanExercises.length
-? gymPlanExercises.map((n) => `<div class="plan-pill">${esc(n)}<button type="button" onclick="gymRemovePlanExercise('${esc(n).replace(/'/g, "\\'")}')">×</button></div>`).join('')
+? gymPlanExercises.map((n) => {
+const tgt = gymPlanTargets[n] || {};
+const enc = esc(n).replace(/'/g, "\\'");
+return `<div class="plan-pill-wrap"><div class="plan-pill">${esc(n)}<button type="button" onclick="gymRemovePlanExercise('${enc}')">×</button></div><div class="plan-target-row"><label>Gewicht</label><input type="number" step="0.5" min="0" value="${tgt.weight || ''}" onchange="gymSetPlanTarget('${enc}','weight',this.value)"><label>Reps</label><input type="number" step="1" min="1" value="${tgt.reps || ''}" onchange="gymSetPlanTarget('${enc}','reps',this.value)"><label>Sets</label><input type="number" step="1" min="1" value="${tgt.sets || 3}" onchange="gymSetPlanTarget('${enc}','sets',this.value)"></div></div>`;
+}).join('')
 : '<div class="plan-empty">Nog geen oefeningen toegevoegd.</div>';
 }
+window.gymSetPlanTarget = (name, field, val) => {
+const num = Number(val) || 0;
+gymPlanTargets[name] = gymPlanTargets[name] || {};
+if (num > 0) gymPlanTargets[name][field] = num; else delete gymPlanTargets[name][field];
+if (!Object.keys(gymPlanTargets[name]).length) delete gymPlanTargets[name];
+};
 
 // Builds the front-view body diagram once (element ids per visible region)
 // and re-colors it on every render — no need to rebuild the SVG shapes,
@@ -3282,6 +3327,7 @@ return `<div class="tmpl-row">
 <div class="tname">${esc(tp.name)}</div>
 <div class="tmeta">${tp.exercises.length} oefening(en)${tp.groups.length ? ' · ' + tp.groups.map((k) => (GYM_MUSCLE_MAP.find((g) => g.key === k) || {}).label || k).join(', ') : ''}</div>
 </div>
+<button class="btn-primary btn-start" onclick="gymStartSession('${tp.id}')">Start</button>
 <button class="btn-ghost" onclick="gymLoadTemplate('${tp.id}')">Laden</button>
 <button class="icon-btn" onclick="gymRemoveTemplate('${tp.id}')" title="Verwijderen">${IC.trash}</button>
 </div>`;
@@ -3294,6 +3340,7 @@ const tp = gymSessionTemplates.find((x) => x.id === id);
 if (!tp) return;
 gymPlanGroups = [...(tp.groups || [])];
 gymPlanExercises = [...(tp.exercises || [])];
+gymPlanTargets = JSON.parse(JSON.stringify(tp.targets || {}));
 gymRenderPlanGroupChips();
 gymRenderSessionPlanner();
 };
@@ -3308,12 +3355,111 @@ const name = $('gymPlanNameInput').value.trim();
 if (!name) { flashSetMsg('Geef je sessie een naam.'); return; }
 if (!gymPlanExercises.length) { flashSetMsg('Voeg eerst een oefening toe.'); return; }
 try {
-const d = await api('/api/gym/sessions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'create', name, groups: gymPlanGroups, exercises: gymPlanExercises }) });
+const d = await api('/api/gym/sessions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'create', name, groups: gymPlanGroups, exercises: gymPlanExercises, targets: gymPlanTargets }) });
 gymSessionTemplates = d.sessions;
 $('gymPlanNameInput').value = '';
+gymPlanTargets = {};
 gymRenderTemplates();
 flashSetMsg(t('set.saved'));
 } catch (e) { flashSetMsg(e.message); }
+};
+
+function gymSuggestNextSet(tmpl, exercise) {
+const target = (tmpl.targets && tmpl.targets[exercise]) || null;
+const sessions = gymSessionsFor(exercise);
+if (!sessions.length) {
+return { weight: target ? target.weight : '', reps: target ? target.reps : '' };
+}
+const latest = sessions[0];
+const weight = Math.max(...latest.sets.map((s) => s.weight));
+const targetReps = target ? target.reps : Math.max(...latest.sets.map((s) => s.reps));
+const allHit = latest.sets.every((s) => s.reps >= targetReps);
+if (allHit) {
+const inc = gymSuggestedIncrement(exercise, weight);
+return { weight: weight + inc, reps: targetReps, note: `Vorige keer overal ${targetReps}+ reps gehaald bij ${weight}${gymUnit()} — probeer ${weight + inc}${gymUnit()}.` };
+}
+return { weight, reps: targetReps, note: `Vorige keer: ${weight}${gymUnit()}. Probeer dezelfde weight, focus op de reps.` };
+}
+window.gymStartSession = (id) => {
+const tp = gymSessionTemplates.find((x) => x.id === id);
+if (!tp) return;
+gymActiveSession = { tmpl: tp, progress: {}, values: {}, restEndsAt: null, restTimerId: null, restTotal: 90 };
+tp.exercises.forEach((ex) => {
+gymActiveSession.progress[ex] = 0;
+const sug = gymSuggestNextSet(tp, ex);
+gymActiveSession.values[ex] = { weight: sug.weight, reps: sug.reps };
+});
+gymRenderActiveSession();
+$('gymActiveOverlay').classList.add('open');
+};
+function gymActiveSessTargetSets(ex) {
+const t = gymActiveSession.tmpl.targets && gymActiveSession.tmpl.targets[ex];
+return (t && t.sets) || 3;
+}
+function gymRenderActiveSession() {
+if (!gymActiveSession) return;
+const s = gymActiveSession;
+$('gymActiveTitle').textContent = s.tmpl.name;
+$('gymActiveList').innerHTML = s.tmpl.exercises.map((ex) => {
+const done = s.progress[ex] || 0;
+const total = gymActiveSessTargetSets(ex);
+const sug = gymSuggestNextSet(s.tmpl, ex);
+const v = s.values[ex] || { weight: sug.weight, reps: sug.reps };
+const enc = esc(ex).replace(/'/g, "\\'");
+return `<div class="sess-ex-card"><div style="display:flex;align-items:center;"><h5>${esc(ex)}</h5><span class="sess-progress">${done}/${total} sets</span></div>${sug.note ? `<div class="sess-ex-meta">${esc(sug.note)}</div>` : ''}<div class="sess-ex-row"><div><label>Gewicht (${gymUnit()})</label><input type="number" step="0.5" min="0" id="sessW-${enc}" value="${v.weight}"></div><div><label>Reps</label><input type="number" step="1" min="1" id="sessR-${enc}" value="${v.reps}"></div><button class="btn-primary" onclick="gymLogActiveSet('${enc}')">Set loggen</button></div></div>`;
+}).join('');
+}
+window.gymLogActiveSet = async (ex) => {
+const s = gymActiveSession;
+if (!s) return;
+const wEl = $('sessW-' + ex), rEl = $('sessR-' + ex);
+const weight = Number(wEl.value) || 0;
+const reps = Number(rEl.value) || 0;
+if (!reps) { flashSetMsg('Vul reps in.'); return; }
+try {
+const payload = { action: 'create', exercise: ex, weight, reps, muscle: gymGuessMuscle(ex), date: iso(new Date()) };
+const d = await api('/api/gym/log', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+gymLog = d.log;
+s.progress[ex] = (s.progress[ex] || 0) + 1;
+gymRenderActiveSession();
+gymStartRestTimer();
+gymRenderAll();
+} catch (e) { flashSetMsg(e.message); }
+};
+function gymStartRestTimer() {
+const s = gymActiveSession;
+if (!s) return;
+if (s.restTimerId) clearInterval(s.restTimerId);
+s.restEndsAt = Date.now() + s.restTotal * 1000;
+gymTickRest();
+s.restTimerId = setInterval(gymTickRest, 1000);
+}
+function gymTickRest() {
+const s = gymActiveSession;
+if (!s || !s.restEndsAt) return;
+const left = Math.max(0, Math.round((s.restEndsAt - Date.now()) / 1000));
+$('gymRestTime').textContent = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
+$('gymRestBar').style.display = left > 0 ? 'flex' : 'none';
+if (left <= 0) { clearInterval(s.restTimerId); s.restTimerId = null; }
+}
+window.gymAdjustRest = (delta) => {
+const s = gymActiveSession;
+if (!s || !s.restEndsAt) return;
+s.restEndsAt += delta * 1000;
+gymTickRest();
+};
+window.gymSkipRest = () => {
+const s = gymActiveSession;
+if (!s) return;
+if (s.restTimerId) clearInterval(s.restTimerId);
+s.restTimerId = null;
+s.restEndsAt = null;
+$('gymRestBar').style.display = 'none';
+};
+window.gymCloseActiveSession = () => {
+if (gymActiveSession && gymActiveSession.restTimerId) clearInterval(gymActiveSession.restTimerId);
+gymActiveSession = null;
+$('gymActiveOverlay').classList.remove('open');
 };
 
 $('gymTabs').onclick = (e) => {
