@@ -856,10 +856,10 @@ return d.toISOString().slice(0, 10);
 }
 function renderDashboard() {
 const plus7 = isoPlusDays(7);
-const list = actions.filter((a) => !a.done && a.due && a.due <= plus7);
+const list = actions.filter((a) => !a.done && a.companyId && a.due && a.due <= plus7);
 renderActList(list, 'dashList', { emptyText: 'Niets gepland voor de komende 7 dagen.', showComplete: true, sortByDate: true, showRelative: true });
 // To-do's zonder datum: eigen kolom naast de herinneringen, ingedeeld op prioriteit.
-const todos = actions.filter((a) => !a.done && !a.companyId && !a.due);
+const todos = actions.filter((a) => !a.done && !a.companyId);
 renderActList(todos, 'dashTodoList', { emptyText: 'Geen open to-do\'s zonder datum.', showComplete: true });
 }
 
