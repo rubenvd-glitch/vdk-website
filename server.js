@@ -1243,16 +1243,23 @@ function gymSanitizeTargets(targets, exercises) {
 const out = {};
 if (!targets || typeof targets !== 'object') return out;
 const allowed = new Set((exercises || []).map((x) => String(x)));
+const GOALS = new Set(['kracht', 'spiergroei', 'uithouding']);
 for (const key of Object.keys(targets)) {
 if (!allowed.has(key)) continue;
 const t = targets[key] || {};
+const entry = {};
 const weight = Number(t.weight);
 const reps = Number(t.reps);
 const sets = Number(t.sets);
-const entry = {};
 if (weight > 0 && weight < 2000) entry.weight = Math.round(weight * 2) / 2;
 if (reps > 0 && reps <= 200) entry.reps = Math.round(reps);
 if (sets > 0 && sets <= 50) entry.sets = Math.round(sets);
+if (typeof t.goal === 'string' && GOALS.has(t.goal)) entry.goal = t.goal;
+const warmups = Number(t.warmups);
+if (warmups >= 0 && warmups <= 10) entry.warmups = Math.round(warmups);
+const topsets = Number(t.topsets);
+if (topsets > 0 && topsets <= 10) entry.topsets = Math.round(topsets);
+if (t.dropset !== undefined) entry.dropset = !!t.dropset;
 if (Object.keys(entry).length) out[key] = entry;
 }
 return out;
