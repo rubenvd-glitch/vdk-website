@@ -1239,6 +1239,25 @@ return json(res, 500, { error: 'Opslag niet bereikbaar. Is Upstash gekoppeld?' }
 // names, no new taxonomy data needs to live server-side).
 function gymSessionKey(email) { return `gymsessions:${email}`; }
 
+function gymSanitizeTargets(targets, exercises) {
+const out = {};
+if (!targets || typeof targets !== 'object') return out;
+const allowed = new Set((exercises || []).map((x) => String(x)));
+for (const key of Object.keys(targets)) {
+if (!allowed.has(key)) continue;
+const t = targets[key] || {};
+const weight = Number(t.weight);
+const reps = Number(t.reps);
+const sets = Number(t.sets);
+const entry = {};
+if (weight > 0 && weight < 2000) entry.weight = Math.round(weight * 2) / 2;
+if (reps > 0 && reps <= 200) entry.reps = Math.round(reps);
+if (sets > 0 && sets <= 50) entry.sets = Math.round(sets);
+if (Object.keys(entry).length) out[key] = entry;
+}
+return out;
+}
+
 async function handleGymSessions(req, res) {
 const s = await getSession(req, 'admin');
 if (!s) return json(res, 401, { error: 'Not logged in' });
@@ -1253,13 +1272,15 @@ const name = String(body.name || '').trim().slice(0, 100);
 if (!name) return json(res, 400, { error: 'Geef je sessie een naam.' });
 const groups = Array.isArray(body.groups) ? body.groups.map((g) => String(g).slice(0, 30)).slice(0, 10) : [];
 const exercises = Array.isArray(body.exercises) ? body.exercises.map((x) => String(x).trim().slice(0, 100)).filter(Boolean).slice(0, 30) : [];
-list.push({ id: crypto.randomUUID(), name, groups, exercises, createdAt: Date.now() });
+const targets = gymSanitizeTargets(body.targets, exercises);
+list.push({ id: crypto.randomUUID(), name, groups, exercises, targets, createdAt: Date.now() });
 } else if (body.action === 'update') {
 const it = list.find((x) => x.id === body.id);
 if (!it) return json(res, 404, { error: 'Niet gevonden' });
 if (body.name !== undefined) it.name = String(body.name).trim().slice(0, 100) || it.name;
 if (body.groups !== undefined) it.groups = Array.isArray(body.groups) ? body.groups.map((g) => String(g).slice(0, 30)).slice(0, 10) : it.groups;
 if (body.exercises !== undefined) it.exercises = Array.isArray(body.exercises) ? body.exercises.map((x) => String(x).trim().slice(0, 100)).filter(Boolean).slice(0, 30) : it.exercises;
+if (body.targets !== undefined) it.targets = gymSanitizeTargets(body.targets, it.exercises);
 } else if (body.action === 'delete') {
 list = list.filter((x) => x.id !== body.id);
 } else {
