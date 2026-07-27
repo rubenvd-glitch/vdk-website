@@ -401,6 +401,12 @@ padding: 2px; font-family: inherit;
 .mz-dot.mz-empty { background: #454f5c; border: none; }
 .mz-suggest { color: #7fdc9e; margin-left: auto; cursor: pointer; font-size: 12px; white-space: nowrap; }
 .mz-suggest:hover { text-decoration: underline; }
+.mz-toggle{display:inline-block;margin-left:8px;padding:1px 8px;border-radius:10px;background:#eef2f6;color:#2f3855;font-size:11px;font-weight:600;cursor:pointer;user-select:none;border:1px solid #d7dee6;transition:transform .12s ease,background .12s ease;}
+.mz-toggle:hover{background:#e3e9ef;}
+.mz-toggle.open{background:#7fdc9e;color:#183a26;border-color:#5fbf7a;}
+.mz-suggest-list{margin:6px 0 10px 18px;display:flex;flex-wrap:wrap;gap:6px;}
+.mz-suggest-item{display:inline-block;padding:3px 9px;border-radius:8px;background:#f0b45c22;color:#8a5a12;border:1px solid #f0b45c66;font-size:12px;cursor:pointer;transition:background .12s ease,transform .12s ease;}
+.mz-suggest-item:hover{background:#f0b45c44;transform:translateY(-1px);}
 .group-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
 .group-chips button {
 background: #151a21; border: 1px solid #232a33; color: #cfd6de;
@@ -2345,10 +2351,19 @@ const GYM_MUSCLE_MAP = [
 { key: 'delt_rear', label: 'Achterste delt', visible: true },
 ] },
 { key: 'traps', label: 'Trapezius', regions: [
-{ key: 'traps', label: 'Trapezius', visible: true },
+{ key: 'traps_upper', label: 'Boven-trapezius', visible: true },
+{ key: 'traps_mid', label: 'Midden-trapezius', visible: true },
+{ key: 'traps_lower', label: 'Onder-trapezius', visible: true },
+] },
+{ key: 'back', label: 'Rug', regions: [
+{ key: 'lats', label: 'Lats (brede rugspier)', visible: true },
+{ key: 'rhomboids', label: 'Rhomboids (tussen schouderbladen)', visible: true },
+{ key: 'teres_major', label: 'Teres major', visible: true },
+{ key: 'lowerback', label: 'Onderrug (erector spinae)', visible: true },
 ] },
 { key: 'biceps', label: 'Biceps', regions: [
 { key: 'biceps', label: 'Biceps', visible: true },
+{ key: 'brachialis', label: 'Brachialis', visible: true },
 ] },
 { key: 'triceps', label: 'Triceps', regions: [
 { key: 'tri_long', label: 'Lange kop', visible: true },
@@ -2356,14 +2371,12 @@ const GYM_MUSCLE_MAP = [
 { key: 'tri_medial', label: 'Mediale kop', visible: true },
 ] },
 { key: 'forearms', label: 'Onderarmen', regions: [
-{ key: 'forearms', label: 'Onderarmen', visible: true },
-] },
-{ key: 'back', label: 'Rug', regions: [
-{ key: 'lats', label: 'Lats (brede rugspier)', visible: true },
-{ key: 'lowerback', label: 'Onderrug (erector spinae)', visible: true },
+{ key: 'forearm_flexors', label: 'Buigers (onderkant)', visible: true },
+{ key: 'forearm_extensors', label: 'Strekkers (bovenkant)', visible: true },
 ] },
 { key: 'core', label: 'Buik', regions: [
-{ key: 'abs', label: 'Buikspieren', visible: true },
+{ key: 'abs_upper', label: 'Bovenbuik', visible: true },
+{ key: 'abs_lower', label: 'Onderbuik', visible: true },
 { key: 'obliques', label: 'Schuine buikspieren', visible: true },
 ] },
 { key: 'legs', label: 'Benen', regions: [
@@ -2371,74 +2384,75 @@ const GYM_MUSCLE_MAP = [
 { key: 'hamstrings', label: 'Hamstrings', visible: true },
 { key: 'glutes', label: 'Bilspieren', visible: true },
 { key: 'adductors', label: 'Binnenkant bovenbeen', visible: true },
+{ key: 'abductors', label: 'Buitenkant bovenbeen/heup', visible: true },
 { key: 'calves', label: 'Kuiten', visible: true },
 { key: 'tibialis', label: 'Scheenspier (tibialis)', visible: true },
 ] },
 ];
 
 const GYM_EXERCISE_TARGETS = {
-'ab wheel rollout': [['core', 'abs', 1], ['core', 'obliques', 0.3]],
+'ab wheel rollout': [['core', 'abs_upper', 0.6], ['core', 'abs_lower', 0.9], ['core', 'obliques', 0.4]],
 'adductor machine': [['legs', 'adductors', 1]],
 'alternating dumbbell curl': [['biceps', 'biceps', 1]],
-'arnold press': [['shoulders', 'delt_front', 1], ['shoulders', 'delt_side', 0.6]],
-'assisted pull-up': [['back', 'lats', 0.8], ['biceps', 'biceps', 0.4]],
-'back extension': [['back', 'lowerback', 1], ['legs', 'glutes', 0.4]],
-'back squat': [['legs', 'quads', 1], ['legs', 'glutes', 0.6]],
+'arnold press': [['shoulders', 'delt_front', 1], ['shoulders', 'delt_side', 0.7], ['triceps', 'tri_lateral', 0.3]],
+'assisted pull-up': [['back', 'lats', 0.8], ['biceps', 'biceps', 0.4], ['back', 'teres_major', 0.3]],
+'back extension': [['back', 'lowerback', 1], ['legs', 'glutes', 0.5], ['legs', 'hamstrings', 0.3]],
+'back squat': [['legs', 'quads', 1], ['legs', 'glutes', 0.6], ['back', 'lowerback', 0.3], ['core', 'abs_upper', 0.25], ['core', 'obliques', 0.25]],
 'barbell bench press': [['chest', 'chest_mid', 1], ['triceps', 'tri_lateral', 0.4], ['shoulders', 'delt_front', 0.3]],
 'barbell curl': [['biceps', 'biceps', 1]],
-'barbell glute bridge': [['legs', 'glutes', 1]],
-'barbell row': [['back', 'lats', 0.9], ['back', 'lowerback', 0.3], ['biceps', 'biceps', 0.4], ['traps', 'traps', 0.3]],
-'barbell shrug': [['traps', 'traps', 1]],
-'bent-over reverse fly': [['shoulders', 'delt_rear', 1]],
-'bicycle crunch': [['core', 'abs', 0.7], ['core', 'obliques', 0.7]],
-'bulgarian split squat': [['legs', 'quads', 0.9], ['legs', 'glutes', 0.6]],
-'cable crunch': [['core', 'abs', 1]],
+'barbell glute bridge': [['legs', 'glutes', 1], ['legs', 'hamstrings', 0.3]],
+'barbell row': [['back', 'lats', 0.8], ['back', 'rhomboids', 0.6], ['traps', 'traps_mid', 0.4], ['biceps', 'biceps', 0.4], ['back', 'lowerback', 0.3]],
+'barbell shrug': [['traps', 'traps_upper', 1]],
+'bent-over reverse fly': [['shoulders', 'delt_rear', 1], ['back', 'rhomboids', 0.4]],
+'bicycle crunch': [['core', 'abs_upper', 0.6], ['core', 'obliques', 0.8]],
+'bulgarian split squat': [['legs', 'quads', 0.9], ['legs', 'glutes', 0.6], ['core', 'abs_upper', 0.25], ['core', 'obliques', 0.25]],
+'cable crunch': [['core', 'abs_upper', 1]],
 'cable curl': [['biceps', 'biceps', 1]],
 'cable fly': [['chest', 'chest_mid', 1]],
 'cable glute kickback': [['legs', 'glutes', 1]],
 'cable lateral raise': [['shoulders', 'delt_side', 1]],
-'cable rear delt fly': [['shoulders', 'delt_rear', 1]],
-'cable shrug': [['traps', 'traps', 0.9]],
+'cable rear delt fly': [['shoulders', 'delt_rear', 1], ['back', 'rhomboids', 0.3]],
+'cable shrug': [['traps', 'traps_upper', 0.9]],
 'cable woodchop': [['core', 'obliques', 1]],
 'chest dip': [['chest', 'chest_lower', 0.9], ['triceps', 'tri_lateral', 0.6]],
 'chest press machine': [['chest', 'chest_mid', 1], ['triceps', 'tri_lateral', 0.3]],
-'chest-supported row': [['back', 'lats', 0.9], ['traps', 'traps', 0.3]],
+'chest-supported row': [['back', 'lats', 0.7], ['back', 'rhomboids', 0.6], ['traps', 'traps_mid', 0.3]],
 'chin-up': [['back', 'lats', 0.9], ['biceps', 'biceps', 0.7]],
 'close-grip bench press': [['triceps', 'tri_medial', 0.8], ['chest', 'chest_mid', 0.4]],
 'close-grip lat pulldown': [['back', 'lats', 1], ['biceps', 'biceps', 0.5]],
 'concentration curl': [['biceps', 'biceps', 1]],
-'copenhagen plank': [['legs', 'adductors', 1]],
-'cossack squat': [['legs', 'adductors', 0.8], ['legs', 'quads', 0.6]],
-'crunch': [['core', 'abs', 1]],
-'deadlift': [['legs', 'hamstrings', 1], ['legs', 'glutes', 0.8], ['back', 'lats', 0.4], ['back', 'lowerback', 0.6], ['traps', 'traps', 0.3]],
+'copenhagen plank': [['legs', 'adductors', 1], ['core', 'obliques', 0.3]],
+'cossack squat': [['legs', 'adductors', 0.8], ['legs', 'quads', 0.6], ['legs', 'abductors', 0.4]],
+'crunch': [['core', 'abs_upper', 1]],
+'deadlift': [['legs', 'hamstrings', 1], ['legs', 'glutes', 0.8], ['back', 'lats', 0.3], ['back', 'lowerback', 0.6], ['traps', 'traps_upper', 0.3], ['core', 'abs_upper', 0.25], ['core', 'obliques', 0.25]],
 'decline barbell bench press': [['chest', 'chest_lower', 1], ['triceps', 'tri_lateral', 0.3]],
 'decline dumbbell press': [['chest', 'chest_lower', 1], ['triceps', 'tri_lateral', 0.3]],
 'decline push-up': [['chest', 'chest_upper', 0.8], ['shoulders', 'delt_front', 0.4]],
-'decline sit-up': [['core', 'abs', 1]],
+'decline sit-up': [['core', 'abs_upper', 1]],
 'diamond push-up': [['triceps', 'tri_lateral', 0.8], ['chest', 'chest_mid', 0.5]],
 'donkey calf raise': [['legs', 'calves', 1]],
 'drag curl': [['biceps', 'biceps', 1]],
 'dumbbell bench press': [['chest', 'chest_mid', 1], ['triceps', 'tri_lateral', 0.3], ['shoulders', 'delt_front', 0.3]],
 'dumbbell curl': [['biceps', 'biceps', 1]],
 'dumbbell fly': [['chest', 'chest_mid', 0.9]],
-'dumbbell shrug': [['traps', 'traps', 1]],
+'dumbbell shrug': [['traps', 'traps_upper', 1]],
 'ez-bar curl': [['biceps', 'biceps', 1]],
-'face pull': [['shoulders', 'delt_rear', 0.9], ['traps', 'traps', 0.4]],
-'farmer\'s walk': [['traps', 'traps', 0.6], ['forearms', 'forearms', 0.6]],
+'face pull': [['shoulders', 'delt_rear', 0.9], ['back', 'rhomboids', 0.5], ['traps', 'traps_mid', 0.4]],
+'farmer\'s walk': [['traps', 'traps_upper', 0.6], ['forearms', 'forearm_flexors', 0.6], ['core', 'obliques', 0.3]],
 'frog pump': [['legs', 'glutes', 0.8]],
 'front raise': [['shoulders', 'delt_front', 1]],
-'front squat': [['legs', 'quads', 1], ['legs', 'glutes', 0.4]],
+'front squat': [['legs', 'quads', 1], ['legs', 'glutes', 0.4], ['core', 'abs_upper', 0.25], ['core', 'obliques', 0.25]],
 'glute bridge': [['legs', 'glutes', 0.9]],
 'glute-ham raise': [['legs', 'hamstrings', 1], ['legs', 'glutes', 0.4]],
-'goblet squat': [['legs', 'quads', 0.9], ['legs', 'glutes', 0.4]],
-'good morning': [['legs', 'hamstrings', 0.8], ['back', 'lowerback', 0.5]],
-'hack squat': [['legs', 'quads', 1]],
-'hammer curl': [['biceps', 'biceps', 0.8], ['forearms', 'forearms', 0.4]],
-'hanging knee raise': [['core', 'abs', 0.9]],
-'hanging leg raise': [['core', 'abs', 1]],
+'goblet squat': [['legs', 'quads', 0.9], ['legs', 'glutes', 0.4], ['core', 'abs_upper', 0.25], ['core', 'obliques', 0.25]],
+'good morning': [['legs', 'hamstrings', 0.8], ['back', 'lowerback', 0.5], ['core', 'abs_upper', 0.25], ['core', 'obliques', 0.25]],
+'hack squat': [['legs', 'quads', 1], ['core', 'abs_upper', 0.25], ['core', 'obliques', 0.25]],
+'hammer curl': [['biceps', 'brachialis', 0.9], ['forearms', 'forearm_flexors', 0.3]],
+'hanging knee raise': [['core', 'abs_lower', 0.9]],
+'hanging leg raise': [['core', 'abs_lower', 1]],
 'hanging oblique raise': [['core', 'obliques', 1]],
 'high-to-low cable fly': [['chest', 'chest_lower', 0.9]],
-'hip abduction machine': [['legs', 'glutes', 0.8]],
+'hip abduction machine': [['legs', 'abductors', 1]],
 'hip thrust': [['legs', 'glutes', 1]],
 'incline barbell bench press': [['chest', 'chest_upper', 1], ['shoulders', 'delt_front', 0.4], ['triceps', 'tri_lateral', 0.3]],
 'incline dumbbell curl': [['biceps', 'biceps', 1]],
@@ -2455,67 +2469,70 @@ const GYM_EXERCISE_TARGETS = {
 'leg press calf raise': [['legs', 'calves', 1]],
 'low-to-high cable fly': [['chest', 'chest_upper', 0.9]],
 'lying leg curl': [['legs', 'hamstrings', 1]],
-'machine crunch': [['core', 'abs', 1]],
+'machine crunch': [['core', 'abs_upper', 1]],
 'machine lateral raise': [['shoulders', 'delt_side', 1]],
-'mountain climber': [['core', 'abs', 0.7]],
+'mountain climber': [['core', 'abs_lower', 0.6], ['core', 'obliques', 0.3]],
 'nordic curl': [['legs', 'hamstrings', 1]],
-'one-arm dumbbell row': [['back', 'lats', 1], ['biceps', 'biceps', 0.3]],
+'one-arm dumbbell row': [['back', 'lats', 0.9], ['back', 'rhomboids', 0.4], ['biceps', 'biceps', 0.3]],
 'overhead cable tricep extension': [['triceps', 'tri_long', 1]],
 'overhead dumbbell tricep extension': [['triceps', 'tri_long', 1]],
-'overhead press': [['shoulders', 'delt_front', 1], ['shoulders', 'delt_side', 0.5], ['triceps', 'tri_lateral', 0.4]],
+'overhead press': [['shoulders', 'delt_front', 1], ['shoulders', 'delt_side', 0.5], ['triceps', 'tri_lateral', 0.4], ['traps', 'traps_upper', 0.2], ['core', 'abs_upper', 0.25], ['core', 'obliques', 0.25]],
 'pec deck machine': [['chest', 'chest_mid', 1]],
-'pendlay row': [['back', 'lats', 1], ['traps', 'traps', 0.4], ['biceps', 'biceps', 0.3]],
-'plank': [['core', 'abs', 0.8], ['core', 'obliques', 0.5]],
+'pendlay row': [['back', 'lats', 0.9], ['back', 'rhomboids', 0.6], ['traps', 'traps_mid', 0.4], ['biceps', 'biceps', 0.3]],
+'plank': [['core', 'abs_upper', 0.6], ['core', 'obliques', 0.5]],
 'plate front raise': [['shoulders', 'delt_front', 1]],
-'plate pinch': [['forearms', 'forearms', 1]],
+'plate pinch': [['forearms', 'forearm_flexors', 1]],
 'preacher curl': [['biceps', 'biceps', 1]],
-'pull-up': [['back', 'lats', 1], ['biceps', 'biceps', 0.5]],
-'push press': [['shoulders', 'delt_front', 1], ['legs', 'quads', 0.3], ['triceps', 'tri_lateral', 0.4]],
+'pull-up': [['back', 'lats', 0.9], ['biceps', 'biceps', 0.5], ['back', 'teres_major', 0.3]],
+'push press': [['shoulders', 'delt_front', 1], ['legs', 'quads', 0.3], ['triceps', 'tri_lateral', 0.4], ['core', 'abs_upper', 0.25], ['core', 'obliques', 0.25]],
 'push-up': [['chest', 'chest_mid', 0.9], ['triceps', 'tri_lateral', 0.4], ['shoulders', 'delt_front', 0.3]],
-'rack pull': [['back', 'lowerback', 0.8], ['legs', 'hamstrings', 0.5], ['traps', 'traps', 0.4]],
+'rack pull': [['back', 'lowerback', 0.8], ['legs', 'hamstrings', 0.5], ['traps', 'traps_upper', 0.5], ['back', 'lats', 0.3]],
 'reverse calf raise': [['legs', 'tibialis', 1]],
-'reverse crunch': [['core', 'abs', 1]],
-'reverse curl': [['forearms', 'forearms', 0.8], ['biceps', 'biceps', 0.4]],
-'reverse pec deck': [['shoulders', 'delt_rear', 1]],
-'reverse wrist curl': [['forearms', 'forearms', 1]],
-'romanian deadlift': [['legs', 'hamstrings', 1], ['legs', 'glutes', 0.7]],
+'reverse crunch': [['core', 'abs_lower', 1]],
+'reverse curl': [['forearms', 'forearm_extensors', 0.8], ['biceps', 'brachialis', 0.4]],
+'reverse pec deck': [['shoulders', 'delt_rear', 1], ['back', 'rhomboids', 0.4]],
+'reverse wrist curl': [['forearms', 'forearm_extensors', 1]],
+'romanian deadlift': [['legs', 'hamstrings', 1], ['legs', 'glutes', 0.6], ['back', 'lowerback', 0.3], ['core', 'abs_upper', 0.25], ['core', 'obliques', 0.25]],
 'russian twist': [['core', 'obliques', 1]],
-'seated cable row': [['back', 'lats', 0.8], ['traps', 'traps', 0.4], ['biceps', 'biceps', 0.3]],
+'seated cable row': [['back', 'lats', 0.7], ['back', 'rhomboids', 0.6], ['traps', 'traps_mid', 0.4], ['biceps', 'biceps', 0.3]],
 'seated calf raise': [['legs', 'calves', 1]],
 'seated dumbbell press': [['shoulders', 'delt_front', 1], ['shoulders', 'delt_side', 0.5], ['triceps', 'tri_lateral', 0.3]],
 'seated leg curl': [['legs', 'hamstrings', 1]],
 'side plank': [['core', 'obliques', 1]],
 'single-arm cable tricep extension': [['triceps', 'tri_lateral', 1]],
 'single-leg calf raise': [['legs', 'calves', 1]],
-'single-leg romanian deadlift': [['legs', 'hamstrings', 0.9], ['legs', 'glutes', 0.6]],
+'single-leg romanian deadlift': [['legs', 'hamstrings', 0.9], ['legs', 'glutes', 0.6], ['legs', 'abductors', 0.3], ['core', 'abs_upper', 0.25], ['core', 'obliques', 0.25]],
 'sissy squat': [['legs', 'quads', 1]],
-'sit-up': [['core', 'abs', 1]],
+'sit-up': [['core', 'abs_upper', 1]],
 'skull crusher': [['triceps', 'tri_long', 0.8], ['triceps', 'tri_lateral', 0.5]],
 'spider curl': [['biceps', 'biceps', 1]],
 'standing calf raise': [['legs', 'calves', 1]],
-'step-up': [['legs', 'quads', 0.8], ['legs', 'glutes', 0.6]],
-'stiff-leg deadlift': [['legs', 'hamstrings', 1], ['legs', 'glutes', 0.5]],
+'step-up': [['legs', 'quads', 0.8], ['legs', 'glutes', 0.6], ['core', 'abs_upper', 0.25], ['core', 'obliques', 0.25]],
+'stiff-leg deadlift': [['legs', 'hamstrings', 1], ['legs', 'glutes', 0.5], ['core', 'abs_upper', 0.25], ['core', 'obliques', 0.25]],
 'straight-arm pulldown': [['back', 'lats', 0.9]],
-'sumo deadlift': [['legs', 'glutes', 1], ['legs', 'adductors', 0.6], ['legs', 'hamstrings', 0.7], ['back', 'lowerback', 0.5]],
-'sumo squat': [['legs', 'adductors', 0.7], ['legs', 'quads', 0.6], ['legs', 'glutes', 0.5]],
-'superman': [['back', 'lowerback', 0.8]],
+'sumo deadlift': [['legs', 'glutes', 1], ['legs', 'adductors', 0.6], ['legs', 'hamstrings', 0.7], ['back', 'lowerback', 0.5], ['core', 'abs_upper', 0.25], ['core', 'obliques', 0.25]],
+'sumo squat': [['legs', 'adductors', 0.7], ['legs', 'quads', 0.6], ['legs', 'glutes', 0.5], ['core', 'abs_upper', 0.25], ['core', 'obliques', 0.25]],
+'superman': [['back', 'lowerback', 0.8], ['legs', 'glutes', 0.3]],
 'svend press': [['chest', 'chest_mid', 0.7]],
-'t-bar row': [['back', 'lats', 1], ['biceps', 'biceps', 0.3]],
+'t-bar row': [['back', 'lats', 0.8], ['back', 'rhomboids', 0.6], ['traps', 'traps_mid', 0.3], ['biceps', 'biceps', 0.3]],
 'tibialis raise': [['legs', 'tibialis', 1]],
-'toe touch': [['core', 'abs', 0.8]],
-'trap bar shrug': [['traps', 'traps', 1]],
+'toe touch': [['core', 'abs_upper', 0.8]],
+'trap bar shrug': [['traps', 'traps_upper', 1]],
 'tricep bar pushdown': [['triceps', 'tri_lateral', 1]],
 'tricep dip': [['triceps', 'tri_lateral', 0.9], ['chest', 'chest_lower', 0.3]],
 'tricep kickback': [['triceps', 'tri_lateral', 1]],
 'tricep rope pushdown': [['triceps', 'tri_lateral', 1]],
-'upright row': [['traps', 'traps', 0.7], ['shoulders', 'delt_side', 0.6]],
-'v-up': [['core', 'abs', 1]],
-'walking lunge': [['legs', 'quads', 0.8], ['legs', 'glutes', 0.6]],
-'weighted plank': [['core', 'abs', 0.9], ['core', 'obliques', 0.5]],
-'wrist curl': [['forearms', 'forearms', 1]],
-'wrist roller': [['forearms', 'forearms', 1]],
-'zottman curl': [['biceps', 'biceps', 0.8], ['forearms', 'forearms', 0.5]],
+'upright row': [['traps', 'traps_upper', 0.6], ['shoulders', 'delt_side', 0.6]],
+'v-up': [['core', 'abs_upper', 0.6], ['core', 'abs_lower', 0.6]],
+'walking lunge': [['legs', 'quads', 0.8], ['legs', 'glutes', 0.6], ['core', 'abs_upper', 0.25], ['core', 'obliques', 0.25]],
+'weighted plank': [['core', 'abs_upper', 0.9], ['core', 'obliques', 0.5]],
+'wrist curl': [['forearms', 'forearm_flexors', 1]],
+'wrist roller': [['forearms', 'forearm_flexors', 0.7], ['forearms', 'forearm_extensors', 0.7]],
+'zottman curl': [['biceps', 'biceps', 0.8], ['forearms', 'forearm_flexors', 0.5]],
 };
+// Best-effort keyword fallback for exercises not in the exact table above
+// (custom names, typos, less common lifts) — same idea as gymGuessMuscle
+// but mapped onto the finer group/region taxonomy used by the planner.
 // Best-effort keyword fallback for exercises not in the exact table above
 // (custom names, typos, less common lifts) — same idea as gymGuessMuscle
 // but mapped onto the finer group/region taxonomy used by the planner.
@@ -2536,24 +2553,27 @@ if (/calf/.test(n) && !/tibialis/.test(n)) hits.push(['legs', 'calves', 0.8]);
 if (/tibialis|reverse calf|toe raise/.test(n)) hits.push(['legs', 'tibialis', 0.8]);
 if (/leg curl|hamstring|nordic|glute-?ham/.test(n)) hits.push(['legs', 'hamstrings', 0.8]);
 if (/adductor|sumo|cossack|copenhagen/.test(n)) hits.push(['legs', 'adductors', 0.7]);
+if (/abductor|hip.*(abduct|kickback)/.test(n)) hits.push(['legs', 'abductors', 0.7]);
 if (/lateral raise|side raise/.test(n)) hits.push(['shoulders', 'delt_side', 0.8]);
 else if (/front raise/.test(n)) hits.push(['shoulders', 'delt_front', 0.8]);
 else if (/rear delt|reverse fly|reverse pec/.test(n)) hits.push(['shoulders', 'delt_rear', 0.8]);
-else if (/face pull/.test(n)) { hits.push(['shoulders', 'delt_rear', 0.7]); hits.push(['traps', 'traps', 0.4]); }
+else if (/face pull/.test(n)) { hits.push(['shoulders', 'delt_rear', 0.7]); hits.push(['back', 'rhomboids', 0.4]); }
 else if (/shoulder|overhead|arnold|push press|landmine press/.test(n) && /press/.test(n)) hits.push(['shoulders', 'delt_front', 0.7]);
-if (/shrug/.test(n)) hits.push(['traps', 'traps', 0.9]);
-if (/upright row/.test(n)) { hits.push(['traps', 'traps', 0.6]); hits.push(['shoulders', 'delt_side', 0.5]); }
-if (/farmer/.test(n)) { hits.push(['traps', 'traps', 0.5]); hits.push(['forearms', 'forearms', 0.5]); }
-if (/row|pulldown|pull-?up|pullup|chin-?up|lat\b/.test(n)) hits.push(['back', 'lats', 0.7]);
+if (/shrug/.test(n)) hits.push(['traps', 'traps_upper', 0.9]);
+if (/upright row/.test(n)) { hits.push(['traps', 'traps_upper', 0.6]); hits.push(['shoulders', 'delt_side', 0.5]); }
+if (/farmer/.test(n)) { hits.push(['traps', 'traps_upper', 0.5]); hits.push(['forearms', 'forearm_flexors', 0.5]); }
+if (/row|pulldown|pull-?up|pullup|chin-?up|lat\b/.test(n)) { hits.push(['back', 'lats', 0.7]); hits.push(['back', 'rhomboids', 0.3]); }
 if (/back extension|hyperextension|superman|good morning|rack pull/.test(n)) hits.push(['back', 'lowerback', 0.7]);
 if (/tricep|pushdown|skull|kickback|jm press/.test(n)) hits.push(['triceps', 'tri_lateral', 0.7]);
 if (/close-?grip.*(bench|press)/.test(n)) hits.push(['triceps', 'tri_medial', 0.7]);
 if (/overhead.*(tricep|extension)/.test(n)) hits.push(['triceps', 'tri_long', 0.7]);
 if (/dip/.test(n) && !/tricep/.test(n)) { hits.push(['triceps', 'tri_lateral', 0.6]); hits.push(['chest', 'chest_lower', 0.5]); }
-if (/wrist curl|wrist roller|pinch/.test(n)) hits.push(['forearms', 'forearms', 0.9]);
+if (/hammer curl/.test(n)) hits.push(['biceps', 'brachialis', 0.8]);
+if (/wrist curl|wrist roller|pinch/.test(n)) hits.push(['forearms', 'forearm_flexors', 0.9]);
+if (/reverse curl/.test(n)) { hits.push(['forearms', 'forearm_extensors', 0.7]); hits.push(['biceps', 'brachialis', 0.3]); }
 if (/curl/.test(n) && !/leg|hamstring|wrist|reverse curl/.test(n)) hits.push(['biceps', 'biceps', 0.8]);
-if (/reverse curl/.test(n)) { hits.push(['forearms', 'forearms', 0.6]); hits.push(['biceps', 'biceps', 0.4]); }
-if (/plank|crunch|sit-?up|core\b|v-?up|leg raise|toe touch|mountain climber|rollout/.test(n) && !/side|oblique/.test(n)) hits.push(['core', 'abs', 0.7]);
+if (/plank|crunch|sit-?up|core\b|v-?up|leg raise|toe touch|mountain climber|rollout/.test(n) && !/side|oblique/.test(n)) hits.push(['core', 'abs_upper', 0.6]);
+if (/hanging.*(leg|knee)/.test(n)) hits.push(['core', 'abs_lower', 0.7]);
 if (/twist|oblique|woodchop|side plank/.test(n)) hits.push(['core', 'obliques', 0.7]);
 return hits;
 }
@@ -2578,19 +2598,25 @@ if (!v) return 'empty';
 if (v >= 0.6) return 'full';
 return 'partial';
 }
-// Finds the best (highest-weight) exercise from the known table that
-// targets a specific region and isn't already in the current plan —
-// used to suggest a gap-filler.
-function gymSuggestExerciseFor(group, region, exclude) {
+// Finds ALL exercises from the known table that target a specific
+// group/region and aren't already in the current plan, sorted by how
+// strongly they hit that region (best/most-isolated first).
+function gymSuggestExercisesFor(group, region, exclude) {
 const excl = new Set(exclude.map((x) => x.toLowerCase()));
-let best = null, bestW = 0;
+const out = [];
 Object.entries(GYM_EXERCISE_TARGETS).forEach(([name, targets]) => {
 if (excl.has(name)) return;
 targets.forEach(([g, r, w]) => {
-if (g === group && r === region && w > bestW) { best = name; bestW = w; }
+if (g === group && r === region) out.push({ name, w });
 });
 });
-return best;
+out.sort((a, b) => b.w - a.w);
+return out;
+}
+// Back-compat single-best helper (kept in case anything else calls it).
+function gymSuggestExerciseFor(group, region, exclude) {
+const all = gymSuggestExercisesFor(group, region, exclude);
+return all.length ? all[0].name : null;
 }
 
 let gymLog = [], gymBodycomp = [], gymGoals = [], gymCustomEx = [], gymSessionTemplates = [];
@@ -3161,25 +3187,31 @@ back.dataset.built = '1';
 // Body diagram polygons adapted from the MIT-licensed react-body-highlighter
 // project (github.com/giavinh79/react-body-highlighter) — anatomically
 // correct, tested muscle-region shapes rather than a hand-drawn approximation.
-// Each polygon id is "<f|b>-<muscle>-<l|r>"; DIRECT maps a muscle straight to
-// one (group,region); AGGREGATE maps a muscle that visually shows just one
-// shape on the body but represents several finer regions tracked elsewhere
-// (e.g. the single front delt shape represents both delt_front + delt_side —
-// the text legend below still breaks those out individually with their own
-// suggestions).
+// Each polygon id is "<f|b>-<muscle>-<l|r>". DIRECT maps a polygon straight to
+// one (group,region); AGGREGATE maps a polygon that visually shows just one
+// shape but represents several finer regions tracked separately by the
+// planner (e.g. the back's "lats" shape also stands in for rhomboids/teres
+// major, since the library has no separate polygon for those) — scored via
+// Math.max across all of them. The text legend below still breaks those out
+// individually with their own suggestions.
 const GYM_MZ_DIRECT = {
-'f-obliques': ['core', 'obliques'], 'f-abs': ['core', 'abs'], 'f-biceps': ['biceps', 'biceps'],
 'f-adductors': ['legs', 'adductors'], 'f-quads': ['legs', 'quads'], 'f-tibialis': ['legs', 'tibialis'],
-'f-forearms': ['forearms', 'forearms'],
-'b-traps': ['traps', 'traps'], 'b-back_delt': ['shoulders', 'delt_rear'], 'b-lats': ['back', 'lats'],
-'b-lowerback': ['back', 'lowerback'], 'b-forearms': ['forearms', 'forearms'], 'b-glutes': ['legs', 'glutes'],
-'b-adductors': ['legs', 'adductors'], 'b-hamstrings': ['legs', 'hamstrings'], 'b-calves': ['legs', 'calves'],
+'b-back_delt': ['shoulders', 'delt_rear'], 'b-lowerback': ['back', 'lowerback'], 'b-glutes': ['legs', 'glutes'],
+'b-hamstrings': ['legs', 'hamstrings'], 'b-calves': ['legs', 'calves'],
 };
 const GYM_MZ_AGGREGATE = {
 'f-chest': { group: 'chest', regions: ['chest_upper', 'chest_mid', 'chest_lower'] },
 'f-front_delt': { group: 'shoulders', regions: ['delt_front', 'delt_side'] },
 'f-triceps': { group: 'triceps', regions: ['tri_long', 'tri_lateral', 'tri_medial'] },
 'b-triceps': { group: 'triceps', regions: ['tri_long', 'tri_lateral', 'tri_medial'] },
+'f-obliques': { group: 'core', regions: ['obliques'] },
+'f-abs': { group: 'core', regions: ['abs_upper', 'abs_lower'] },
+'f-biceps': { group: 'biceps', regions: ['biceps', 'brachialis'] },
+'f-forearms': { group: 'forearms', regions: ['forearm_flexors', 'forearm_extensors'] },
+'b-forearms': { group: 'forearms', regions: ['forearm_flexors', 'forearm_extensors'] },
+'b-traps': { group: 'traps', regions: ['traps_upper', 'traps_mid', 'traps_lower'] },
+'b-lats': { group: 'back', regions: ['lats', 'rhomboids', 'teres_major'] },
+'b-adductors': { group: 'legs', regions: ['adductors', 'abductors'] },
 };
 // Non-interactive body parts (head/neck/knees) always render as neutral skin.
 const GYM_MZ_SKIN_PREFIXES = ['f-neck', 'f-head', 'f-knees', 'b-head', 'b-knees'];
@@ -3205,7 +3237,13 @@ el.setAttribute('class', 'mz-part mz-' + gymCoverageLevel(v));
 });
 });
 }
+let gymMzOpenRegion = null;
+function gymToggleMzRegion(rowId) {
+gymMzOpenRegion = gymMzOpenRegion === rowId ? null : rowId;
+gymRenderMzLegend(window.__gymLastMzScore || {});
+}
 function gymRenderMzLegend(score) {
+window.__gymLastMzScore = score;
 const groups = gymPlanGroups.length ? GYM_MUSCLE_MAP.filter((g) => gymPlanGroups.includes(g.key)) : GYM_MUSCLE_MAP;
 if (!gymPlanGroups.length) {
 $('gymMzLegend').innerHTML = '<div class="plan-empty">Kies hierboven welke spiergroepen je vandaag traint om per spier te zien wat je nog mist.</div>';
@@ -3215,12 +3253,18 @@ $('gymMzLegend').innerHTML = groups.map((g) => {
 const rows = g.regions.map((r) => {
 const v = score[`${g.key}:${r.key}`] || 0;
 const level = gymCoverageLevel(v);
-let suggestHtml = '';
+const rowId = `${g.key}__${r.key}`;
+let expandHtml = '';
 if (level !== 'full') {
-const sug = gymSuggestExerciseFor(g.key, r.key, gymPlanExercises);
-if (sug) suggestHtml = `<span class="mz-suggest" onclick="gymAddSuggested('${sug.replace(/'/g, "\\'")}')">+ ${esc(sug)}</span>`;
+const all = gymSuggestExercisesFor(g.key, r.key, gymPlanExercises);
+if (all.length) {
+const isOpen = gymMzOpenRegion === rowId;
+const list = all.map((s) => `<span class="mz-suggest-item" onclick="gymAddSuggested('${s.name.replace(/'/g, "\\'")}')">+ ${esc(s.name)}</span>`).join('');
+expandHtml = `<span class="mz-toggle ${isOpen ? 'open' : ''}" onclick="gymToggleMzRegion('${rowId}')" title="Toon oefeningen">${isOpen ? '▾' : '▸'} ${all.length}</span>` +
+(isOpen ? `<div class="mz-suggest-list">${list}</div>` : '');
 }
-return `<div class="mz-region"><span class="mz-dot mz-${level}"></span>${esc(r.label)}${suggestHtml}</div>`;
+}
+return `<div class="mz-region"><span class="mz-dot mz-${level}"></span>${esc(r.label)}${expandHtml}</div>`;
 }).join('');
 return `<div class="mz-group"><div class="mz-group-name">${esc(g.label)}</div>${rows}</div>`;
 }).join('');
