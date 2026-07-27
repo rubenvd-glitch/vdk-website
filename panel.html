@@ -383,18 +383,20 @@ padding: 2px; font-family: inherit;
 .plan-pill button:hover { color: #f28b8b; }
 .plan-empty { color: #5a6472; font-size: 13px; padding: 4px 0 8px; }
 .mz-wrap { display: flex; gap: 22px; flex-wrap: wrap; align-items: flex-start; }
-.mz-svg { width: 140px; height: 240px; flex-shrink: 0; }
-.mz-svg .mz-part { transition: fill .15s, stroke .15s; }
-.mz-empty { fill: #232a33; stroke: #2f3947; stroke-width: 1.5; }
-.mz-partial { fill: #3a2a14; stroke: #f0b45c; stroke-width: 1.5; }
-.mz-full { fill: #17321c; stroke: #7fd68f; stroke-width: 1.5; }
-.mz-skin { fill: #1a2028; stroke: none; }
+.mz-figures { display: flex; gap: 14px; flex-shrink: 0; background: #e9edf1; border-radius: 12px; padding: 16px 14px 10px; }
+.mz-figure-lbl { text-align: center; font-size: 11px; color: #5a6472; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px; }
+.mz-svg { width: 145px; }
+.mz-part { transition: fill .15s; cursor: default; stroke: #2f3855; stroke-width: 0.5; }
+.mz-empty { fill: #dde2e7; }
+.mz-partial { fill: #f0b45c; }
+.mz-full { fill: #5fbf7a; }
+.mz-skin { fill: #dde2e7; stroke: #2f3855; stroke-width: 0.5; }
 .mz-legend { flex: 1; min-width: 220px; }
 .mz-group { margin-bottom: 14px; }
 .mz-group-name { font-size: 13.5px; font-weight: 700; color: #cfd6de; margin-bottom: 6px; }
 .mz-region { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #a7afba; padding: 3px 0; }
 .mz-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
-.mz-dot.mz-full { background: #7fd68f; border: none; }
+.mz-dot.mz-full { background: #5fbf7a; border: none; }
 .mz-dot.mz-partial { background: #f0b45c; border: none; }
 .mz-dot.mz-empty { background: #454f5c; border: none; }
 .mz-suggest { color: #7fdc9e; margin-left: auto; cursor: pointer; font-size: 12px; white-space: nowrap; }
@@ -583,7 +585,17 @@ padding: 9px; border-radius: 8px; font-size: 13px; cursor: pointer; font-family:
 <div class="planner-box">
 <h4>Dekking — welke spieren pak je al goed mee?</h4>
 <div class="mz-wrap">
-<svg class="mz-svg" id="gymMzSvg" viewBox="0 0 120 240" xmlns="http://www.w3.org/2000/svg"></svg>
+<div class="mz-figures">
+<div>
+<div class="mz-figure-lbl">Voorkant</div>
+<svg class="mz-svg" id="gymMzSvgFront" viewBox="0 0 100 200" xmlns="http://www.w3.org/2000/svg" style="height:290px;"></svg>
+</div>
+<div>
+<div class="mz-figure-lbl">Achterkant</div>
+<svg class="mz-svg" id="gymMzSvgBack" viewBox="0 0 100 220" xmlns="http://www.w3.org/2000/svg" style="height:319px;"></svg>
+</div>
+</div>
+
 <div class="mz-legend" id="gymMzLegend"></div>
 </div>
 </div>
@@ -2264,13 +2276,53 @@ $('logoutBtn').onclick = async () => { await fetch('/base/logout', { method: 'PO
 // Lives entirely inside Base — same session, same login, just its own view
 // (like Suggestions or the Idea box). No separate app, no separate 2FA.
 const GYM_DEFAULT_EXERCISES = {
-'Squat': 'Legs', 'Deadlift': 'Legs', 'Leg Press': 'Legs', 'Romanian Deadlift': 'Legs',
-'Leg Curl': 'Legs', 'Hip Thrust': 'Legs',
-'Bench Press': 'Push', 'Overhead Press': 'Push', 'Incline Dumbbell Press': 'Push', 'Dips': 'Push',
-'Barbell Row': 'Pull', 'Pull-up': 'Pull', 'Dumbbell Curl': 'Pull', 'Lat Pulldown': 'Pull',
-'Plank': 'Core',
-};
-const GYM_BIG_JUMP = ['squat', 'deadlift', 'leg press', 'romanian deadlift', 'hip thrust'];
+'Ab Wheel Rollout': 'Core', 'Adductor Machine': 'Legs', 'Alternating Dumbbell Curl': 'Pull',
+'Arnold Press': 'Push', 'Assisted Pull-up': 'Pull', 'Back Extension': 'Pull',
+'Back Squat': 'Legs', 'Barbell Bench Press': 'Push', 'Barbell Curl': 'Pull',
+'Barbell Glute Bridge': 'Legs', 'Barbell Row': 'Pull', 'Barbell Shrug': 'Pull',
+'Bent-Over Reverse Fly': 'Pull', 'Bicycle Crunch': 'Core', 'Bulgarian Split Squat': 'Legs',
+'Cable Crunch': 'Core', 'Cable Curl': 'Pull', 'Cable Fly': 'Push',
+'Cable Glute Kickback': 'Legs', 'Cable Lateral Raise': 'Push', 'Cable Rear Delt Fly': 'Pull',
+'Cable Shrug': 'Pull', 'Cable Woodchop': 'Core', 'Chest Dip': 'Push',
+'Chest Press Machine': 'Push', 'Chest-Supported Row': 'Pull', 'Chin-up': 'Pull',
+'Close-Grip Bench Press': 'Push', 'Close-Grip Lat Pulldown': 'Pull', 'Concentration Curl': 'Pull',
+'Copenhagen Plank': 'Legs', 'Cossack Squat': 'Legs', 'Crunch': 'Core',
+'Deadlift': 'Pull', 'Decline Barbell Bench Press': 'Push', 'Decline Dumbbell Press': 'Push',
+'Decline Push-up': 'Push', 'Decline Sit-up': 'Core', 'Diamond Push-up': 'Push',
+'Donkey Calf Raise': 'Legs', 'Drag Curl': 'Pull', 'Dumbbell Bench Press': 'Push',
+'Dumbbell Curl': 'Pull', 'Dumbbell Fly': 'Push', 'Dumbbell Shrug': 'Pull',
+'EZ-Bar Curl': 'Pull', 'Face Pull': 'Pull', 'Farmer\'s Walk': 'Pull',
+'Frog Pump': 'Legs', 'Front Raise': 'Push', 'Front Squat': 'Legs',
+'Glute Bridge': 'Legs', 'Glute-Ham Raise': 'Legs', 'Goblet Squat': 'Legs',
+'Good Morning': 'Pull', 'Hack Squat': 'Legs', 'Hammer Curl': 'Pull',
+'Hanging Knee Raise': 'Core', 'Hanging Leg Raise': 'Core', 'Hanging Oblique Raise': 'Core',
+'High-to-Low Cable Fly': 'Push', 'Hip Abduction Machine': 'Legs', 'Hip Thrust': 'Legs',
+'Incline Barbell Bench Press': 'Push', 'Incline Dumbbell Curl': 'Pull', 'Incline Dumbbell Fly': 'Push',
+'Incline Dumbbell Press': 'Push', 'Incline Push-up': 'Push', 'JM Press': 'Push',
+'Landmine Press': 'Push', 'Landmine Rotation': 'Core', 'Lat Pulldown': 'Pull',
+'Lateral Raise': 'Push', 'Leg Extension': 'Legs', 'Leg Press': 'Legs',
+'Leg Press Calf Raise': 'Legs', 'Low-to-High Cable Fly': 'Push', 'Lying Leg Curl': 'Legs',
+'Machine Crunch': 'Core', 'Machine Lateral Raise': 'Push', 'Mountain Climber': 'Core',
+'Nordic Curl': 'Legs', 'One-Arm Dumbbell Row': 'Pull', 'Overhead Cable Tricep Extension': 'Push',
+'Overhead Dumbbell Tricep Extension': 'Push', 'Overhead Press': 'Push', 'Pec Deck Machine': 'Push',
+'Pendlay Row': 'Pull', 'Plank': 'Core', 'Plate Front Raise': 'Push',
+'Plate Pinch': 'Other', 'Preacher Curl': 'Pull', 'Pull-up': 'Pull',
+'Push Press': 'Push', 'Push-up': 'Push', 'Rack Pull': 'Pull',
+'Reverse Calf Raise': 'Legs', 'Reverse Crunch': 'Core', 'Reverse Curl': 'Pull',
+'Reverse Pec Deck': 'Pull', 'Reverse Wrist Curl': 'Other', 'Romanian Deadlift': 'Legs',
+'Russian Twist': 'Core', 'Seated Cable Row': 'Pull', 'Seated Calf Raise': 'Legs',
+'Seated Dumbbell Press': 'Push', 'Seated Leg Curl': 'Legs', 'Side Plank': 'Core',
+'Single-Arm Cable Tricep Extension': 'Push', 'Single-Leg Calf Raise': 'Legs', 'Single-Leg Romanian Deadlift': 'Legs',
+'Sissy Squat': 'Legs', 'Sit-up': 'Core', 'Skull Crusher': 'Push',
+'Spider Curl': 'Pull', 'Standing Calf Raise': 'Legs', 'Step-up': 'Legs',
+'Stiff-Leg Deadlift': 'Legs', 'Straight-Arm Pulldown': 'Pull', 'Sumo Deadlift': 'Pull',
+'Sumo Squat': 'Legs', 'Superman': 'Pull', 'Svend Press': 'Push',
+'T-Bar Row': 'Pull', 'Tibialis Raise': 'Legs', 'Toe Touch': 'Core',
+'Trap Bar Shrug': 'Pull', 'Tricep Bar Pushdown': 'Push', 'Tricep Dip': 'Push',
+'Tricep Kickback': 'Push', 'Tricep Rope Pushdown': 'Push', 'Upright Row': 'Pull',
+'V-Up': 'Core', 'Walking Lunge': 'Legs', 'Weighted Plank': 'Core',
+'Wrist Curl': 'Other', 'Wrist Roller': 'Other', 'Zottman Curl': 'Pull',
+};const GYM_BIG_JUMP = ['squat', 'deadlift', 'leg press', 'romanian deadlift', 'hip thrust'];
 const GYM_GROUP_LABEL = { Legs: 'Benen', Push: 'Push', Pull: 'Pull', Core: 'Core', Other: 'Overig' };
 
 // ---- Session composer: muscle-coverage "poppetje" advisor ----
@@ -2290,19 +2342,25 @@ const GYM_MUSCLE_MAP = [
 { key: 'shoulders', label: 'Schouders', regions: [
 { key: 'delt_front', label: 'Voorste delt', visible: true },
 { key: 'delt_side', label: 'Zijdelt', visible: true },
-{ key: 'delt_rear', label: 'Achterste delt', visible: false },
+{ key: 'delt_rear', label: 'Achterste delt', visible: true },
+] },
+{ key: 'traps', label: 'Trapezius', regions: [
+{ key: 'traps', label: 'Trapezius', visible: true },
 ] },
 { key: 'biceps', label: 'Biceps', regions: [
 { key: 'biceps', label: 'Biceps', visible: true },
 ] },
 { key: 'triceps', label: 'Triceps', regions: [
-{ key: 'tri_long', label: 'Lange kop', visible: false },
-{ key: 'tri_lateral', label: 'Zijkant (lateral head)', visible: false },
-{ key: 'tri_medial', label: 'Mediale kop', visible: false },
+{ key: 'tri_long', label: 'Lange kop', visible: true },
+{ key: 'tri_lateral', label: 'Zijkant (lateral head)', visible: true },
+{ key: 'tri_medial', label: 'Mediale kop', visible: true },
+] },
+{ key: 'forearms', label: 'Onderarmen', regions: [
+{ key: 'forearms', label: 'Onderarmen', visible: true },
 ] },
 { key: 'back', label: 'Rug', regions: [
-{ key: 'lats', label: 'Lats (brede rugspier)', visible: false },
-{ key: 'upperback', label: 'Boven-rug / trapezius', visible: false },
+{ key: 'lats', label: 'Lats (brede rugspier)', visible: true },
+{ key: 'lowerback', label: 'Onderrug (erector spinae)', visible: true },
 ] },
 { key: 'core', label: 'Buik', regions: [
 { key: 'abs', label: 'Buikspieren', visible: true },
@@ -2310,51 +2368,153 @@ const GYM_MUSCLE_MAP = [
 ] },
 { key: 'legs', label: 'Benen', regions: [
 { key: 'quads', label: 'Quadriceps', visible: true },
-{ key: 'hamstrings', label: 'Hamstrings', visible: false },
-{ key: 'glutes', label: 'Bilspieren', visible: false },
+{ key: 'hamstrings', label: 'Hamstrings', visible: true },
+{ key: 'glutes', label: 'Bilspieren', visible: true },
+{ key: 'adductors', label: 'Binnenkant bovenbeen', visible: true },
 { key: 'calves', label: 'Kuiten', visible: true },
+{ key: 'tibialis', label: 'Scheenspier (tibialis)', visible: true },
 ] },
 ];
-// Exercise → [group, region, weight] targets. weight 1 = primary mover,
-// lower = secondary/assisting. Covers the default exercise list plus a
-// handful of common accessory movements so gap-filling suggestions have
-// something concrete to point to.
+
 const GYM_EXERCISE_TARGETS = {
-'squat': [['legs', 'quads', 1], ['legs', 'glutes', 0.6]],
-'deadlift': [['legs', 'hamstrings', 1], ['legs', 'glutes', 0.8], ['back', 'lats', 0.5], ['back', 'upperback', 0.6]],
-'romanian deadlift': [['legs', 'hamstrings', 1], ['legs', 'glutes', 0.8]],
-'leg press': [['legs', 'quads', 1], ['legs', 'glutes', 0.4]],
-'leg curl': [['legs', 'hamstrings', 1]],
-'hip thrust': [['legs', 'glutes', 1]],
-'calf raise': [['legs', 'calves', 1]],
-'bench press': [['chest', 'chest_mid', 1], ['triceps', 'tri_lateral', 0.5], ['shoulders', 'delt_front', 0.4]],
-'incline dumbbell press': [['chest', 'chest_upper', 1], ['shoulders', 'delt_front', 0.5], ['triceps', 'tri_lateral', 0.3]],
-'incline bench press': [['chest', 'chest_upper', 1], ['triceps', 'tri_lateral', 0.3]],
-'decline bench press': [['chest', 'chest_lower', 1]],
-'chest fly': [['chest', 'chest_mid', 0.8]],
+'ab wheel rollout': [['core', 'abs', 1], ['core', 'obliques', 0.3]],
+'adductor machine': [['legs', 'adductors', 1]],
+'alternating dumbbell curl': [['biceps', 'biceps', 1]],
+'arnold press': [['shoulders', 'delt_front', 1], ['shoulders', 'delt_side', 0.6]],
+'assisted pull-up': [['back', 'lats', 0.8], ['biceps', 'biceps', 0.4]],
+'back extension': [['back', 'lowerback', 1], ['legs', 'glutes', 0.4]],
+'back squat': [['legs', 'quads', 1], ['legs', 'glutes', 0.6]],
+'barbell bench press': [['chest', 'chest_mid', 1], ['triceps', 'tri_lateral', 0.4], ['shoulders', 'delt_front', 0.3]],
+'barbell curl': [['biceps', 'biceps', 1]],
+'barbell glute bridge': [['legs', 'glutes', 1]],
+'barbell row': [['back', 'lats', 0.9], ['back', 'lowerback', 0.3], ['biceps', 'biceps', 0.4], ['traps', 'traps', 0.3]],
+'barbell shrug': [['traps', 'traps', 1]],
+'bent-over reverse fly': [['shoulders', 'delt_rear', 1]],
+'bicycle crunch': [['core', 'abs', 0.7], ['core', 'obliques', 0.7]],
+'bulgarian split squat': [['legs', 'quads', 0.9], ['legs', 'glutes', 0.6]],
+'cable crunch': [['core', 'abs', 1]],
+'cable curl': [['biceps', 'biceps', 1]],
 'cable fly': [['chest', 'chest_mid', 1]],
-'overhead press': [['shoulders', 'delt_front', 1], ['shoulders', 'delt_side', 0.6], ['triceps', 'tri_lateral', 0.4]],
-'lateral raise': [['shoulders', 'delt_side', 1]],
-'front raise': [['shoulders', 'delt_front', 1]],
-'face pull': [['shoulders', 'delt_rear', 1], ['back', 'upperback', 0.5]],
-'reverse fly': [['shoulders', 'delt_rear', 1]],
-'dips': [['chest', 'chest_lower', 0.8], ['triceps', 'tri_lateral', 0.8], ['triceps', 'tri_medial', 0.6]],
-'tricep pushdown': [['triceps', 'tri_lateral', 1]],
-'overhead tricep extension': [['triceps', 'tri_long', 1]],
-'close grip bench press': [['triceps', 'tri_medial', 0.8], ['chest', 'chest_mid', 0.4]],
-'skull crusher': [['triceps', 'tri_long', 0.8], ['triceps', 'tri_lateral', 0.5]],
-'barbell row': [['back', 'lats', 0.8], ['back', 'upperback', 0.6], ['biceps', 'biceps', 0.3]],
-'seated row': [['back', 'lats', 0.7], ['back', 'upperback', 0.6], ['biceps', 'biceps', 0.3]],
-'pull-up': [['back', 'lats', 1], ['biceps', 'biceps', 0.5]],
-'lat pulldown': [['back', 'lats', 1], ['biceps', 'biceps', 0.4]],
-'shrug': [['back', 'upperback', 1]],
-'dumbbell curl': [['biceps', 'biceps', 1]],
-'hammer curl': [['biceps', 'biceps', 0.8]],
-'preacher curl': [['biceps', 'biceps', 1]],
-'plank': [['core', 'abs', 0.8], ['core', 'obliques', 0.5]],
+'cable glute kickback': [['legs', 'glutes', 1]],
+'cable lateral raise': [['shoulders', 'delt_side', 1]],
+'cable rear delt fly': [['shoulders', 'delt_rear', 1]],
+'cable shrug': [['traps', 'traps', 0.9]],
+'cable woodchop': [['core', 'obliques', 1]],
+'chest dip': [['chest', 'chest_lower', 0.9], ['triceps', 'tri_lateral', 0.6]],
+'chest press machine': [['chest', 'chest_mid', 1], ['triceps', 'tri_lateral', 0.3]],
+'chest-supported row': [['back', 'lats', 0.9], ['traps', 'traps', 0.3]],
+'chin-up': [['back', 'lats', 0.9], ['biceps', 'biceps', 0.7]],
+'close-grip bench press': [['triceps', 'tri_medial', 0.8], ['chest', 'chest_mid', 0.4]],
+'close-grip lat pulldown': [['back', 'lats', 1], ['biceps', 'biceps', 0.5]],
+'concentration curl': [['biceps', 'biceps', 1]],
+'copenhagen plank': [['legs', 'adductors', 1]],
+'cossack squat': [['legs', 'adductors', 0.8], ['legs', 'quads', 0.6]],
 'crunch': [['core', 'abs', 1]],
+'deadlift': [['legs', 'hamstrings', 1], ['legs', 'glutes', 0.8], ['back', 'lats', 0.4], ['back', 'lowerback', 0.6], ['traps', 'traps', 0.3]],
+'decline barbell bench press': [['chest', 'chest_lower', 1], ['triceps', 'tri_lateral', 0.3]],
+'decline dumbbell press': [['chest', 'chest_lower', 1], ['triceps', 'tri_lateral', 0.3]],
+'decline push-up': [['chest', 'chest_upper', 0.8], ['shoulders', 'delt_front', 0.4]],
+'decline sit-up': [['core', 'abs', 1]],
+'diamond push-up': [['triceps', 'tri_lateral', 0.8], ['chest', 'chest_mid', 0.5]],
+'donkey calf raise': [['legs', 'calves', 1]],
+'drag curl': [['biceps', 'biceps', 1]],
+'dumbbell bench press': [['chest', 'chest_mid', 1], ['triceps', 'tri_lateral', 0.3], ['shoulders', 'delt_front', 0.3]],
+'dumbbell curl': [['biceps', 'biceps', 1]],
+'dumbbell fly': [['chest', 'chest_mid', 0.9]],
+'dumbbell shrug': [['traps', 'traps', 1]],
+'ez-bar curl': [['biceps', 'biceps', 1]],
+'face pull': [['shoulders', 'delt_rear', 0.9], ['traps', 'traps', 0.4]],
+'farmer\'s walk': [['traps', 'traps', 0.6], ['forearms', 'forearms', 0.6]],
+'frog pump': [['legs', 'glutes', 0.8]],
+'front raise': [['shoulders', 'delt_front', 1]],
+'front squat': [['legs', 'quads', 1], ['legs', 'glutes', 0.4]],
+'glute bridge': [['legs', 'glutes', 0.9]],
+'glute-ham raise': [['legs', 'hamstrings', 1], ['legs', 'glutes', 0.4]],
+'goblet squat': [['legs', 'quads', 0.9], ['legs', 'glutes', 0.4]],
+'good morning': [['legs', 'hamstrings', 0.8], ['back', 'lowerback', 0.5]],
+'hack squat': [['legs', 'quads', 1]],
+'hammer curl': [['biceps', 'biceps', 0.8], ['forearms', 'forearms', 0.4]],
+'hanging knee raise': [['core', 'abs', 0.9]],
+'hanging leg raise': [['core', 'abs', 1]],
+'hanging oblique raise': [['core', 'obliques', 1]],
+'high-to-low cable fly': [['chest', 'chest_lower', 0.9]],
+'hip abduction machine': [['legs', 'glutes', 0.8]],
+'hip thrust': [['legs', 'glutes', 1]],
+'incline barbell bench press': [['chest', 'chest_upper', 1], ['shoulders', 'delt_front', 0.4], ['triceps', 'tri_lateral', 0.3]],
+'incline dumbbell curl': [['biceps', 'biceps', 1]],
+'incline dumbbell fly': [['chest', 'chest_upper', 0.9]],
+'incline dumbbell press': [['chest', 'chest_upper', 1], ['shoulders', 'delt_front', 0.5], ['triceps', 'tri_lateral', 0.3]],
+'incline push-up': [['chest', 'chest_lower', 0.8]],
+'jm press': [['triceps', 'tri_medial', 0.9], ['chest', 'chest_mid', 0.3]],
+'landmine press': [['shoulders', 'delt_front', 0.8], ['chest', 'chest_upper', 0.5], ['triceps', 'tri_lateral', 0.3]],
+'landmine rotation': [['core', 'obliques', 1]],
+'lat pulldown': [['back', 'lats', 1], ['biceps', 'biceps', 0.4]],
+'lateral raise': [['shoulders', 'delt_side', 1]],
+'leg extension': [['legs', 'quads', 1]],
+'leg press': [['legs', 'quads', 1], ['legs', 'glutes', 0.4]],
+'leg press calf raise': [['legs', 'calves', 1]],
+'low-to-high cable fly': [['chest', 'chest_upper', 0.9]],
+'lying leg curl': [['legs', 'hamstrings', 1]],
+'machine crunch': [['core', 'abs', 1]],
+'machine lateral raise': [['shoulders', 'delt_side', 1]],
+'mountain climber': [['core', 'abs', 0.7]],
+'nordic curl': [['legs', 'hamstrings', 1]],
+'one-arm dumbbell row': [['back', 'lats', 1], ['biceps', 'biceps', 0.3]],
+'overhead cable tricep extension': [['triceps', 'tri_long', 1]],
+'overhead dumbbell tricep extension': [['triceps', 'tri_long', 1]],
+'overhead press': [['shoulders', 'delt_front', 1], ['shoulders', 'delt_side', 0.5], ['triceps', 'tri_lateral', 0.4]],
+'pec deck machine': [['chest', 'chest_mid', 1]],
+'pendlay row': [['back', 'lats', 1], ['traps', 'traps', 0.4], ['biceps', 'biceps', 0.3]],
+'plank': [['core', 'abs', 0.8], ['core', 'obliques', 0.5]],
+'plate front raise': [['shoulders', 'delt_front', 1]],
+'plate pinch': [['forearms', 'forearms', 1]],
+'preacher curl': [['biceps', 'biceps', 1]],
+'pull-up': [['back', 'lats', 1], ['biceps', 'biceps', 0.5]],
+'push press': [['shoulders', 'delt_front', 1], ['legs', 'quads', 0.3], ['triceps', 'tri_lateral', 0.4]],
+'push-up': [['chest', 'chest_mid', 0.9], ['triceps', 'tri_lateral', 0.4], ['shoulders', 'delt_front', 0.3]],
+'rack pull': [['back', 'lowerback', 0.8], ['legs', 'hamstrings', 0.5], ['traps', 'traps', 0.4]],
+'reverse calf raise': [['legs', 'tibialis', 1]],
+'reverse crunch': [['core', 'abs', 1]],
+'reverse curl': [['forearms', 'forearms', 0.8], ['biceps', 'biceps', 0.4]],
+'reverse pec deck': [['shoulders', 'delt_rear', 1]],
+'reverse wrist curl': [['forearms', 'forearms', 1]],
+'romanian deadlift': [['legs', 'hamstrings', 1], ['legs', 'glutes', 0.7]],
 'russian twist': [['core', 'obliques', 1]],
-'good morning': [['legs', 'hamstrings', 0.8], ['back', 'upperback', 0.4]],
+'seated cable row': [['back', 'lats', 0.8], ['traps', 'traps', 0.4], ['biceps', 'biceps', 0.3]],
+'seated calf raise': [['legs', 'calves', 1]],
+'seated dumbbell press': [['shoulders', 'delt_front', 1], ['shoulders', 'delt_side', 0.5], ['triceps', 'tri_lateral', 0.3]],
+'seated leg curl': [['legs', 'hamstrings', 1]],
+'side plank': [['core', 'obliques', 1]],
+'single-arm cable tricep extension': [['triceps', 'tri_lateral', 1]],
+'single-leg calf raise': [['legs', 'calves', 1]],
+'single-leg romanian deadlift': [['legs', 'hamstrings', 0.9], ['legs', 'glutes', 0.6]],
+'sissy squat': [['legs', 'quads', 1]],
+'sit-up': [['core', 'abs', 1]],
+'skull crusher': [['triceps', 'tri_long', 0.8], ['triceps', 'tri_lateral', 0.5]],
+'spider curl': [['biceps', 'biceps', 1]],
+'standing calf raise': [['legs', 'calves', 1]],
+'step-up': [['legs', 'quads', 0.8], ['legs', 'glutes', 0.6]],
+'stiff-leg deadlift': [['legs', 'hamstrings', 1], ['legs', 'glutes', 0.5]],
+'straight-arm pulldown': [['back', 'lats', 0.9]],
+'sumo deadlift': [['legs', 'glutes', 1], ['legs', 'adductors', 0.6], ['legs', 'hamstrings', 0.7], ['back', 'lowerback', 0.5]],
+'sumo squat': [['legs', 'adductors', 0.7], ['legs', 'quads', 0.6], ['legs', 'glutes', 0.5]],
+'superman': [['back', 'lowerback', 0.8]],
+'svend press': [['chest', 'chest_mid', 0.7]],
+'t-bar row': [['back', 'lats', 1], ['biceps', 'biceps', 0.3]],
+'tibialis raise': [['legs', 'tibialis', 1]],
+'toe touch': [['core', 'abs', 0.8]],
+'trap bar shrug': [['traps', 'traps', 1]],
+'tricep bar pushdown': [['triceps', 'tri_lateral', 1]],
+'tricep dip': [['triceps', 'tri_lateral', 0.9], ['chest', 'chest_lower', 0.3]],
+'tricep kickback': [['triceps', 'tri_lateral', 1]],
+'tricep rope pushdown': [['triceps', 'tri_lateral', 1]],
+'upright row': [['traps', 'traps', 0.7], ['shoulders', 'delt_side', 0.6]],
+'v-up': [['core', 'abs', 1]],
+'walking lunge': [['legs', 'quads', 0.8], ['legs', 'glutes', 0.6]],
+'weighted plank': [['core', 'abs', 0.9], ['core', 'obliques', 0.5]],
+'wrist curl': [['forearms', 'forearms', 1]],
+'wrist roller': [['forearms', 'forearms', 1]],
+'zottman curl': [['biceps', 'biceps', 0.8], ['forearms', 'forearms', 0.5]],
 };
 // Best-effort keyword fallback for exercises not in the exact table above
 // (custom names, typos, less common lifts) — same idea as gymGuessMuscle
@@ -2362,26 +2522,39 @@ const GYM_EXERCISE_TARGETS = {
 function gymGuessTargets(name) {
 const n = name.toLowerCase();
 const hits = [];
-if (/incline/.test(n) && /press|bench/.test(n)) hits.push(['chest', 'chest_upper', 0.8]);
-else if (/decline/.test(n) && /press|bench/.test(n)) hits.push(['chest', 'chest_lower', 0.8]);
-else if (/(bench|chest).*press|press.*(bench|chest)/.test(n)) hits.push(['chest', 'chest_mid', 0.8]);
+if (/incline/.test(n) && /press|bench|fly|flye/.test(n)) hits.push(['chest', 'chest_upper', 0.8]);
+else if (/decline/.test(n) && /press|bench|fly|flye/.test(n)) hits.push(['chest', 'chest_lower', 0.8]);
+else if (/(bench|chest).*press|press.*(bench|chest)|pec deck|chest press/.test(n)) hits.push(['chest', 'chest_mid', 0.8]);
 else if (/fly|flye/.test(n)) hits.push(['chest', 'chest_mid', 0.7]);
-if (/squat|leg press/.test(n)) hits.push(['legs', 'quads', 0.8]);
-if (/deadlift/.test(n)) { hits.push(['legs', 'hamstrings', 0.8]); hits.push(['legs', 'glutes', 0.6]); }
-if (/hip thrust|glute/.test(n)) hits.push(['legs', 'glutes', 0.8]);
-if (/calf/.test(n)) hits.push(['legs', 'calves', 0.8]);
-if (/leg curl|hamstring/.test(n)) hits.push(['legs', 'hamstrings', 0.8]);
+else if (/push-?up/.test(n)) hits.push(['chest', 'chest_mid', 0.7]);
+if (/squat|leg press|hack squat|sissy/.test(n)) hits.push(['legs', 'quads', 0.8]);
+if (/lunge|step-?up|bulgarian/.test(n)) { hits.push(['legs', 'quads', 0.7]); hits.push(['legs', 'glutes', 0.5]); }
+if (/deadlift/.test(n) && !/stiff|romanian|single-?leg/.test(n)) { hits.push(['legs', 'hamstrings', 0.8]); hits.push(['legs', 'glutes', 0.6]); hits.push(['back', 'lowerback', 0.5]); }
+if (/romanian|stiff-?leg|rdl/.test(n)) { hits.push(['legs', 'hamstrings', 0.9]); hits.push(['legs', 'glutes', 0.5]); }
+if (/hip thrust|glute bridge|glute kickback|frog pump|abduction/.test(n)) hits.push(['legs', 'glutes', 0.8]);
+if (/calf/.test(n) && !/tibialis/.test(n)) hits.push(['legs', 'calves', 0.8]);
+if (/tibialis|reverse calf|toe raise/.test(n)) hits.push(['legs', 'tibialis', 0.8]);
+if (/leg curl|hamstring|nordic|glute-?ham/.test(n)) hits.push(['legs', 'hamstrings', 0.8]);
+if (/adductor|sumo|cossack|copenhagen/.test(n)) hits.push(['legs', 'adductors', 0.7]);
 if (/lateral raise|side raise/.test(n)) hits.push(['shoulders', 'delt_side', 0.8]);
 else if (/front raise/.test(n)) hits.push(['shoulders', 'delt_front', 0.8]);
-else if (/rear delt|reverse fly|face pull/.test(n)) hits.push(['shoulders', 'delt_rear', 0.8]);
-else if (/shoulder|overhead/.test(n) && /press/.test(n)) hits.push(['shoulders', 'delt_front', 0.7]);
-if (/row|pulldown|pull-?up|pullup|lat\b/.test(n)) hits.push(['back', 'lats', 0.7]);
-if (/shrug/.test(n)) hits.push(['back', 'upperback', 0.8]);
-if (/tricep|pushdown|skull|kickback/.test(n)) hits.push(['triceps', 'tri_lateral', 0.7]);
-if (/dip/.test(n)) { hits.push(['triceps', 'tri_lateral', 0.6]); hits.push(['chest', 'chest_lower', 0.5]); }
-if (/curl/.test(n) && !/leg|hamstring/.test(n)) hits.push(['biceps', 'biceps', 0.8]);
-if (/plank|crunch|sit-?up|core\b/.test(n)) hits.push(['core', 'abs', 0.7]);
-if (/twist|oblique|woodchop/.test(n)) hits.push(['core', 'obliques', 0.7]);
+else if (/rear delt|reverse fly|reverse pec/.test(n)) hits.push(['shoulders', 'delt_rear', 0.8]);
+else if (/face pull/.test(n)) { hits.push(['shoulders', 'delt_rear', 0.7]); hits.push(['traps', 'traps', 0.4]); }
+else if (/shoulder|overhead|arnold|push press|landmine press/.test(n) && /press/.test(n)) hits.push(['shoulders', 'delt_front', 0.7]);
+if (/shrug/.test(n)) hits.push(['traps', 'traps', 0.9]);
+if (/upright row/.test(n)) { hits.push(['traps', 'traps', 0.6]); hits.push(['shoulders', 'delt_side', 0.5]); }
+if (/farmer/.test(n)) { hits.push(['traps', 'traps', 0.5]); hits.push(['forearms', 'forearms', 0.5]); }
+if (/row|pulldown|pull-?up|pullup|chin-?up|lat\b/.test(n)) hits.push(['back', 'lats', 0.7]);
+if (/back extension|hyperextension|superman|good morning|rack pull/.test(n)) hits.push(['back', 'lowerback', 0.7]);
+if (/tricep|pushdown|skull|kickback|jm press/.test(n)) hits.push(['triceps', 'tri_lateral', 0.7]);
+if (/close-?grip.*(bench|press)/.test(n)) hits.push(['triceps', 'tri_medial', 0.7]);
+if (/overhead.*(tricep|extension)/.test(n)) hits.push(['triceps', 'tri_long', 0.7]);
+if (/dip/.test(n) && !/tricep/.test(n)) { hits.push(['triceps', 'tri_lateral', 0.6]); hits.push(['chest', 'chest_lower', 0.5]); }
+if (/wrist curl|wrist roller|pinch/.test(n)) hits.push(['forearms', 'forearms', 0.9]);
+if (/curl/.test(n) && !/leg|hamstring|wrist|reverse curl/.test(n)) hits.push(['biceps', 'biceps', 0.8]);
+if (/reverse curl/.test(n)) { hits.push(['forearms', 'forearms', 0.6]); hits.push(['biceps', 'biceps', 0.4]); }
+if (/plank|crunch|sit-?up|core\b|v-?up|leg raise|toe touch|mountain climber|rollout/.test(n) && !/side|oblique/.test(n)) hits.push(['core', 'abs', 0.7]);
+if (/twist|oblique|woodchop|side plank/.test(n)) hits.push(['core', 'obliques', 0.7]);
 return hits;
 }
 function gymTargetsFor(exercise) {
@@ -2906,53 +3079,130 @@ $('gymPlanList').innerHTML = gymPlanExercises.length
 // and re-colors it on every render — no need to rebuild the SVG shapes,
 // just swap fill/stroke classes.
 function gymBuildMzSvg() {
-const svg = $('gymMzSvg');
-if (svg.dataset.built) return;
-svg.innerHTML = `
-<circle cx="60" cy="20" r="15" class="mz-skin"/>
-<rect x="52" y="34" width="16" height="10" class="mz-skin"/>
-<rect x="26" y="44" width="68" height="6" rx="3" class="mz-skin"/>
-<circle id="mz-shoulder-l" class="mz-part" cx="28" cy="50" r="11"/>
-<circle id="mz-shoulder-r" class="mz-part" cx="92" cy="50" r="11"/>
-<rect id="mz-chest-upper" class="mz-part" x="40" y="46" width="40" height="12" rx="3"/>
-<rect id="mz-chest-mid" class="mz-part" x="40" y="59" width="40" height="12" rx="3"/>
-<rect id="mz-chest-lower" class="mz-part" x="40" y="72" width="40" height="10" rx="3"/>
-<rect id="mz-bicep-l" class="mz-part" x="14" y="58" width="14" height="34" rx="6"/>
-<rect id="mz-bicep-r" class="mz-part" x="92" y="58" width="14" height="34" rx="6"/>
-<rect x="14" y="92" width="14" height="26" rx="5" class="mz-skin"/>
-<rect x="92" y="92" width="14" height="26" rx="5" class="mz-skin"/>
-<rect id="mz-abs" class="mz-part" x="48" y="83" width="24" height="30" rx="4"/>
-<rect id="mz-oblique-l" class="mz-part" x="38" y="83" width="9" height="28" rx="3"/>
-<rect id="mz-oblique-r" class="mz-part" x="73" y="83" width="9" height="28" rx="3"/>
-<rect x="38" y="114" width="44" height="8" rx="3" class="mz-skin"/>
-<rect id="mz-quad-l" class="mz-part" x="39" y="123" width="18" height="46" rx="6"/>
-<rect id="mz-quad-r" class="mz-part" x="63" y="123" width="18" height="46" rx="6"/>
-<rect x="39" y="170" width="18" height="8" class="mz-skin"/>
-<rect x="63" y="170" width="18" height="8" class="mz-skin"/>
-<rect id="mz-calf-l" class="mz-part" x="41" y="179" width="14" height="38" rx="6"/>
-<rect id="mz-calf-r" class="mz-part" x="65" y="179" width="14" height="38" rx="6"/>
-<rect x="41" y="219" width="14" height="10" rx="2" class="mz-skin"/>
-<rect x="65" y="219" width="14" height="10" rx="2" class="mz-skin"/>
+const front = $('gymMzSvgFront');
+const back = $('gymMzSvgBack');
+if (!front.dataset.built) {
+front.innerHTML = `
+<polygon id="f-chest-l" class="mz-part" points="51.8367347 41.6326531 51.0204082 55.1020408 57.9591837 57.9591837 67.755102 55.5102041 70.6122449 47.3469388 62.0408163 41.6326531"/>
+<polygon id="f-chest-r" class="mz-part" points="29.7959184 46.5306122 31.4285714 55.5102041 40.8163265 57.9591837 48.1632653 55.1020408 47.755102 42.0408163 37.5510204 42.0408163"/>
+<polygon id="f-obliques-l" class="mz-part" points="68.5714286 63.2653061 67.3469388 57.1428571 58.7755102 59.5918367 60 64.0816327 60.4081633 83.2653061 65.7142857 78.7755102 66.5306122 69.7959184"/>
+<polygon id="f-obliques-r" class="mz-part" points="33.877551 78.3673469 33.0612245 71.8367347 31.0204082 63.2653061 32.244898 57.1428571 40.8163265 59.1836735 39.1836735 63.2653061 39.1836735 83.6734694"/>
+<polygon id="f-abs-l" class="mz-part" points="56.3265306 59.1836735 57.9591837 64.0816327 58.3673469 77.9591837 58.3673469 92.6530612 56.3265306 98.3673469 55.1020408 104.081633 51.4285714 107.755102 51.0204082 84.4897959 50.6122449 67.3469388 51.0204082 57.1428571"/>
+<polygon id="f-abs-r" class="mz-part" points="43.6734694 58.7755102 48.5714286 57.1428571 48.9795918 67.3469388 48.5714286 84.4897959 48.1632653 107.346939 44.4897959 103.673469 40.8163265 91.4285714 40.8163265 78.3673469 41.2244898 64.4897959"/>
+<polygon id="f-biceps-l" class="mz-part" points="16.7346939 68.1632653 17.9591837 71.4285714 22.8571429 66.122449 28.9795918 53.877551 27.755102 49.3877551 20.4081633 55.9183673"/>
+<polygon id="f-biceps-r" class="mz-part" points="71.4285714 49.3877551 70.2040816 54.6938776 76.3265306 66.122449 81.6326531 71.8367347 82.8571429 68.9795918 78.7755102 55.5102041"/>
+<polygon id="f-triceps-l" class="mz-part" points="69.3877551 55.5102041 69.3877551 61.6326531 75.9183673 72.6530612 77.5510204 70.2040816 75.5102041 67.3469388"/>
+<polygon id="f-triceps-r" class="mz-part" points="22.4489796 69.3877551 29.7959184 55.5102041 29.7959184 60.8163265 22.8571429 73.0612245"/>
+<polygon id="f-neck-l" class="mz-part" points="55.5102041 23.6734694 50.6122449 33.4693878 50.6122449 39.1836735 61.6326531 40 70.6122449 44.8979592 69.3877551 36.7346939 63.2653061 35.1020408 58.3673469 30.6122449"/>
+<polygon id="f-neck-r" class="mz-part" points="28.9795918 44.8979592 30.2040816 37.1428571 36.3265306 35.1020408 41.2244898 30.2040816 44.4897959 24.4897959 48.9795918 33.877551 48.5714286 39.1836735 37.9591837 39.5918367"/>
+<polygon id="f-front_delt-l" class="mz-part" points="78.3673469 53.0612245 79.5918367 47.755102 79.1836735 41.2244898 75.9183673 37.9591837 71.0204082 36.3265306 72.244898 42.8571429 71.4285714 47.3469388"/>
+<polygon id="f-front_delt-r" class="mz-part" points="28.1632653 47.3469388 21.2244898 53.0612245 20 47.755102 20.4081633 40.8163265 24.4897959 37.1428571 28.5714286 37.1428571 26.9387755 43.2653061"/>
+<polygon id="f-head-l" class="mz-part" points="42.4489796 2.85714286 40 11.8367347 42.0408163 19.5918367 46.122449 23.2653061 49.7959184 25.3061224 54.6938776 22.4489796 57.5510204 19.1836735 59.1836735 10.2040816 57.1428571 2.44897959 49.7959184 0"/>
+<polygon id="f-adductors-l" class="mz-part" points="52.6530612 110.204082 54.2857143 124.897959 60 110.204082 62.0408163 100 64.8979592 94.2857143 60 92.6530612 56.7346939 104.489796"/>
+<polygon id="f-adductors-r" class="mz-part" points="47.755102 110.612245 44.8979592 125.306122 42.0408163 115.918367 40.4081633 113.061224 39.5918367 107.346939 37.9591837 102.44898 34.6938776 93.877551 39.5918367 92.244898 41.6326531 99.1836735 43.6734694 105.306122"/>
+<polygon id="f-quads-l" class="mz-part" points="34.6938776 98.7755102 37.1428571 108.163265 37.1428571 127.755102 34.2857143 137.142857 31.0204082 132.653061 29.3877551 120 28.1632653 111.428571 29.3877551 100.816327 32.244898 94.6938776"/>
+<polygon id="f-quads-r" class="mz-part" points="63.2653061 105.714286 64.4897959 100 66.9387755 94.6938776 70.2040816 101.22449 71.0204082 111.836735 68.1632653 133.061224 65.3061224 137.55102 62.4489796 128.571429 62.0408163 111.428571"/>
+<polygon id="f-quads-r" class="mz-part" points="38.7755102 129.387755 38.3673469 112.244898 41.2244898 118.367347 44.4897959 129.387755 42.8571429 135.102041 40 146.122449 36.3265306 146.530612 35.5102041 140"/>
+<polygon id="f-quads-r" class="mz-part" points="59.5918367 145.714286 55.5102041 128.979592 60.8163265 113.877551 61.2244898 130.204082 64.0816327 139.591837 62.8571429 146.530612"/>
+<polygon id="f-quads-r" class="mz-part" points="32.6530612 138.367347 26.5306122 145.714286 25.7142857 136.734694 25.7142857 127.346939 26.9387755 114.285714 29.3877551 133.469388"/>
+<polygon id="f-quads-r" class="mz-part" points="71.8367347 113.061224 73.877551 124.081633 73.877551 140.408163 72.6530612 145.714286 66.5306122 138.367347 70.2040816 133.469388"/>
+<polygon id="f-knees-l" class="mz-part" points="33.877551 140 34.6938776 143.265306 35.5102041 147.346939 36.3265306 151.020408 35.1020408 156.734694 29.7959184 156.734694 27.3469388 152.653061 27.3469388 147.346939 30.2040816 144.081633"/>
+<polygon id="f-knees-r" class="mz-part" points="65.7142857 140 72.244898 147.755102 72.244898 152.244898 69.7959184 157.142857 64.8979592 156.734694 62.8571429 151.020408"/>
+<polygon id="f-tibialis-l" class="mz-part" points="71.4285714 160.408163 73.4693878 153.469388 76.7346939 161.22449 79.5918367 167.755102 78.3673469 187.755102 79.5918367 195.510204 74.6938776 195.510204"/>
+<polygon id="f-tibialis-r" class="mz-part" points="24.8979592 194.693878 27.755102 164.897959 28.1632653 160.408163 26.122449 154.285714 24.8979592 157.55102 22.4489796 161.632653 20.8163265 167.755102 22.0408163 188.163265 20.8163265 195.510204"/>
+<polygon id="f-tibialis-r" class="mz-part" points="72.6530612 195.102041 69.7959184 159.183673 65.3061224 158.367347 64.0816327 162.44898 64.0816327 165.306122 65.7142857 177.142857"/>
+<polygon id="f-tibialis-r" class="mz-part" points="35.5102041 158.367347 35.9183673 162.44898 35.9183673 166.938776 35.1020408 172.244898 35.1020408 176.734694 32.244898 182.040816 30.6122449 187.346939 26.9387755 194.693878 27.3469388 187.755102 28.1632653 180.408163 28.5714286 175.510204 28.9795918 169.795918 29.7959184 164.081633 30.2040816 158.77551"/>
+<polygon id="f-forearms-l" class="mz-part" points="6.12244898 88.5714286 10.2040816 75.1020408 14.6938776 70.2040816 16.3265306 74.2857143 19.1836735 73.4693878 4.48979592 97.5510204 0 100"/>
+<polygon id="f-forearms-r" class="mz-part" points="84.4897959 69.7959184 83.2653061 73.4693878 80 73.0612245 95.1020408 98.3673469 100 100.408163 93.4693878 89.3877551 89.7959184 76.3265306"/>
+<polygon id="f-forearms-r" class="mz-part" points="77.5510204 72.244898 77.5510204 77.5510204 80.4081633 84.0816327 85.3061224 89.7959184 92.244898 101.22449 94.6938776 99.5918367"/>
+<polygon id="f-forearms-r" class="mz-part" points="6.93877551 101.22449 13.4693878 90.6122449 18.7755102 84.0816327 21.6326531 77.1428571 21.2244898 71.8367347 4.89795918 98.7755102"/>
 `;
-svg.dataset.built = '1';
+front.dataset.built = '1';
 }
-// Maps visible SVG zone ids to the (group, region) whose coverage score
-// should color them; shoulders/biceps are mirrored left/right so both
-// sides get the same value.
-const GYM_MZ_ZONES = {
-'mz-chest-upper': ['chest', 'chest_upper'], 'mz-chest-mid': ['chest', 'chest_mid'], 'mz-chest-lower': ['chest', 'chest_lower'],
-'mz-shoulder-l': ['shoulders', 'delt_front'], 'mz-shoulder-r': ['shoulders', 'delt_side'],
-'mz-bicep-l': ['biceps', 'biceps'], 'mz-bicep-r': ['biceps', 'biceps'],
-'mz-abs': ['core', 'abs'], 'mz-oblique-l': ['core', 'obliques'], 'mz-oblique-r': ['core', 'obliques'],
-'mz-quad-l': ['legs', 'quads'], 'mz-quad-r': ['legs', 'quads'],
-'mz-calf-l': ['legs', 'calves'], 'mz-calf-r': ['legs', 'calves'],
+if (!back.dataset.built) {
+back.innerHTML = `
+<polygon id="b-head-l" class="mz-part" points="50.6382979 0 45.9574468 0.85106383 40.8510638 5.53191489 40.4255319 12.7659574 45.106383 20 55.7446809 20 59.1489362 13.6170213 59.5744681 4.68085106 55.7446809 1.27659574"/>
+<polygon id="b-traps-l" class="mz-part" points="44.6808511 21.7021277 47.6595745 21.7021277 47.2340426 38.2978723 47.6595745 64.6808511 38.2978723 53.1914894 35.3191489 40.8510638 31.0638298 36.5957447 39.1489362 33.1914894 43.8297872 27.2340426"/>
+<polygon id="b-traps-r" class="mz-part" points="52.3404255 21.7021277 55.7446809 21.7021277 56.5957447 27.2340426 60.8510638 32.7659574 68.9361702 36.5957447 64.6808511 40.4255319 61.7021277 53.1914894 52.3404255 64.6808511 53.1914894 38.2978723"/>
+<polygon id="b-back_delt-l" class="mz-part" points="29.3617021 37.0212766 22.9787234 39.1489362 17.4468085 44.2553191 18.2978723 53.6170213 24.2553191 49.3617021 27.2340426 46.3829787"/>
+<polygon id="b-back_delt-r" class="mz-part" points="71.0638298 37.0212766 78.2978723 39.5744681 82.5531915 44.6808511 81.7021277 53.6170213 74.893617 48.9361702 72.3404255 45.106383"/>
+<polygon id="b-lats-l" class="mz-part" points="31.0638298 38.7234043 28.0851064 48.9361702 28.5106383 55.3191489 34.0425532 75.3191489 47.2340426 71.0638298 47.2340426 66.3829787 36.5957447 54.0425532 33.6170213 41.2765957"/>
+<polygon id="b-lats-r" class="mz-part" points="68.9361702 38.7234043 71.9148936 49.3617021 71.4893617 56.1702128 65.9574468 75.3191489 52.7659574 71.0638298 52.7659574 66.3829787 63.4042553 54.4680851 66.3829787 41.7021277"/>
+<polygon id="b-triceps-l" class="mz-part" points="26.8085106 49.787234 17.8723404 55.7446809 14.4680851 72.3404255 16.5957447 81.7021277 21.7021277 63.8297872 26.8085106 55.7446809"/>
+<polygon id="b-triceps-r" class="mz-part" points="73.6170213 50.212766 82.1276596 55.7446809 85.9574468 73.1914894 83.4042553 82.1276596 77.8723404 62.9787234 73.1914894 55.7446809"/>
+<polygon id="b-triceps-r" class="mz-part" points="26.8085106 58.2978723 26.8085106 68.5106383 22.9787234 75.3191489 19.1489362 77.4468085 22.5531915 65.5319149"/>
+<polygon id="b-triceps-r" class="mz-part" points="72.7659574 58.2978723 77.0212766 64.6808511 80.4255319 77.4468085 76.5957447 75.3191489 72.7659574 68.9361702"/>
+<polygon id="b-lowerback-l" class="mz-part" points="47.6595745 72.7659574 34.4680851 77.0212766 35.3191489 83.4042553 49.3617021 102.12766 46.8085106 82.9787234"/>
+<polygon id="b-lowerback-r" class="mz-part" points="52.3404255 72.7659574 65.5319149 77.0212766 64.6808511 83.4042553 50.6382979 102.12766 53.1914894 83.8297872"/>
+<polygon id="b-forearms-l" class="mz-part" points="86.3829787 75.7446809 91.0638298 83.4042553 93.1914894 94.0425532 100 106.382979 96.1702128 104.255319 88.0851064 89.3617021 84.2553191 83.8297872"/>
+<polygon id="b-forearms-r" class="mz-part" points="13.6170213 75.7446809 8.93617021 83.8297872 6.80851064 93.6170213 0 106.382979 3.82978723 104.255319 12.3404255 88.5106383 15.7446809 82.9787234"/>
+<polygon id="b-forearms-r" class="mz-part" points="81.2765957 79.5744681 77.4468085 77.8723404 79.1489362 84.6808511 91.0638298 103.829787 93.1914894 108.93617 94.4680851 104.680851"/>
+<polygon id="b-forearms-r" class="mz-part" points="18.7234043 79.5744681 22.1276596 77.8723404 20.8510638 84.2553191 9.36170213 102.978723 6.80851064 108.510638 5.10638298 104.680851"/>
+<polygon id="b-glutes-l" class="mz-part" points="44.6808511 99.5744681 30.212766 108.510638 29.787234 118.723404 31.4893617 125.957447 47.2340426 121.276596 49.3617021 114.893617"/>
+<polygon id="b-glutes-r" class="mz-part" points="55.3191489 99.1489362 51.0638298 114.468085 52.3404255 120.851064 68.0851064 125.957447 69.787234 119.148936 69.3617021 108.510638"/>
+<polygon id="b-adductors-l" class="mz-part" points="48.0851064 122.978723 44.6808511 122.978723 41.2765957 125.531915 45.106383 144.255319 48.5106383 135.744681 48.9361702 129.361702"/>
+<polygon id="b-adductors-r" class="mz-part" points="51.9148936 122.553191 55.7446809 123.404255 59.1489362 125.957447 54.893617 144.255319 51.9148936 136.170213 51.0638298 129.361702"/>
+<polygon id="b-hamstrings-l" class="mz-part" points="28.9361702 122.12766 31.0638298 129.361702 36.5957447 125.957447 35.3191489 135.319149 34.4680851 150.212766 29.3617021 158.297872 28.9361702 146.808511 27.6595745 141.276596 27.2340426 131.489362"/>
+<polygon id="b-hamstrings-r" class="mz-part" points="71.4893617 121.702128 69.3617021 128.93617 63.8297872 125.957447 65.5319149 136.595745 66.3829787 150.212766 71.0638298 158.297872 71.4893617 147.659574 72.7659574 142.12766 73.6170213 131.914894"/>
+<polygon id="b-hamstrings-r" class="mz-part" points="38.7234043 125.531915 44.2553191 145.957447 40.4255319 166.808511 36.1702128 152.765957 37.0212766 135.319149"/>
+<polygon id="b-hamstrings-r" class="mz-part" points="61.7021277 125.531915 63.4042553 136.170213 64.2553191 153.191489 60 166.808511 56.1702128 146.382979"/>
+<polygon id="b-knees-l" class="mz-part" points="34.4680851 153.191489 31.0638298 159.148936 33.6170213 166.382979 37.4468085 162.553191"/>
+<polygon id="b-knees-r" class="mz-part" points="66.3829787 153.617021 62.9787234 162.978723 66.8085106 166.382979 69.3617021 159.148936"/>
+<polygon id="b-calves-l" class="mz-part" points="29.3617021 160.425532 28.5106383 167.234043 24.6808511 179.574468 23.8297872 192.765957 25.5319149 197.021277 28.5106383 193.191489 29.787234 180 31.9148936 171.06383 31.9148936 166.808511"/>
+<polygon id="b-calves-r" class="mz-part" points="37.4468085 165.106383 35.3191489 167.659574 33.1914894 171.914894 31.0638298 180.425532 30.212766 191.914894 34.0425532 200 38.7234043 190.638298 39.1489362 168.93617"/>
+<polygon id="b-calves-r" class="mz-part" points="62.9787234 165.106383 61.2765957 168.510638 61.7021277 190.638298 66.3829787 199.574468 70.6382979 191.914894 68.9361702 179.574468 66.8085106 170.212766"/>
+<polygon id="b-calves-r" class="mz-part" points="70.6382979 160.425532 72.3404255 168.510638 75.7446809 179.148936 76.5957447 192.765957 74.4680851 196.595745 72.3404255 193.617021 70.6382979 179.574468 68.0851064 168.085106"/>
+<polygon id="b-calves-r" class="mz-part" points="28.5106383 195.744681 30.212766 195.744681 33.6170213 201.702128 30.6382979 220 28.5106383 213.617021 26.8085106 198.297872"/>
+<polygon id="b-calves-r" class="mz-part" points="69.787234 195.744681 71.9148936 195.744681 73.6170213 198.297872 71.9148936 213.191489 70.212766 219.574468 67.2340426 202.12766"/>
+`;
+back.dataset.built = '1';
+}
+}
+// Body diagram polygons adapted from the MIT-licensed react-body-highlighter
+// project (github.com/giavinh79/react-body-highlighter) — anatomically
+// correct, tested muscle-region shapes rather than a hand-drawn approximation.
+// Each polygon id is "<f|b>-<muscle>-<l|r>"; DIRECT maps a muscle straight to
+// one (group,region); AGGREGATE maps a muscle that visually shows just one
+// shape on the body but represents several finer regions tracked elsewhere
+// (e.g. the single front delt shape represents both delt_front + delt_side —
+// the text legend below still breaks those out individually with their own
+// suggestions).
+const GYM_MZ_DIRECT = {
+'f-obliques': ['core', 'obliques'], 'f-abs': ['core', 'abs'], 'f-biceps': ['biceps', 'biceps'],
+'f-adductors': ['legs', 'adductors'], 'f-quads': ['legs', 'quads'], 'f-tibialis': ['legs', 'tibialis'],
+'f-forearms': ['forearms', 'forearms'],
+'b-traps': ['traps', 'traps'], 'b-back_delt': ['shoulders', 'delt_rear'], 'b-lats': ['back', 'lats'],
+'b-lowerback': ['back', 'lowerback'], 'b-forearms': ['forearms', 'forearms'], 'b-glutes': ['legs', 'glutes'],
+'b-adductors': ['legs', 'adductors'], 'b-hamstrings': ['legs', 'hamstrings'], 'b-calves': ['legs', 'calves'],
 };
+const GYM_MZ_AGGREGATE = {
+'f-chest': { group: 'chest', regions: ['chest_upper', 'chest_mid', 'chest_lower'] },
+'f-front_delt': { group: 'shoulders', regions: ['delt_front', 'delt_side'] },
+'f-triceps': { group: 'triceps', regions: ['tri_long', 'tri_lateral', 'tri_medial'] },
+'b-triceps': { group: 'triceps', regions: ['tri_long', 'tri_lateral', 'tri_medial'] },
+};
+// Non-interactive body parts (head/neck/knees) always render as neutral skin.
+const GYM_MZ_SKIN_PREFIXES = ['f-neck', 'f-head', 'f-knees', 'b-head', 'b-knees'];
+function gymMzScoreFor(score, baseId) {
+if (GYM_MZ_AGGREGATE[baseId]) {
+const agg = GYM_MZ_AGGREGATE[baseId];
+return Math.max(...agg.regions.map((r) => score[`${agg.group}:${r}`] || 0));
+}
+if (GYM_MZ_DIRECT[baseId]) {
+const pair = GYM_MZ_DIRECT[baseId];
+return score[`${pair[0]}:${pair[1]}`] || 0;
+}
+return 0;
+}
 function gymRenderMzSvg(score) {
 gymBuildMzSvg();
-Object.entries(GYM_MZ_ZONES).forEach(([id, [g, r]]) => {
-const el = document.getElementById(id);
-if (!el) return;
-el.setAttribute('class', 'mz-part mz-' + gymCoverageLevel(score[`${g}:${r}`]));
+[$('gymMzSvgFront'), $('gymMzSvgBack')].forEach((svg) => {
+svg.querySelectorAll('.mz-part').forEach((el) => {
+const baseId = el.id.replace(/-[lr]$/, '');
+if (GYM_MZ_SKIN_PREFIXES.includes(baseId)) { el.setAttribute('class', 'mz-part mz-skin'); return; }
+const v = gymMzScoreFor(score, baseId);
+el.setAttribute('class', 'mz-part mz-' + gymCoverageLevel(v));
+});
 });
 }
 function gymRenderMzLegend(score) {
