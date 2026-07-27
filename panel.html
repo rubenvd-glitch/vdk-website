@@ -453,6 +453,33 @@ padding: 9px; border-radius: 8px; font-size: 13px; cursor: pointer; font-family:
 .goal-general-card { border-left: 3px solid #6fa8dc; }
 .goal-general-card .cat { font-size: 11px; color: #8b94a1; text-transform: uppercase; letter-spacing: .03em; }
 
+
+/* --- UI polish 2026-07-27: calm animations, simplified look, nav/dropdown icons, mobile --- */
+@media (prefers-reduced-motion: reduce) {
+*, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
+.drawer { transition: transform .22s cubic-bezier(.4,0,.2,1); }
+.backdrop { transition: opacity .18s ease; }
+.overlay .modal { animation: modalIn .18s ease both; }
+@keyframes modalIn { from { opacity: 0; transform: translateY(6px) scale(.98); } to { opacity: 1; transform: none; } }
+.nav-ic { display: inline-flex; width: 18px; height: 18px; margin-right: 10px; opacity: .75; vertical-align: -4px; flex-shrink: 0; }
+.nav-ic svg { width: 100%; height: 100%; }
+.drawer button, .drawer a { display: flex; align-items: center; transition: background .15s ease, padding-left .15s ease; }
+.drawer button:hover, .drawer a:hover { padding-left: 4px; }
+.icon-lbl { display: inline-flex; align-items: center; gap: 6px; }
+.icon-lbl svg { width: 15px; height: 15px; opacity: .7; flex-shrink: 0; }
+@media (max-width: 640px) {
+main { padding: 0 14px; margin: 20px auto; }
+header { padding: 10px 16px; }
+.greeting { font-size: 21px; }
+.section-head h2 { font-size: 18px; }
+.sess-ex-row { flex-wrap: wrap; row-gap: 8px; }
+.sess-ex-row > div { flex: 1 1 45%; }
+.plan-target-row { flex-wrap: wrap; row-gap: 6px; }
+.tmpl-row { flex-wrap: wrap; row-gap: 8px; }
+.tmpl-row > div:first-child { flex: 1 1 100%; }
+.modal { max-width: 94vw !important; }
+}
 </style>
 </head>
 <body>
@@ -473,14 +500,14 @@ padding: 9px; border-radius: 8px; font-size: 13px; cursor: pointer; font-family:
 
 <div class="backdrop" id="backdrop"></div>
 <nav class="drawer" id="drawer">
-<button data-i18n="nav.home" onclick="showView('home')">Dashboard</button>
-<button data-i18n="nav.rem" onclick="showView('reminders')">Herinneringen</button>
-<button data-i18n="nav.timeline" onclick="showView('timeline')">Tijdlijn</button>
-<button data-i18n="nav.sug" onclick="showView('sugs')">Suggesties</button>
-<button data-i18n="nav.gym" onclick="showView('gym')">Gym Coach</button>
-<button data-i18n="nav.idea" onclick="showView('ideas')">Ideeënbox</button>
-<button data-i18n="nav.log" onclick="showView('log')" id="logMenuBtn" style="display:none;">Logboek</button>
-<a href="/crm" style="display:block; width:100%; box-sizing:border-box; text-align:left; background:none; border:none; color:#e6e9ed; font-size:15px; padding:12px 14px; border-radius:9px; font-family:inherit; text-decoration:none;" onmouseover="this.style.background='#1c222b'" onmouseout="this.style.background='none'">→ Naar CRM</a>
+<button onclick="showView('home')"><span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg></span><span data-i18n="nav.home">Dashboard</span></button>
+<button onclick="showView('reminders')"><span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></span><span data-i18n="nav.rem">Herinneringen</span></button>
+<button onclick="showView('timeline')"><span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></span><span data-i18n="nav.timeline">Tijdlijn</span></button>
+<button onclick="showView('sugs')"><span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l1.4 4.2L18 8l-4.2 1.4L12 14l-1.4-4.2L6 8l4.2-1.6L12 2z"/></svg></span><span data-i18n="nav.sug">Suggesties</span></button>
+<button onclick="showView('gym')"><span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12h12"/><path d="M2 10v4M22 10v4"/><rect x="4" y="8" width="4" height="8" rx="1"/><rect x="16" y="8" width="4" height="8" rx="1"/></svg></span><span data-i18n="nav.gym">Gym Coach</span></button>
+<button onclick="showView('ideas')"><span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.2 1 2.3h6c0-1.1.4-1.8 1-2.3A7 7 0 0 0 12 2z"/></svg></span><span data-i18n="nav.idea">Ideeënbox</span></button>
+<button onclick="showView('log')" id="logMenuBtn" style="display:none;"><span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5V4.5A2.5 2.5 0 0 1 6.5 2H20v18H6.5A2.5 2.5 0 0 0 4 22"/><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/></svg></span><span data-i18n="nav.log">Logboek</span></button>
+<a href="/crm" style="display:block; width:100%; box-sizing:border-box; text-align:left; background:none; border:none; color:#e6e9ed; font-size:15px; padding:12px 14px; border-radius:9px; font-family:inherit; text-decoration:none;" onmouseover="this.style.background='#1c222b'" onmouseout="this.style.background='none'"><span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>→ Naar CRM</a>
 <div class="lock" id="lockBox">
 <label class="switch">
 <input type="checkbox" id="lockToggle">
@@ -713,7 +740,7 @@ padding: 9px; border-radius: 8px; font-size: 13px; cursor: pointer; font-family:
 <h3 data-i18n="set.account">Account</h3>
 <div class="set-row">
 <div class="lbl"><span data-i18n="set.lang">Taal</span><div class="hint" data-i18n="set.langHint">De taal van het paneel.</div></div>
-<select id="setLang" style="background:#10141a;color:#cfd6de;border:1px solid #2a323d;border-radius:8px;padding:9px 11px;font-size:14px;font-family:inherit;cursor:pointer;color-scheme:dark;">
+<span class="nav-ic" style="margin-right:6px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 0 1 0 20 15 15 0 0 1 0-20z"/></svg></span><select id="setLang" style="background:#10141a;color:#cfd6de;border:1px solid #2a323d;border-radius:8px;padding:9px 11px;font-size:14px;font-family:inherit;cursor:pointer;color-scheme:dark;">
 <option value="en">English</option>
 <option value="nl">Nederlands</option>
 </select>
@@ -3149,7 +3176,7 @@ const warmups = tgt.warmups != null ? tgt.warmups : 2;
 const topsets = tgt.topsets != null ? tgt.topsets : 1;
 const dropset = !!tgt.dropset;
 const enc = esc(n).replace(/'/g, "\\'");
-return `<div class="plan-pill-wrap"><div class="plan-pill">${esc(n)}<button type="button" onclick="gymRemovePlanExercise('${enc}')">×</button></div><div class="plan-target-row"><label>Doel</label><select onchange="gymSetPlanTarget('${enc}','goal',this.value)"><option value="kracht"${goal === 'kracht' ? ' selected' : ''}>Kracht</option><option value="spiergroei"${goal === 'spiergroei' ? ' selected' : ''}>Spiergroei</option><option value="uithouding"${goal === 'uithouding' ? ' selected' : ''}>Uithouding</option></select><label>Warmups</label><input type="number" step="1" min="0" value="${warmups}" onchange="gymSetPlanTarget('${enc}','warmups',this.value)"><label>Topsets</label><input type="number" step="1" min="1" value="${topsets}" onchange="gymSetPlanTarget('${enc}','topsets',this.value)"><label><input type="checkbox" ${dropset ? 'checked' : ''} onchange="gymSetPlanTarget('${enc}','dropset',this.checked?1:0)">Dropset</label></div></div>`;
+return `<div class="plan-pill-wrap"><div class="plan-pill">${esc(n)}<button type="button" onclick="gymRemovePlanExercise('${enc}')">×</button></div><div class="plan-target-row"><label class="icon-lbl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></svg>Doel</label><select onchange="gymSetPlanTarget('${enc}','goal',this.value)"><option value="kracht"${goal === 'kracht' ? ' selected' : ''}>Kracht</option><option value="spiergroei"${goal === 'spiergroei' ? ' selected' : ''}>Spiergroei</option><option value="uithouding"${goal === 'uithouding' ? ' selected' : ''}>Uithouding</option></select><label>Warmups</label><input type="number" step="1" min="0" value="${warmups}" onchange="gymSetPlanTarget('${enc}','warmups',this.value)"><label>Topsets</label><input type="number" step="1" min="1" value="${topsets}" onchange="gymSetPlanTarget('${enc}','topsets',this.value)"><label><input type="checkbox" ${dropset ? 'checked' : ''} onchange="gymSetPlanTarget('${enc}','dropset',this.checked?1:0)">Dropset</label></div></div>`;
 }).join('')
 : '<div class="plan-empty">Nog geen oefeningen toegevoegd.</div>';
 }
