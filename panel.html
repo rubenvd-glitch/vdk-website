@@ -422,6 +422,16 @@ padding: 2px; font-family: inherit;
 .plan-target-row input{width:56px;padding:2px 4px;font-size:12px;}
 .plan-target-row label{color:#8b94a1;}
 .plan-pill-wrap{margin-bottom:4px;}
+.plan-target-row select{padding:4px 6px;border-radius:6px;background:#12161d;color:#e6e9ed;border:1px solid #232a33;}
+.plan-target-row label input[type=checkbox]{margin-right:4px;}
+.sess-set-row{border-top:1px solid #232a33;padding:8px 0;}
+.sess-set-row:first-child{border-top:none;}
+.sess-set-label{font-size:13px;font-weight:600;display:flex;align-items:center;}
+.sess-set-target{color:#8b94a1;font-weight:400;font-size:12px;margin-left:6px;}
+.sess-set-row.current{background:#161c24;border-radius:8px;padding:8px;}
+.sess-set-row.done{opacity:.55;}
+.sess-set-check{color:#2ea36f;font-size:18px;font-weight:700;padding:0 8px;}
+
 .group-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
 .group-chips button {
 background: #151a21; border: 1px solid #232a33; color: #cfd6de;
@@ -3134,193 +3144,22 @@ function gymRenderPlanList() {
 $('gymPlanList').innerHTML = gymPlanExercises.length
 ? gymPlanExercises.map((n) => {
 const tgt = gymPlanTargets[n] || {};
+const goal = tgt.goal || 'spiergroei';
+const warmups = tgt.warmups != null ? tgt.warmups : 2;
+const topsets = tgt.topsets != null ? tgt.topsets : 1;
+const dropset = !!tgt.dropset;
 const enc = esc(n).replace(/'/g, "\\'");
-return `<div class="plan-pill-wrap"><div class="plan-pill">${esc(n)}<button type="button" onclick="gymRemovePlanExercise('${enc}')">×</button></div><div class="plan-target-row"><label>Gewicht</label><input type="number" step="0.5" min="0" value="${tgt.weight || ''}" onchange="gymSetPlanTarget('${enc}','weight',this.value)"><label>Reps</label><input type="number" step="1" min="1" value="${tgt.reps || ''}" onchange="gymSetPlanTarget('${enc}','reps',this.value)"><label>Sets</label><input type="number" step="1" min="1" value="${tgt.sets || 3}" onchange="gymSetPlanTarget('${enc}','sets',this.value)"></div></div>`;
+return `<div class="plan-pill-wrap"><div class="plan-pill">${esc(n)}<button type="button" onclick="gymRemovePlanExercise('${enc}')">×</button></div><div class="plan-target-row"><label>Doel</label><select onchange="gymSetPlanTarget('${enc}','goal',this.value)"><option value="kracht"${goal === 'kracht' ? ' selected' : ''}>Kracht</option><option value="spiergroei"${goal === 'spiergroei' ? ' selected' : ''}>Spiergroei</option><option value="uithouding"${goal === 'uithouding' ? ' selected' : ''}>Uithouding</option></select><label>Warmups</label><input type="number" step="1" min="0" value="${warmups}" onchange="gymSetPlanTarget('${enc}','warmups',this.value)"><label>Topsets</label><input type="number" step="1" min="1" value="${topsets}" onchange="gymSetPlanTarget('${enc}','topsets',this.value)"><label><input type="checkbox" ${dropset ? 'checked' : ''} onchange="gymSetPlanTarget('${enc}','dropset',this.checked?1:0)">Dropset</label></div></div>`;
 }).join('')
 : '<div class="plan-empty">Nog geen oefeningen toegevoegd.</div>';
 }
 window.gymSetPlanTarget = (name, field, val) => {
-const num = Number(val) || 0;
-gymPlanTargets[name] = gymPlanTargets[name] || {};
-if (num > 0) gymPlanTargets[name][field] = num; else delete gymPlanTargets[name][field];
-if (!Object.keys(gymPlanTargets[name]).length) delete gymPlanTargets[name];
-};
-
-// Builds the front-view body diagram once (element ids per visible region)
-// and re-colors it on every render — no need to rebuild the SVG shapes,
-// just swap fill/stroke classes.
-function gymBuildMzSvg() {
-const front = $('gymMzSvgFront');
-const back = $('gymMzSvgBack');
-if (!front.dataset.built) {
-front.innerHTML = `
-<polygon id="f-chest-l" class="mz-part" points="51.8367347 41.6326531 51.0204082 55.1020408 57.9591837 57.9591837 67.755102 55.5102041 70.6122449 47.3469388 62.0408163 41.6326531"/>
-<polygon id="f-chest-r" class="mz-part" points="29.7959184 46.5306122 31.4285714 55.5102041 40.8163265 57.9591837 48.1632653 55.1020408 47.755102 42.0408163 37.5510204 42.0408163"/>
-<polygon id="f-obliques-l" class="mz-part" points="68.5714286 63.2653061 67.3469388 57.1428571 58.7755102 59.5918367 60 64.0816327 60.4081633 83.2653061 65.7142857 78.7755102 66.5306122 69.7959184"/>
-<polygon id="f-obliques-r" class="mz-part" points="33.877551 78.3673469 33.0612245 71.8367347 31.0204082 63.2653061 32.244898 57.1428571 40.8163265 59.1836735 39.1836735 63.2653061 39.1836735 83.6734694"/>
-<polygon id="f-abs-l" class="mz-part" points="56.3265306 59.1836735 57.9591837 64.0816327 58.3673469 77.9591837 58.3673469 92.6530612 56.3265306 98.3673469 55.1020408 104.081633 51.4285714 107.755102 51.0204082 84.4897959 50.6122449 67.3469388 51.0204082 57.1428571"/>
-<polygon id="f-abs-r" class="mz-part" points="43.6734694 58.7755102 48.5714286 57.1428571 48.9795918 67.3469388 48.5714286 84.4897959 48.1632653 107.346939 44.4897959 103.673469 40.8163265 91.4285714 40.8163265 78.3673469 41.2244898 64.4897959"/>
-<polygon id="f-biceps-l" class="mz-part" points="16.7346939 68.1632653 17.9591837 71.4285714 22.8571429 66.122449 28.9795918 53.877551 27.755102 49.3877551 20.4081633 55.9183673"/>
-<polygon id="f-biceps-r" class="mz-part" points="71.4285714 49.3877551 70.2040816 54.6938776 76.3265306 66.122449 81.6326531 71.8367347 82.8571429 68.9795918 78.7755102 55.5102041"/>
-<polygon id="f-triceps-l" class="mz-part" points="69.3877551 55.5102041 69.3877551 61.6326531 75.9183673 72.6530612 77.5510204 70.2040816 75.5102041 67.3469388"/>
-<polygon id="f-triceps-r" class="mz-part" points="22.4489796 69.3877551 29.7959184 55.5102041 29.7959184 60.8163265 22.8571429 73.0612245"/>
-<polygon id="f-neck-l" class="mz-part" points="55.5102041 23.6734694 50.6122449 33.4693878 50.6122449 39.1836735 61.6326531 40 70.6122449 44.8979592 69.3877551 36.7346939 63.2653061 35.1020408 58.3673469 30.6122449"/>
-<polygon id="f-neck-r" class="mz-part" points="28.9795918 44.8979592 30.2040816 37.1428571 36.3265306 35.1020408 41.2244898 30.2040816 44.4897959 24.4897959 48.9795918 33.877551 48.5714286 39.1836735 37.9591837 39.5918367"/>
-<polygon id="f-front_delt-l" class="mz-part" points="78.3673469 53.0612245 79.5918367 47.755102 79.1836735 41.2244898 75.9183673 37.9591837 71.0204082 36.3265306 72.244898 42.8571429 71.4285714 47.3469388"/>
-<polygon id="f-front_delt-r" class="mz-part" points="28.1632653 47.3469388 21.2244898 53.0612245 20 47.755102 20.4081633 40.8163265 24.4897959 37.1428571 28.5714286 37.1428571 26.9387755 43.2653061"/>
-<polygon id="f-head-l" class="mz-part" points="42.4489796 2.85714286 40 11.8367347 42.0408163 19.5918367 46.122449 23.2653061 49.7959184 25.3061224 54.6938776 22.4489796 57.5510204 19.1836735 59.1836735 10.2040816 57.1428571 2.44897959 49.7959184 0"/>
-<polygon id="f-adductors-l" class="mz-part" points="52.6530612 110.204082 54.2857143 124.897959 60 110.204082 62.0408163 100 64.8979592 94.2857143 60 92.6530612 56.7346939 104.489796"/>
-<polygon id="f-adductors-r" class="mz-part" points="47.755102 110.612245 44.8979592 125.306122 42.0408163 115.918367 40.4081633 113.061224 39.5918367 107.346939 37.9591837 102.44898 34.6938776 93.877551 39.5918367 92.244898 41.6326531 99.1836735 43.6734694 105.306122"/>
-<polygon id="f-quads-l" class="mz-part" points="34.6938776 98.7755102 37.1428571 108.163265 37.1428571 127.755102 34.2857143 137.142857 31.0204082 132.653061 29.3877551 120 28.1632653 111.428571 29.3877551 100.816327 32.244898 94.6938776"/>
-<polygon id="f-quads-r" class="mz-part" points="63.2653061 105.714286 64.4897959 100 66.9387755 94.6938776 70.2040816 101.22449 71.0204082 111.836735 68.1632653 133.061224 65.3061224 137.55102 62.4489796 128.571429 62.0408163 111.428571"/>
-<polygon id="f-quads-r" class="mz-part" points="38.7755102 129.387755 38.3673469 112.244898 41.2244898 118.367347 44.4897959 129.387755 42.8571429 135.102041 40 146.122449 36.3265306 146.530612 35.5102041 140"/>
-<polygon id="f-quads-r" class="mz-part" points="59.5918367 145.714286 55.5102041 128.979592 60.8163265 113.877551 61.2244898 130.204082 64.0816327 139.591837 62.8571429 146.530612"/>
-<polygon id="f-quads-r" class="mz-part" points="32.6530612 138.367347 26.5306122 145.714286 25.7142857 136.734694 25.7142857 127.346939 26.9387755 114.285714 29.3877551 133.469388"/>
-<polygon id="f-quads-r" class="mz-part" points="71.8367347 113.061224 73.877551 124.081633 73.877551 140.408163 72.6530612 145.714286 66.5306122 138.367347 70.2040816 133.469388"/>
-<polygon id="f-knees-l" class="mz-part" points="33.877551 140 34.6938776 143.265306 35.5102041 147.346939 36.3265306 151.020408 35.1020408 156.734694 29.7959184 156.734694 27.3469388 152.653061 27.3469388 147.346939 30.2040816 144.081633"/>
-<polygon id="f-knees-r" class="mz-part" points="65.7142857 140 72.244898 147.755102 72.244898 152.244898 69.7959184 157.142857 64.8979592 156.734694 62.8571429 151.020408"/>
-<polygon id="f-tibialis-l" class="mz-part" points="71.4285714 160.408163 73.4693878 153.469388 76.7346939 161.22449 79.5918367 167.755102 78.3673469 187.755102 79.5918367 195.510204 74.6938776 195.510204"/>
-<polygon id="f-tibialis-r" class="mz-part" points="24.8979592 194.693878 27.755102 164.897959 28.1632653 160.408163 26.122449 154.285714 24.8979592 157.55102 22.4489796 161.632653 20.8163265 167.755102 22.0408163 188.163265 20.8163265 195.510204"/>
-<polygon id="f-tibialis-r" class="mz-part" points="72.6530612 195.102041 69.7959184 159.183673 65.3061224 158.367347 64.0816327 162.44898 64.0816327 165.306122 65.7142857 177.142857"/>
-<polygon id="f-tibialis-r" class="mz-part" points="35.5102041 158.367347 35.9183673 162.44898 35.9183673 166.938776 35.1020408 172.244898 35.1020408 176.734694 32.244898 182.040816 30.6122449 187.346939 26.9387755 194.693878 27.3469388 187.755102 28.1632653 180.408163 28.5714286 175.510204 28.9795918 169.795918 29.7959184 164.081633 30.2040816 158.77551"/>
-<polygon id="f-forearms-l" class="mz-part" points="6.12244898 88.5714286 10.2040816 75.1020408 14.6938776 70.2040816 16.3265306 74.2857143 19.1836735 73.4693878 4.48979592 97.5510204 0 100"/>
-<polygon id="f-forearms-r" class="mz-part" points="84.4897959 69.7959184 83.2653061 73.4693878 80 73.0612245 95.1020408 98.3673469 100 100.408163 93.4693878 89.3877551 89.7959184 76.3265306"/>
-<polygon id="f-forearms-r" class="mz-part" points="77.5510204 72.244898 77.5510204 77.5510204 80.4081633 84.0816327 85.3061224 89.7959184 92.244898 101.22449 94.6938776 99.5918367"/>
-<polygon id="f-forearms-r" class="mz-part" points="6.93877551 101.22449 13.4693878 90.6122449 18.7755102 84.0816327 21.6326531 77.1428571 21.2244898 71.8367347 4.89795918 98.7755102"/>
-`;
-front.dataset.built = '1';
-}
-if (!back.dataset.built) {
-back.innerHTML = `
-<polygon id="b-head-l" class="mz-part" points="50.6382979 0 45.9574468 0.85106383 40.8510638 5.53191489 40.4255319 12.7659574 45.106383 20 55.7446809 20 59.1489362 13.6170213 59.5744681 4.68085106 55.7446809 1.27659574"/>
-<polygon id="b-traps-l" class="mz-part" points="44.6808511 21.7021277 47.6595745 21.7021277 47.2340426 38.2978723 47.6595745 64.6808511 38.2978723 53.1914894 35.3191489 40.8510638 31.0638298 36.5957447 39.1489362 33.1914894 43.8297872 27.2340426"/>
-<polygon id="b-traps-r" class="mz-part" points="52.3404255 21.7021277 55.7446809 21.7021277 56.5957447 27.2340426 60.8510638 32.7659574 68.9361702 36.5957447 64.6808511 40.4255319 61.7021277 53.1914894 52.3404255 64.6808511 53.1914894 38.2978723"/>
-<polygon id="b-back_delt-l" class="mz-part" points="29.3617021 37.0212766 22.9787234 39.1489362 17.4468085 44.2553191 18.2978723 53.6170213 24.2553191 49.3617021 27.2340426 46.3829787"/>
-<polygon id="b-back_delt-r" class="mz-part" points="71.0638298 37.0212766 78.2978723 39.5744681 82.5531915 44.6808511 81.7021277 53.6170213 74.893617 48.9361702 72.3404255 45.106383"/>
-<polygon id="b-lats-l" class="mz-part" points="31.0638298 38.7234043 28.0851064 48.9361702 28.5106383 55.3191489 34.0425532 75.3191489 47.2340426 71.0638298 47.2340426 66.3829787 36.5957447 54.0425532 33.6170213 41.2765957"/>
-<polygon id="b-lats-r" class="mz-part" points="68.9361702 38.7234043 71.9148936 49.3617021 71.4893617 56.1702128 65.9574468 75.3191489 52.7659574 71.0638298 52.7659574 66.3829787 63.4042553 54.4680851 66.3829787 41.7021277"/>
-<polygon id="b-triceps-l" class="mz-part" points="26.8085106 49.787234 17.8723404 55.7446809 14.4680851 72.3404255 16.5957447 81.7021277 21.7021277 63.8297872 26.8085106 55.7446809"/>
-<polygon id="b-triceps-r" class="mz-part" points="73.6170213 50.212766 82.1276596 55.7446809 85.9574468 73.1914894 83.4042553 82.1276596 77.8723404 62.9787234 73.1914894 55.7446809"/>
-<polygon id="b-triceps-r" class="mz-part" points="26.8085106 58.2978723 26.8085106 68.5106383 22.9787234 75.3191489 19.1489362 77.4468085 22.5531915 65.5319149"/>
-<polygon id="b-triceps-r" class="mz-part" points="72.7659574 58.2978723 77.0212766 64.6808511 80.4255319 77.4468085 76.5957447 75.3191489 72.7659574 68.9361702"/>
-<polygon id="b-lowerback-l" class="mz-part" points="47.6595745 72.7659574 34.4680851 77.0212766 35.3191489 83.4042553 49.3617021 102.12766 46.8085106 82.9787234"/>
-<polygon id="b-lowerback-r" class="mz-part" points="52.3404255 72.7659574 65.5319149 77.0212766 64.6808511 83.4042553 50.6382979 102.12766 53.1914894 83.8297872"/>
-<polygon id="b-forearms-l" class="mz-part" points="86.3829787 75.7446809 91.0638298 83.4042553 93.1914894 94.0425532 100 106.382979 96.1702128 104.255319 88.0851064 89.3617021 84.2553191 83.8297872"/>
-<polygon id="b-forearms-r" class="mz-part" points="13.6170213 75.7446809 8.93617021 83.8297872 6.80851064 93.6170213 0 106.382979 3.82978723 104.255319 12.3404255 88.5106383 15.7446809 82.9787234"/>
-<polygon id="b-forearms-r" class="mz-part" points="81.2765957 79.5744681 77.4468085 77.8723404 79.1489362 84.6808511 91.0638298 103.829787 93.1914894 108.93617 94.4680851 104.680851"/>
-<polygon id="b-forearms-r" class="mz-part" points="18.7234043 79.5744681 22.1276596 77.8723404 20.8510638 84.2553191 9.36170213 102.978723 6.80851064 108.510638 5.10638298 104.680851"/>
-<polygon id="b-glutes-l" class="mz-part" points="44.6808511 99.5744681 30.212766 108.510638 29.787234 118.723404 31.4893617 125.957447 47.2340426 121.276596 49.3617021 114.893617"/>
-<polygon id="b-glutes-r" class="mz-part" points="55.3191489 99.1489362 51.0638298 114.468085 52.3404255 120.851064 68.0851064 125.957447 69.787234 119.148936 69.3617021 108.510638"/>
-<polygon id="b-adductors-l" class="mz-part" points="48.0851064 122.978723 44.6808511 122.978723 41.2765957 125.531915 45.106383 144.255319 48.5106383 135.744681 48.9361702 129.361702"/>
-<polygon id="b-adductors-r" class="mz-part" points="51.9148936 122.553191 55.7446809 123.404255 59.1489362 125.957447 54.893617 144.255319 51.9148936 136.170213 51.0638298 129.361702"/>
-<polygon id="b-hamstrings-l" class="mz-part" points="28.9361702 122.12766 31.0638298 129.361702 36.5957447 125.957447 35.3191489 135.319149 34.4680851 150.212766 29.3617021 158.297872 28.9361702 146.808511 27.6595745 141.276596 27.2340426 131.489362"/>
-<polygon id="b-hamstrings-r" class="mz-part" points="71.4893617 121.702128 69.3617021 128.93617 63.8297872 125.957447 65.5319149 136.595745 66.3829787 150.212766 71.0638298 158.297872 71.4893617 147.659574 72.7659574 142.12766 73.6170213 131.914894"/>
-<polygon id="b-hamstrings-r" class="mz-part" points="38.7234043 125.531915 44.2553191 145.957447 40.4255319 166.808511 36.1702128 152.765957 37.0212766 135.319149"/>
-<polygon id="b-hamstrings-r" class="mz-part" points="61.7021277 125.531915 63.4042553 136.170213 64.2553191 153.191489 60 166.808511 56.1702128 146.382979"/>
-<polygon id="b-knees-l" class="mz-part" points="34.4680851 153.191489 31.0638298 159.148936 33.6170213 166.382979 37.4468085 162.553191"/>
-<polygon id="b-knees-r" class="mz-part" points="66.3829787 153.617021 62.9787234 162.978723 66.8085106 166.382979 69.3617021 159.148936"/>
-<polygon id="b-calves-l" class="mz-part" points="29.3617021 160.425532 28.5106383 167.234043 24.6808511 179.574468 23.8297872 192.765957 25.5319149 197.021277 28.5106383 193.191489 29.787234 180 31.9148936 171.06383 31.9148936 166.808511"/>
-<polygon id="b-calves-r" class="mz-part" points="37.4468085 165.106383 35.3191489 167.659574 33.1914894 171.914894 31.0638298 180.425532 30.212766 191.914894 34.0425532 200 38.7234043 190.638298 39.1489362 168.93617"/>
-<polygon id="b-calves-r" class="mz-part" points="62.9787234 165.106383 61.2765957 168.510638 61.7021277 190.638298 66.3829787 199.574468 70.6382979 191.914894 68.9361702 179.574468 66.8085106 170.212766"/>
-<polygon id="b-calves-r" class="mz-part" points="70.6382979 160.425532 72.3404255 168.510638 75.7446809 179.148936 76.5957447 192.765957 74.4680851 196.595745 72.3404255 193.617021 70.6382979 179.574468 68.0851064 168.085106"/>
-<polygon id="b-calves-r" class="mz-part" points="28.5106383 195.744681 30.212766 195.744681 33.6170213 201.702128 30.6382979 220 28.5106383 213.617021 26.8085106 198.297872"/>
-<polygon id="b-calves-r" class="mz-part" points="69.787234 195.744681 71.9148936 195.744681 73.6170213 198.297872 71.9148936 213.191489 70.212766 219.574468 67.2340426 202.12766"/>
-`;
-back.dataset.built = '1';
-}
-}
-// Body diagram polygons adapted from the MIT-licensed react-body-highlighter
-// project (github.com/giavinh79/react-body-highlighter) — anatomically
-// correct, tested muscle-region shapes rather than a hand-drawn approximation.
-// Each polygon id is "<f|b>-<muscle>-<l|r>". DIRECT maps a polygon straight to
-// one (group,region); AGGREGATE maps a polygon that visually shows just one
-// shape but represents several finer regions tracked separately by the
-// planner (e.g. the back's "lats" shape also stands in for rhomboids/teres
-// major, since the library has no separate polygon for those) — scored via
-// Math.max across all of them. The text legend below still breaks those out
-// individually with their own suggestions.
-const GYM_MZ_DIRECT = {
-'f-adductors': ['legs', 'adductors'], 'f-quads': ['legs', 'quads'], 'f-tibialis': ['legs', 'tibialis'],
-'b-back_delt': ['shoulders', 'delt_rear'], 'b-lowerback': ['back', 'lowerback'], 'b-glutes': ['legs', 'glutes'],
-'b-hamstrings': ['legs', 'hamstrings'], 'b-calves': ['legs', 'calves'],
-};
-const GYM_MZ_AGGREGATE = {
-'f-chest': { group: 'chest', regions: ['chest_upper', 'chest_mid', 'chest_lower'] },
-'f-front_delt': { group: 'shoulders', regions: ['delt_front', 'delt_side'] },
-'f-triceps': { group: 'triceps', regions: ['tri_long', 'tri_lateral', 'tri_medial'] },
-'b-triceps': { group: 'triceps', regions: ['tri_long', 'tri_lateral', 'tri_medial'] },
-'f-obliques': { group: 'core', regions: ['obliques'] },
-'f-abs': { group: 'core', regions: ['abs_upper', 'abs_lower'] },
-'f-biceps': { group: 'biceps', regions: ['biceps', 'brachialis'] },
-'f-forearms': { group: 'forearms', regions: ['forearm_flexors', 'forearm_extensors'] },
-'b-forearms': { group: 'forearms', regions: ['forearm_flexors', 'forearm_extensors'] },
-'b-traps': { group: 'traps', regions: ['traps_upper', 'traps_mid', 'traps_lower'] },
-'b-lats': { group: 'back', regions: ['lats', 'rhomboids', 'teres_major'] },
-'b-adductors': { group: 'legs', regions: ['adductors', 'abductors'] },
-};
-// Non-interactive body parts (head/neck/knees) always render as neutral skin.
-const GYM_MZ_SKIN_PREFIXES = ['f-neck', 'f-head', 'f-knees', 'b-head', 'b-knees'];
-function gymMzScoreFor(score, baseId) {
-if (GYM_MZ_AGGREGATE[baseId]) {
-const agg = GYM_MZ_AGGREGATE[baseId];
-return Math.max(...agg.regions.map((r) => score[`${agg.group}:${r}`] || 0));
-}
-if (GYM_MZ_DIRECT[baseId]) {
-const pair = GYM_MZ_DIRECT[baseId];
-return score[`${pair[0]}:${pair[1]}`] || 0;
-}
-return 0;
-}
-function gymRenderMzSvg(score) {
-gymBuildMzSvg();
-[$('gymMzSvgFront'), $('gymMzSvgBack')].forEach((svg) => {
-svg.querySelectorAll('.mz-part').forEach((el) => {
-const baseId = el.id.replace(/-[lr]$/, '');
-if (GYM_MZ_SKIN_PREFIXES.includes(baseId)) { el.setAttribute('class', 'mz-part mz-skin'); return; }
-const v = gymMzScoreFor(score, baseId);
-el.setAttribute('class', 'mz-part mz-' + gymCoverageLevel(v));
-});
-});
-}
-let gymMzOpenRegion = null;
-function gymToggleMzRegion(rowId) {
-gymMzOpenRegion = gymMzOpenRegion === rowId ? null : rowId;
-gymRenderMzLegend(window.__gymLastMzScore || {});
-}
-function gymRenderMzLegend(score) {
-window.__gymLastMzScore = score;
-const groups = gymPlanGroups.length ? GYM_MUSCLE_MAP.filter((g) => gymPlanGroups.includes(g.key)) : GYM_MUSCLE_MAP;
-if (!gymPlanGroups.length) {
-$('gymMzLegend').innerHTML = '<div class="plan-empty">Kies hierboven welke spiergroepen je vandaag traint om per spier te zien wat je nog mist.</div>';
-return;
-}
-$('gymMzLegend').innerHTML = groups.map((g) => {
-const rows = g.regions.map((r) => {
-const v = score[`${g.key}:${r.key}`] || 0;
-const level = gymCoverageLevel(v);
-const rowId = `${g.key}__${r.key}`;
-let expandHtml = '';
-if (level !== 'full') {
-const all = gymSuggestExercisesFor(g.key, r.key, gymPlanExercises);
-if (all.length) {
-const isOpen = gymMzOpenRegion === rowId;
-const list = all.map((s) => `<span class="mz-suggest-item" onclick="gymAddSuggested('${s.name.replace(/'/g, "\\'")}')">+ ${esc(s.name)}</span>`).join('');
-expandHtml = `<span class="mz-toggle ${isOpen ? 'open' : ''}" onclick="gymToggleMzRegion('${rowId}')" title="Toon oefeningen">${isOpen ? '▾' : '▸'} ${all.length}</span>` +
-(isOpen ? `<div class="mz-suggest-list">${list}</div>` : '');
-}
-}
-return `<div class="mz-region"><span class="mz-dot mz-${level}"></span>${esc(r.label)}${expandHtml}</div>`;
-}).join('');
-return `<div class="mz-group"><div class="mz-group-name">${esc(g.label)}</div>${rows}</div>`;
-}).join('');
-}
-function gymRenderSessionPlanner() {
+gymPlanTargets[name] = gymPlanTargets[name] || { goal: 'spiergroei', warmups: 2, topsets: 1, dropset: false };
+if (field === 'goal') gymPlanTargets[name].goal = val;
+else if (field === 'dropset') gymPlanTargets[name].dropset = !!Number(val);
+else gymPlanTargets[name][field] = Math.max(0, Number(val) || 0);
 gymRenderPlanList();
-const score = gymComputeCoverage(gymPlanExercises);
-gymRenderMzSvg(score);
-gymRenderMzLegend(score);
-}
-
+};
 function gymTmplRowHtml(tp) {
 return `<div class="tmpl-row">
 <div>
@@ -3364,63 +3203,96 @@ flashSetMsg(t('set.saved'));
 } catch (e) { flashSetMsg(e.message); }
 };
 
-function gymSuggestNextSet(tmpl, exercise) {
-const target = (tmpl.targets && tmpl.targets[exercise]) || null;
+const GYM_REP_RANGES = {
+kracht: { warmup: [8, 10], topset: [3, 6], dropset: [6, 10] },
+spiergroei: { warmup: [12, 15], topset: [8, 12], dropset: [15, 20] },
+uithouding: { warmup: [12, 15], topset: [15, 20], dropset: [20, 25] },
+};
+const GYM_GOAL_LABELS = { kracht: 'Kracht', spiergroei: 'Spiergroei', uithouding: 'Uithouding' };
+function gymBuildSetPlan(target) {
+const t = target || {};
+if (t.goal === undefined && (t.weight || t.reps || t.sets)) {
+const reps = t.reps || GYM_REP_RANGES.spiergroei.topset[0];
+return [{ type: 'topset', label: 'Topset 1', repRange: [reps, reps], weight: t.weight }];
+}
+const goal = GYM_REP_RANGES[t.goal] ? t.goal : 'spiergroei';
+const ranges = GYM_REP_RANGES[goal];
+const warmups = Math.max(0, Number(t.warmups) || 0);
+const topsets = Math.max(1, Number(t.topsets) || 1);
+const dropset = !!t.dropset;
+const plan = [];
+for (let i = 1; i <= warmups; i++) plan.push({ type: 'warmup', label: `Warmup ${i}`, repRange: ranges.warmup, goal });
+for (let i = 1; i <= topsets; i++) {
+plan.push({ type: 'topset', label: `Topset ${i}`, repRange: ranges.topset, goal });
+if (i === topsets && dropset) plan.push({ type: 'dropset', label: `Dropset (na topset ${i})`, repRange: ranges.dropset, goal });
+}
+return plan;
+}
+function gymSuggestSetValue(exercise, slot, idx) {
 const sessions = gymSessionsFor(exercise);
-if (!sessions.length) {
-return { weight: target ? target.weight : '', reps: target ? target.reps : '' };
-}
+const repTarget = slot.repRange ? slot.repRange[0] : '';
+if (!sessions.length) return { weight: slot.weight !== undefined ? slot.weight : '', reps: repTarget, note: '' };
 const latest = sessions[0];
-const weight = Math.max(...latest.sets.map((s) => s.weight));
-const targetReps = target ? target.reps : Math.max(...latest.sets.map((s) => s.reps));
-const allHit = latest.sets.every((s) => s.reps >= targetReps);
-if (allHit) {
-const inc = gymSuggestedIncrement(exercise, weight);
-return { weight: weight + inc, reps: targetReps, note: `Vorige keer overal ${targetReps}+ reps gehaald bij ${weight}${gymUnit()} — probeer ${weight + inc}${gymUnit()}.` };
+const prior = latest.sets[idx];
+if (!prior) {
+const w = latest.sets.length ? Math.max(...latest.sets.map((s) => s.weight)) : (slot.weight || '');
+return { weight: w, reps: repTarget, note: '' };
 }
-return { weight, reps: targetReps, note: `Vorige keer: ${weight}${gymUnit()}. Probeer dezelfde weight, focus op de reps.` };
+const hitTop = slot.repRange ? prior.reps >= slot.repRange[1] : false;
+if (hitTop) {
+const inc = gymSuggestedIncrement(exercise, prior.weight);
+return { weight: prior.weight + inc, reps: slot.repRange ? slot.repRange[0] : prior.reps, note: `Vorige keer ${prior.reps} reps bij ${prior.weight}${gymUnit()} — probeer ${prior.weight + inc}${gymUnit()}.` };
+}
+const nextReps = slot.repRange ? Math.max(slot.repRange[0], prior.reps) : prior.reps;
+const rangeLabel = slot.repRange ? `${slot.repRange[0]}-${slot.repRange[1]}` : '';
+return { weight: prior.weight, reps: nextReps, note: `Vorige keer: ${prior.weight}${gymUnit()} × ${prior.reps} reps. Zelfde gewicht, focus op reps${rangeLabel ? ' (' + rangeLabel + ')' : ''}.` };
 }
 window.gymStartSession = (id) => {
 const tp = gymSessionTemplates.find((x) => x.id === id);
 if (!tp) return;
-gymActiveSession = { tmpl: tp, progress: {}, values: {}, restEndsAt: null, restTimerId: null, restTotal: 90 };
+gymActiveSession = { tmpl: tp, plans: {}, progress: {}, values: {}, restEndsAt: null, restTimerId: null, restTotal: 90 };
 tp.exercises.forEach((ex) => {
+const plan = gymBuildSetPlan((tp.targets || {})[ex]);
+gymActiveSession.plans[ex] = plan;
 gymActiveSession.progress[ex] = 0;
-const sug = gymSuggestNextSet(tp, ex);
-gymActiveSession.values[ex] = { weight: sug.weight, reps: sug.reps };
+gymActiveSession.values[ex] = plan.map((slot, i) => gymSuggestSetValue(ex, slot, i));
 });
 gymRenderActiveSession();
 $('gymActiveOverlay').classList.add('open');
 };
-function gymActiveSessTargetSets(ex) {
-const t = gymActiveSession.tmpl.targets && gymActiveSession.tmpl.targets[ex];
-return (t && t.sets) || 3;
-}
 function gymRenderActiveSession() {
 if (!gymActiveSession) return;
 const s = gymActiveSession;
 $('gymActiveTitle').textContent = s.tmpl.name;
 $('gymActiveList').innerHTML = s.tmpl.exercises.map((ex) => {
+const plan = s.plans[ex];
 const done = s.progress[ex] || 0;
-const total = gymActiveSessTargetSets(ex);
-const sug = gymSuggestNextSet(s.tmpl, ex);
-const v = s.values[ex] || { weight: sug.weight, reps: sug.reps };
 const enc = esc(ex).replace(/'/g, "\\'");
-return `<div class="sess-ex-card"><div style="display:flex;align-items:center;"><h5>${esc(ex)}</h5><span class="sess-progress">${done}/${total} sets</span></div>${sug.note ? `<div class="sess-ex-meta">${esc(sug.note)}</div>` : ''}<div class="sess-ex-row"><div><label>Gewicht (${gymUnit()})</label><input type="number" step="0.5" min="0" id="sessW-${enc}" value="${v.weight}"></div><div><label>Reps</label><input type="number" step="1" min="1" id="sessR-${enc}" value="${v.reps}"></div><button class="btn-primary" onclick="gymLogActiveSet('${enc}')">Set loggen</button></div></div>`;
+const rows = plan.map((slot, i) => {
+const v = s.values[ex][i] || { weight: '', reps: slot.repRange ? slot.repRange[0] : '' };
+const repLabel = slot.repRange ? `${slot.repRange[0]}-${slot.repRange[1]} reps` : '';
+const isDone = i < done;
+const isCurrent = i === done;
+const rowClass = 'sess-set-row' + (isDone ? ' done' : '') + (isCurrent ? ' current' : '');
+return `<div class="${rowClass}"><div class="sess-set-label">${esc(slot.label)}<span class="sess-set-target">${repLabel}</span></div>${v.note ? `<div class="sess-ex-meta">${esc(v.note)}</div>` : ''}<div class="sess-ex-row"><div><label>Gewicht (${gymUnit()})</label><input type="number" step="0.5" min="0" id="sessW-${enc}-${i}" value="${v.weight}"${isDone ? ' disabled' : ''}></div><div><label>Reps</label><input type="number" step="1" min="1" id="sessR-${enc}-${i}" value="${v.reps}"${isDone ? ' disabled' : ''}></div>${isDone ? '<span class="sess-set-check">✓</span>' : `<button class="btn-primary" onclick="gymLogActiveSet('${enc}',${i})">Loggen</button>`}</div></div>`;
+}).join('');
+return `<div class="sess-ex-card"><div style="display:flex;align-items:center;justify-content:space-between;"><h5>${esc(ex)}</h5><span class="sess-progress">${done}/${plan.length} sets</span></div>${rows}</div>`;
 }).join('');
 }
-window.gymLogActiveSet = async (ex) => {
+window.gymLogActiveSet = async (ex, idx) => {
 const s = gymActiveSession;
 if (!s) return;
-const wEl = $('sessW-' + ex), rEl = $('sessR-' + ex);
+const wEl = $('sessW-' + ex + '-' + idx), rEl = $('sessR-' + ex + '-' + idx);
+if (!wEl || !rEl) return;
 const weight = Number(wEl.value) || 0;
 const reps = Number(rEl.value) || 0;
 if (!reps) { flashSetMsg('Vul reps in.'); return; }
+const slot = (s.plans[ex] || [])[idx] || {};
 try {
-const payload = { action: 'create', exercise: ex, weight, reps, muscle: gymGuessMuscle(ex), date: iso(new Date()) };
+const payload = { action: 'create', exercise: ex, weight, reps, muscle: gymGuessMuscle(ex), date: iso(new Date()), note: slot.label || '' };
 const d = await api('/api/gym/log', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
 gymLog = d.log;
-s.progress[ex] = (s.progress[ex] || 0) + 1;
+s.progress[ex] = idx + 1;
 gymRenderActiveSession();
 gymStartRestTimer();
 gymRenderAll();
@@ -3461,7 +3333,6 @@ if (gymActiveSession && gymActiveSession.restTimerId) clearInterval(gymActiveSes
 gymActiveSession = null;
 $('gymActiveOverlay').classList.remove('open');
 };
-
 $('gymTabs').onclick = (e) => {
 const b = e.target.closest('button'); if (!b) return;
 gymActiveTab = b.dataset.gtab;
