@@ -2727,6 +2727,7 @@ if (!weight || !reps) return 0;
 return weight * (1 + reps / 30); // Epley formula
 }
 function gymSessionsFor(exercise) {
+if (!exercise) return [];
 const items = gymLog.filter((x) => x.exercise.toLowerCase() === exercise.toLowerCase());
 const byDate = {};
 items.forEach((x) => { (byDate[x.date] = byDate[x.date] || []).push(x); });
@@ -2808,7 +2809,7 @@ function gymRenderAdvice() {
 const cards = [];
 const sched = gymScheduleSuggestion();
 cards.push({ ex: 'Vandaag trainen', ...sched });
-gymGoals.forEach((g) => cards.push({ ex: g.exercise, ...gymAdviceForGoal(g) }));
+gymGoals.filter((g) => g.kind === 'exercise').forEach((g) => cards.push({ ex: g.exercise, ...gymAdviceForGoal(g) }));
 $('gymAdviceList').innerHTML = cards.map((c) => {
 const cls = c.kind === 'warn' ? 'warn' : c.kind === 'neutral' ? 'neutral' : '';
 return `<div class="coach-card ${cls}"><div class="ex">${esc(c.ex)}</div><div class="msg">${esc(c.text)}</div></div>`;
