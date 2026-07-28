@@ -422,6 +422,7 @@ padding: 2px; font-family: inherit;
 .mz-balance-item{font-size:11.5px;color:#8b94a1;background:#12161d;border:1px solid #232a33;border-radius:6px;padding:3px 8px;}
 .mz-status{font-size:11px;color:#6b7480;margin-left:2px;}
 .mz-suggest-why{width:100%;font-size:12px;color:#8b94a1;margin-bottom:4px;}
+.mz-balance-science{width:100%;font-size:11px;color:#6b7480;font-style:italic;margin-top:6px;line-height:1.5;}
 .tmpl-row .btn-start{margin-right:6px;}
 .session-overlay .modal{max-width:560px;max-height:86vh;overflow-y:auto;}
 .sess-ex-card{border:1px solid #e2e6ec;border-radius:10px;padding:10px 12px;margin-bottom:10px;}
@@ -2940,18 +2941,29 @@ if (scope === 'mz') gymRenderMzLegend(window.__gymLastMzScore || {});
 else if (scope === 'plan') gymRenderPlanList();
 else gymRenderAdvice();
 }
+const GYM_SCIENCE = {
+volume: 'sets per week per spiergroep is de sterkste voorspeller van spiergroei in dosis-respons-onderzoek (Schoenfeld et al., 2017). Richtlijn: rond 6 sets/week is onderhoudsvolume (MV), 8-10 is het minimum voor groei (MEV), 12-20 is de optimale groeizone (MAV), 20-25+ nadert het maximum dat te herstellen is (MRV) — vergelijkbaar met de MEV/MAV/MRV-indeling van Renaissance Periodization (Mike Israetel), ook gebruikt door Jeff Nippard.',
+frequency: 'elke spiergroep minstens 2x per week trainen geeft een klein maar consistent voordeel t.o.v. 1x per week, vooral voor kracht (Grgic et al., 2018; Ralston et al., 2018). Bij gelijk totaalvolume maakt de frequentie zelf weinig uit voor spiergroei (Schoenfeld et al., 2019), maar 2x/week is in de praktijk de aanbevolen standaard.',
+rest: 'rust van meer dan 60-90 seconden tussen sets geeft een klein maar meetbaar voordeel voor spiergroei t.o.v. korte rust, vooral omdat het volume over meerdere sets beter op peil blijft (meta-analyse Frontiers in Sports & Active Living, 2024). Voor kracht en zware compound-oefeningen wordt 2-5 minuten rust aangeraden.',
+reps: 'spiergroei treedt op over een breed bereik van 6-20+ herhalingen zolang sets dicht bij spierfalen worden uitgevoerd (Schoenfeld et al., 2021). Kracht profiteert het meest van lage herhalingen (1-6) bij hoge intensiteit.',
+};
 function gymMuscleBalanceReport() {
 const today = iso(new Date());
 const since = new Date(); since.setDate(since.getDate() - 14);
 const sinceIso = iso(since);
+const since7 = new Date(); since7.setDate(since7.getDate() - 7);
+const since7Iso = iso(since7);
 const groups = ['Legs', 'Push', 'Pull', 'Core'];
 const counts = {};
+const weekCounts = {};
+const weekDays = {};
 const lastDate = {};
-groups.forEach((g) => { counts[g] = 0; });
+groups.forEach((g) => { counts[g] = 0; weekCounts[g] = 0; weekDays[g] = new Set(); });
 gymLog.forEach((x) => {
 const g = x.muscle || 'Other';
 if (!groups.includes(g)) return;
 if (x.date >= sinceIso) counts[g]++;
+if (x.date >= since7Iso) { weekCounts[g]++; weekDays[g].add(x.date); }
 if (!lastDate[g] || x.date > lastDate[g]) lastDate[g] = x.date;
 });
 const total = groups.reduce((s, g) => s + counts[g], 0);
@@ -2960,7 +2972,7 @@ const days = lastDate[g] ? Math.round((new Date(today) - new Date(lastDate[g])) 
 return { group: g, label: GYM_GROUP_LABEL[g], count: counts[g], days };
 });
 if (!total) {
-return { kind: 'neutral', text: 'Nog niet genoeg data in de laatste 14 dagen om een balans te tonen. Log een paar sessies om hier inzicht te krijgen.', items };
+return { kind: 'neutral', text: 'Nog niet genoeg data in de laatste 14 dagen om een balans te tonen. Log een paar sessies om hier inzicht te krijgen.', items, science: 'Richtlijn zodra je data hebt: ' + GYM_SCIENCE.volume + ' ' + GYM_SCIENCE.frequency };
 }
 const avg = total / groups.length;
 const low = items.filter((it) => it.count < avg * 0.5 && (it.days === null || it.days > 3));
@@ -2972,10 +2984,24 @@ text += ' ' + low.map((it) => it.label).join(' en ') + ' ' + (low.length > 1 ? '
 } else {
 text += ' Mooi in balans.';
 }
-return { kind, text, items };
+const underFreq = groups.filter((g) => weekCounts[g] > 0 && weekDays[g].size < 2).map((g) => GYM_GROUP_LABEL[g]);
+if (underFreq.length) {
+text += ' ' + underFreq.join(' en ') + ' ' + (underFreq.length > 1 ? 'zijn' : 'is') + ' deze week nog maar 1x getraind.';
+}
+const volNotes = groups.filter((g) => weekCounts[g] > 0).map((g) => {
+const n = weekCounts[g];
+let band;
+if (n < 6) band = 'onder onderhoudsvolume';
+else if (n < 10) band = 'rond minimaal effectief (MEV)';
+else if (n <= 20) band = 'in de optimale groeizone (MAV)';
+else band = 'richting maximaal herstelbaar (MRV)';
+return GYM_GROUP_LABEL[g] + ': ' + n + ' sets/week (' + band + ')';
+});
+const science = (volNotes.length ? 'Wekelijks volume — ' + volNotes.join('; ') + '. ' : '') + GYM_SCIENCE.volume + ' ' + GYM_SCIENCE.frequency;
+return { kind, text, items, science };
 }
 function gymVolumeAdvice(goalType, warmups, topsets, dropset) {
-const ranges = { kracht: { min: 3, max: 5, label: 'kracht' }, spiergroei: { min: 3, max: 4, label: 'spiergroei' }, uithouding: { min: 2, max: 3, label: 'uithouding' } };
+const ranges = { kracht: { min: 3, max: 5, label: 'kracht', reps: '1-6', rest: '2-5 minuten' }, spiergroei: { min: 3, max: 4, label: 'spiergroei', reps: '6-20', rest: '60-120 seconden' }, uithouding: { min: 2, max: 3, label: 'uithouding', reps: '15-20+', rest: '30-60 seconden' } };
 const r = ranges[goalType] || ranges.spiergroei;
 const effectiveSets = topsets + (dropset ? 1 : 0);
 let level = 'ok';
@@ -2992,10 +3018,12 @@ text = topsets + ' topset' + (topsets === 1 ? '' : 's') + (dropset ? ' + dropset
 if (warmups < 1) {
 text += ' Overweeg minstens 1 warming-up set om blessurerisico te verlagen.';
 }
+text += ' Mik op ' + r.reps + ' herhalingen dicht bij spierfalen, met ' + r.rest + ' rust tussen sets voor dit doel.';
+text += ' (Bron: ' + GYM_SCIENCE.reps + ' ' + GYM_SCIENCE.rest + ')';
 return { level, text };
 }
 function gymRenderAdvice() {
-const cards = []; const bal = gymMuscleBalanceReport(); cards.push({ ex: '⚖ Balans (laatste 14 dagen)', kind: bal.kind, text: bal.text, key: 'bal', why: bal.items.map((it) => it.label + ': ' + it.count + 'x' + (it.days === null ? ', nog niet getraind' : ', ' + it.days + ' dag(en) geleden')).join(' · ') });
+const cards = []; const bal = gymMuscleBalanceReport(); cards.push({ ex: '⚖ Balans (laatste 14 dagen)', kind: bal.kind, text: bal.text, key: 'bal', why: bal.items.map((it) => it.label + ': ' + it.count + 'x' + (it.days === null ? ', nog niet getraind' : ', ' + it.days + ' dag(en) geleden')).join(' · ') + (bal.science ? (' — ' + bal.science) : '') });
 const sched = gymScheduleSuggestion();
 cards.push({ ex: 'Vandaag trainen', ...sched, key: 'sched', why: sched.group ? ('Gebaseerd op je rustdagen-instelling (' + (gymProfile.restDays || 2) + ' dag(en)) en wanneer je elke spiergroep voor het laatst trainde.') : null });
 gymGoals.filter((g) => g.kind === 'exercise').forEach((g, gi) => { const sessions = gymSessionsFor(g.exercise); const why = sessions.length ? ('Doel: ' + g.repMin + '-' + g.repMax + ' reps' + (g.targetWeight ? (' bij ' + g.targetWeight + gymUnit()) : '') + '. Laatste sessie (' + sessions[0].date + '): ' + sessions[0].sets.map((s) => s.weight + gymUnit() + '×' + s.reps).join(', ') + '.') : null; cards.push({ ex: g.exercise, ...gymAdviceForGoal(g), key: 'goal:' + gi, why }); });
@@ -3523,7 +3551,7 @@ gymMzOpenRegion = gymMzOpenRegion === rowId ? null : rowId;
 gymRenderMzLegend(window.__gymLastMzScore || {});
 }
 function gymRenderMzLegend(score) {
-window.__gymLastMzScore = score; const bal = gymMuscleBalanceReport(); const balOpen = gymAdviceOpen.has('bal'); const balCls = bal.kind === 'warn' ? 'warn' : bal.kind === 'neutral' ? 'neutral' : ''; const balHtml = `<div class="mz-balance ${balCls}"><div class="mz-balance-head" onclick="gymToggleAdvice('bal','mz')">⚖ Balans (14 dagen) <span class="mz-chevron">${balOpen ? '▾' : '▸'}</span></div><div class="mz-balance-sum">${esc(bal.text)}</div>${balOpen ? `<div class="mz-balance-detail">${bal.items.map((it) => `<div class="mz-balance-item">${esc(it.label)}: ${it.count}x${it.days === null ? '' : (', ' + it.days + 'd geleden')}</div>`).join('')}</div>` : ''}</div>`;
+window.__gymLastMzScore = score; const bal = gymMuscleBalanceReport(); const balOpen = gymAdviceOpen.has('bal'); const balCls = bal.kind === 'warn' ? 'warn' : bal.kind === 'neutral' ? 'neutral' : ''; const balHtml = `<div class="mz-balance ${balCls}"><div class="mz-balance-head" onclick="gymToggleAdvice('bal','mz')">⚖ Balans (14 dagen) <span class="mz-chevron">${balOpen ? '▾' : '▸'}</span></div><div class="mz-balance-sum">${esc(bal.text)}</div>${balOpen ? `<div class="mz-balance-detail">${bal.items.map((it) => `<div class="mz-balance-item">${esc(it.label)}: ${it.count}x${it.days === null ? '' : (', ' + it.days + 'd geleden')}</div>`).join('')}${bal.science ? `<div class="mz-balance-science">${esc(bal.science)}</div>` : ''}</div>` : ''}</div>`;
 const groups = gymPlanGroups.length ? GYM_MUSCLE_MAP.filter((g) => gymPlanGroups.includes(g.key)) : GYM_MUSCLE_MAP;
 if (!gymPlanGroups.length) {
 $('gymMzLegend').innerHTML = balHtml + '<div class="plan-empty">Kies hierboven welke spiergroepen je vandaag traint om per spier te zien wat je nog mist.</div>';
