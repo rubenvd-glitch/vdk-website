@@ -344,6 +344,11 @@ padding: 15px 18px; margin-bottom: 12px;
 .coach-card.warn .msg { color: #f0d8c0; }
 .coach-card.neutral { background: #151a21; border-color: #232a33; }
 .coach-card.neutral .msg { color: #a7afba; }
+.coach-why-toggle{margin-top:8px;font-size:11.5px;color:#7fdc9e;cursor:pointer;user-select:none;display:inline-flex;align-items:center;gap:4px;}
+.coach-why-toggle:hover{text-decoration:underline;}
+.coach-card.warn .coach-why-toggle{color:#f0b45c;}
+.coach-card.neutral .coach-why-toggle{color:#8b94a1;}
+.coach-why{margin-top:6px;font-size:12.5px;color:#8b94a1;line-height:1.5;background:#0e1218;border-radius:8px;padding:8px 10px;}
 .gym-log-row {
 background: #151a21; border: 1px solid #232a33; border-radius: 12px;
 padding: 13px 16px; margin-bottom: 9px; display: flex; gap: 12px; align-items: center;
@@ -407,6 +412,16 @@ padding: 2px; font-family: inherit;
 .mz-suggest-list{margin:6px 0 10px 18px;display:flex;flex-wrap:wrap;gap:6px;}
 .mz-suggest-item{display:inline-block;padding:3px 9px;border-radius:8px;background:#f0b45c22;color:#8a5a12;border:1px solid #f0b45c66;font-size:12px;cursor:pointer;transition:background .12s ease,transform .12s ease;}
 .mz-suggest-item:hover{background:#f0b45c44;transform:translateY(-1px);}
+.mz-balance{background:#151a21;border:1px solid #232a33;border-radius:10px;padding:10px 12px;margin-bottom:12px;}
+.mz-balance.warn{background:#1d1815;border-color:#f0883e66;}
+.mz-balance.neutral{background:#151a21;border-color:#232a33;}
+.mz-balance-head{font-size:12.5px;font-weight:700;color:#cfd6de;cursor:pointer;user-select:none;display:flex;align-items:center;gap:6px;}
+.mz-balance-sum{font-size:12px;color:#a7afba;margin-top:4px;line-height:1.5;}
+.mz-balance.warn .mz-balance-sum{color:#f0d8c0;}
+.mz-balance-detail{margin-top:8px;display:flex;flex-wrap:wrap;gap:8px;}
+.mz-balance-item{font-size:11.5px;color:#8b94a1;background:#12161d;border:1px solid #232a33;border-radius:6px;padding:3px 8px;}
+.mz-status{font-size:11px;color:#6b7480;margin-left:2px;}
+.mz-suggest-why{width:100%;font-size:12px;color:#8b94a1;margin-bottom:4px;}
 .tmpl-row .btn-start{margin-right:6px;}
 .session-overlay .modal{max-width:560px;max-height:86vh;overflow-y:auto;}
 .sess-ex-card{border:1px solid #e2e6ec;border-radius:10px;padding:10px 12px;margin-bottom:10px;}
@@ -424,6 +439,11 @@ padding: 2px; font-family: inherit;
 .plan-pill-wrap{margin-bottom:4px;}
 .plan-target-row select{padding:4px 6px;border-radius:6px;background:#12161d;color:#e6e9ed;border:1px solid #232a33;}
 .plan-target-row label input[type=checkbox]{margin-right:4px;}
+.plan-vol-advice{display:inline-flex;align-items:center;gap:5px;margin-top:6px;font-size:11.5px;cursor:pointer;user-select:none;color:#8b94a1;}
+.plan-vol-dot{width:7px;height:7px;border-radius:50%;background:#5fbf7a;flex-shrink:0;}
+.plan-vol-advice.plan-vol-low .plan-vol-dot,.plan-vol-advice.plan-vol-high .plan-vol-dot{background:#f0b45c;}
+.plan-vol-advice.plan-vol-low,.plan-vol-advice.plan-vol-high{color:#c98a3a;}
+.plan-vol-detail{font-size:12px;color:#8b94a1;line-height:1.5;margin-top:4px;padding:6px 8px;background:#12161d;border-radius:6px;}
 .sess-set-row{border-top:1px solid #232a33;padding:8px 0;}
 .sess-set-row:first-child{border-top:none;}
 .sess-set-label{font-size:13px;font-weight:600;display:flex;align-items:center;}
@@ -2913,14 +2933,75 @@ text += ` Oefeningen met een doel: ${exList.join('; ')}.`;
 return { kind: 'ok', text, group: top.g };
 }
 
+let gymAdviceOpen = new Set();
+function gymToggleAdvice(key, scope) {
+if (gymAdviceOpen.has(key)) gymAdviceOpen.delete(key); else gymAdviceOpen.add(key);
+if (scope === 'mz') gymRenderMzLegend(window.__gymLastMzScore || {});
+else if (scope === 'plan') gymRenderPlanList();
+else gymRenderAdvice();
+}
+function gymMuscleBalanceReport() {
+const today = iso(new Date());
+const since = new Date(); since.setDate(since.getDate() - 14);
+const sinceIso = iso(since);
+const groups = ['Legs', 'Push', 'Pull', 'Core'];
+const counts = {};
+const lastDate = {};
+groups.forEach((g) => { counts[g] = 0; });
+gymLog.forEach((x) => {
+const g = x.muscle || 'Other';
+if (!groups.includes(g)) return;
+if (x.date >= sinceIso) counts[g]++;
+if (!lastDate[g] || x.date > lastDate[g]) lastDate[g] = x.date;
+});
+const total = groups.reduce((s, g) => s + counts[g], 0);
+const items = groups.map((g) => {
+const days = lastDate[g] ? Math.round((new Date(today) - new Date(lastDate[g])) / 86400000) : null;
+return { group: g, label: GYM_GROUP_LABEL[g], count: counts[g], days };
+});
+if (!total) {
+return { kind: 'neutral', text: 'Nog niet genoeg data in de laatste 14 dagen om een balans te tonen. Log een paar sessies om hier inzicht te krijgen.', items };
+}
+const avg = total / groups.length;
+const low = items.filter((it) => it.count < avg * 0.5 && (it.days === null || it.days > 3));
+let kind = 'ok';
+let text = 'Laatste 14 dagen: ' + items.map((it) => it.label + ' ' + it.count + 'x').join(', ') + '.';
+if (low.length) {
+kind = 'warn';
+text += ' ' + low.map((it) => it.label).join(' en ') + ' ' + (low.length > 1 ? 'blijven' : 'blijft') + ' achter — overweeg dit eerder in te plannen.';
+} else {
+text += ' Mooi in balans.';
+}
+return { kind, text, items };
+}
+function gymVolumeAdvice(goalType, warmups, topsets, dropset) {
+const ranges = { kracht: { min: 3, max: 5, label: 'kracht' }, spiergroei: { min: 3, max: 4, label: 'spiergroei' }, uithouding: { min: 2, max: 3, label: 'uithouding' } };
+const r = ranges[goalType] || ranges.spiergroei;
+const effectiveSets = topsets + (dropset ? 1 : 0);
+let level = 'ok';
+let text;
+if (effectiveSets < r.min) {
+level = 'low';
+text = 'Met ' + topsets + ' topset' + (topsets === 1 ? '' : 's') + (dropset ? ' + dropset' : '') + ' zit je onder het gangbare volume voor ' + r.label + ' (' + r.min + '-' + r.max + ' sets). Overweeg een extra topset toe te voegen voor meer prikkel.';
+} else if (effectiveSets > r.max + 2) {
+level = 'high';
+text = topsets + ' topsets' + (dropset ? ' + dropset' : '') + ' is relatief veel voor ' + r.label + ' (richtlijn ' + r.min + '-' + r.max + '). Let op herstel — meer is niet altijd beter.';
+} else {
+text = topsets + ' topset' + (topsets === 1 ? '' : 's') + (dropset ? ' + dropset' : '') + ' past goed bij het volume voor ' + r.label + ' (richtlijn ' + r.min + '-' + r.max + ').';
+}
+if (warmups < 1) {
+text += ' Overweeg minstens 1 warming-up set om blessurerisico te verlagen.';
+}
+return { level, text };
+}
 function gymRenderAdvice() {
-const cards = [];
+const cards = []; const bal = gymMuscleBalanceReport(); cards.push({ ex: '⚖ Balans (laatste 14 dagen)', kind: bal.kind, text: bal.text, key: 'bal', why: bal.items.map((it) => it.label + ': ' + it.count + 'x' + (it.days === null ? ', nog niet getraind' : ', ' + it.days + ' dag(en) geleden')).join(' · ') });
 const sched = gymScheduleSuggestion();
-cards.push({ ex: 'Vandaag trainen', ...sched });
-gymGoals.filter((g) => g.kind === 'exercise').forEach((g) => cards.push({ ex: g.exercise, ...gymAdviceForGoal(g) }));
+cards.push({ ex: 'Vandaag trainen', ...sched, key: 'sched', why: sched.group ? ('Gebaseerd op je rustdagen-instelling (' + (gymProfile.restDays || 2) + ' dag(en)) en wanneer je elke spiergroep voor het laatst trainde.') : null });
+gymGoals.filter((g) => g.kind === 'exercise').forEach((g, gi) => { const sessions = gymSessionsFor(g.exercise); const why = sessions.length ? ('Doel: ' + g.repMin + '-' + g.repMax + ' reps' + (g.targetWeight ? (' bij ' + g.targetWeight + gymUnit()) : '') + '. Laatste sessie (' + sessions[0].date + '): ' + sessions[0].sets.map((s) => s.weight + gymUnit() + '×' + s.reps).join(', ') + '.') : null; cards.push({ ex: g.exercise, ...gymAdviceForGoal(g), key: 'goal:' + gi, why }); });
 $('gymAdviceList').innerHTML = cards.map((c) => {
-const cls = c.kind === 'warn' ? 'warn' : c.kind === 'neutral' ? 'neutral' : '';
-return `<div class="coach-card ${cls}"><div class="ex">${esc(c.ex)}</div><div class="msg">${esc(c.text)}</div></div>`;
+const cls = c.kind === 'warn' ? 'warn' : c.kind === 'neutral' ? 'neutral' : ''; const isOpen = gymAdviceOpen.has(c.key); const whyHtml = c.why ? (`<div class="coach-why-toggle" onclick="gymToggleAdvice('${c.key}','advice')">Waarom? <span class="mz-chevron">${isOpen ? '▾' : '▸'}</span></div>` + (isOpen ? `<div class="coach-why">${esc(c.why)}</div>` : '')) : '';
+return `<div class="coach-card ${cls}"><div class="ex">${esc(c.ex)}</div><div class="msg">${esc(c.text)}</div>${whyHtml}</div>`;
 }).join('');
 }
 
@@ -3283,11 +3364,11 @@ const tgt = gymPlanTargets[n] || {};
 const goal = tgt.goal || 'spiergroei';
 const warmups = tgt.warmups != null ? tgt.warmups : 2;
 const topsets = tgt.topsets != null ? tgt.topsets : 1;
-const dropset = !!tgt.dropset;
+const dropset = !!tgt.dropset; const vol = gymVolumeAdvice(goal, warmups, topsets, dropset); const volKey = 'vol:' + enc; const volOpen = gymAdviceOpen.has(volKey); const volHtml = `<div class="plan-vol-advice plan-vol-${vol.level}" onclick="gymToggleAdvice('${volKey}','plan')"><span class="plan-vol-dot"></span>${vol.level === 'low' ? 'Weinig volume' : vol.level === 'high' ? 'Veel volume' : 'Volume OK'} <span class="mz-chevron">${volOpen ? '▾' : '▸'}</span></div>${volOpen ? `<div class="plan-vol-detail">${esc(vol.text)}</div>` : ''}`;
 const enc = esc(n).replace(/'/g, "\\'");
 const upDisabled = idx === 0 ? ' disabled' : '';
 const downDisabled = idx === gymPlanExercises.length - 1 ? ' disabled' : '';
-return `<div class="plan-pill-wrap"><div class="plan-pill"><span class="plan-reorder"><button type="button" title="Naar boven" onclick="gymMovePlanExercise('${enc}',-1)"${upDisabled}>▲</button><button type="button" title="Naar beneden" onclick="gymMovePlanExercise('${enc}',1)"${downDisabled}>▼</button></span>${esc(n)}<button type="button" onclick="gymRemovePlanExercise('${enc}')">×</button></div><div class="plan-target-row"><label class="icon-lbl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></svg>Doel</label><select onchange="gymSetPlanTarget('${enc}','goal',this.value)"><option value="kracht"${goal === 'kracht' ? ' selected' : ''}>Kracht</option><option value="spiergroei"${goal === 'spiergroei' ? ' selected' : ''}>Spiergroei</option><option value="uithouding"${goal === 'uithouding' ? ' selected' : ''}>Uithouding</option></select><label>Warmups</label><input type="number" step="1" min="0" value="${warmups}" onchange="gymSetPlanTarget('${enc}','warmups',this.value)"><label>Topsets</label><input type="number" step="1" min="1" value="${topsets}" onchange="gymSetPlanTarget('${enc}','topsets',this.value)"><label><input type="checkbox" ${dropset ? 'checked' : ''} onchange="gymSetPlanTarget('${enc}','dropset',this.checked?1:0)">Dropset</label></div></div>`;
+return `<div class="plan-pill-wrap"><div class="plan-pill"><span class="plan-reorder"><button type="button" title="Naar boven" onclick="gymMovePlanExercise('${enc}',-1)"${upDisabled}>▲</button><button type="button" title="Naar beneden" onclick="gymMovePlanExercise('${enc}',1)"${downDisabled}>▼</button></span>${esc(n)}<button type="button" onclick="gymRemovePlanExercise('${enc}')">×</button></div><div class="plan-target-row"><label class="icon-lbl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></svg>Doel</label><select onchange="gymSetPlanTarget('${enc}','goal',this.value)"><option value="kracht"${goal === 'kracht' ? ' selected' : ''}>Kracht</option><option value="spiergroei"${goal === 'spiergroei' ? ' selected' : ''}>Spiergroei</option><option value="uithouding"${goal === 'uithouding' ? ' selected' : ''}>Uithouding</option></select><label>Warmups</label><input type="number" step="1" min="0" value="${warmups}" onchange="gymSetPlanTarget('${enc}','warmups',this.value)"><label>Topsets</label><input type="number" step="1" min="1" value="${topsets}" onchange="gymSetPlanTarget('${enc}','topsets',this.value)"><label><input type="checkbox" ${dropset ? 'checked' : ''} onchange="gymSetPlanTarget('${enc}','dropset',this.checked?1:0)">Dropset</label></div>${volHtml}</div>`;
 }).join('')
 : '<div class="plan-empty">Nog geen oefeningen toegevoegd.</div>';
 }
@@ -3444,13 +3525,13 @@ gymMzOpenRegion = gymMzOpenRegion === rowId ? null : rowId;
 gymRenderMzLegend(window.__gymLastMzScore || {});
 }
 function gymRenderMzLegend(score) {
-window.__gymLastMzScore = score;
+window.__gymLastMzScore = score; const bal = gymMuscleBalanceReport(); const balOpen = gymAdviceOpen.has('bal'); const balCls = bal.kind === 'warn' ? 'warn' : bal.kind === 'neutral' ? 'neutral' : ''; const balHtml = `<div class="mz-balance ${balCls}"><div class="mz-balance-head" onclick="gymToggleAdvice('bal','mz')">⚖ Balans (14 dagen) <span class="mz-chevron">${balOpen ? '▾' : '▸'}</span></div><div class="mz-balance-sum">${esc(bal.text)}</div>${balOpen ? `<div class="mz-balance-detail">${bal.items.map((it) => `<div class="mz-balance-item">${esc(it.label)}: ${it.count}x${it.days === null ? '' : (', ' + it.days + 'd geleden')}</div>`).join('')}</div>` : ''}</div>`;
 const groups = gymPlanGroups.length ? GYM_MUSCLE_MAP.filter((g) => gymPlanGroups.includes(g.key)) : GYM_MUSCLE_MAP;
 if (!gymPlanGroups.length) {
-$('gymMzLegend').innerHTML = '<div class="plan-empty">Kies hierboven welke spiergroepen je vandaag traint om per spier te zien wat je nog mist.</div>';
+$('gymMzLegend').innerHTML = balHtml + '<div class="plan-empty">Kies hierboven welke spiergroepen je vandaag traint om per spier te zien wat je nog mist.</div>';
 return;
 }
-$('gymMzLegend').innerHTML = groups.map((g) => {
+$('gymMzLegend').innerHTML = balHtml + groups.map((g) => {
 const rows = g.regions.map((r) => {
 const v = score[`${g.key}:${r.key}`] || 0;
 const level = gymCoverageLevel(v);
@@ -3462,10 +3543,10 @@ if (all.length) {
 const isOpen = gymMzOpenRegion === rowId;
 const list = all.map((s) => `<span class="mz-suggest-item" onclick="gymAddSuggested('${s.name.replace(/'/g, "\\'")}')">+ ${esc(s.name)}</span>`).join('');
 expandHtml = `<span class="mz-toggle ${isOpen ? 'open' : ''}" onclick="gymToggleMzRegion('${rowId}')" title="Andere oefeningen voor dit gebied"><span class="mz-toggle-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg></span>Andere oefeningen <span class="mz-chevron">${isOpen ? '▾' : '▸'}</span> (${all.length})</span>` +
-(isOpen ? `<div class="mz-suggest-list">${list}</div>` : '');
+(isOpen ? `<div class="mz-suggest-list"><div class="mz-suggest-why">${level === 'empty' ? (esc(r.label) + ' is deze sessie nog niet geraakt.') : (esc(r.label) + ' is deels gedekt — nog niet volledig.')}</div>${list}</div>` : '');
 }
 }
-return `<div class="mz-region"><span class="mz-dot mz-${level}"></span>${esc(r.label)}${expandHtml}</div>`;
+return `<div class="mz-region"><span class="mz-dot mz-${level}"></span>${esc(r.label)}<span class="mz-status">${level === 'full' ? 'Compleet' : level === 'partial' ? 'Deels' : 'Nog niet'}</span>${expandHtml}</div>`;
 }).join('');
 return `<div class="mz-group"><div class="mz-group-name">${esc(g.label)}</div>${rows}</div>`;
 }).join('');
