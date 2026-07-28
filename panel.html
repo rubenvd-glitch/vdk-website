@@ -2709,6 +2709,7 @@ function gymRefreshUnitLabels() {
 ['gymUnitLbl1', 'gymUnitLbl2', 'gymUnitLbl3', 'gymUnitLbl4'].forEach((id) => { if ($(id)) $(id).textContent = gymUnit(); });
 }
 function gymGuessMuscle(name) {
+if (!name) return 'Other';
 if (GYM_DEFAULT_EXERCISES[name]) return GYM_DEFAULT_EXERCISES[name];
 const n = name.toLowerCase();
 if (/squat|leg|deadlift|hip|lunge|calf/.test(n)) return 'Legs';
@@ -2781,7 +2782,7 @@ const trainedToday = groups.filter((g) => lastTrained[g] === today);
 if (trainedToday.length) {
 return { kind: 'ok', text: `Je hebt vandaag al ${trainedToday.map((g) => GYM_GROUP_LABEL[g]).join(' en ')} getraind. Mooi bezig — morgen is er weer een nieuwe groep aan de beurt.` };
 }
-const knownGroups = groups.filter((g) => lastTrained[g] || gymGoals.some((goal) => gymGuessMuscle(goal.exercise) === g));
+const knownGroups = groups.filter((g) => lastTrained[g] || gymGoals.filter((goal) => goal.kind === 'exercise').some((goal) => gymGuessMuscle(goal.exercise) === g));
 if (!knownGroups.length) {
 return { kind: 'neutral', text: 'Log een paar sets en stel een doel per oefening, dan kan de coach hier gaan adviseren wanneer en wat je traint.' };
 }
@@ -2795,7 +2796,7 @@ const top = withGap[0];
 if (top.days < restDays) {
 return { kind: 'neutral', text: `Elke spiergroep is recent getraind (minder dan ${restDays} dag(en) geleden). Overweeg een rustdag, of een lichte cardio-/mobility-sessie.` };
 }
-const groupGoals = gymGoals.filter((goal) => gymGuessMuscle(goal.exercise) === top.g);
+const groupGoals = gymGoals.filter((goal) => goal.kind === 'exercise' && gymGuessMuscle(goal.exercise) === top.g);
 const groupLabel = GYM_GROUP_LABEL[top.g];
 const daysTxt = top.days >= 999 ? 'nog niet eerder' : `${top.days} dag(en) geleden`;
 let text = `Vandaag is een goede dag voor ${groupLabel} — voor het laatst getraind ${daysTxt}.`;
