@@ -1111,8 +1111,8 @@ async function handleAssistantClear(req, res) {
 async function handleAssistantChat(req, res) {
   const s = await getSession(req, 'admin');
   if (!s) return json(res, 401, { error: 'Not logged in' });
-  const apiKey = (process.env.ANTHROPIC_API_KEY || '').trim();
-  if (!apiKey) return json(res, 503, { error: 'De assistent is nog niet ingesteld (ANTHROPIC_API_KEY ontbreekt in Render).' });
+  const apiKey = (process.env.GROQ_API_KEY || '').trim();
+  if (!apiKey) return json(res, 503, { error: 'De assistent is nog niet ingesteld (GROQ_API_KEY ontbreekt in Render \u2014 gratis te maken op console.groq.com).' });
   try {
     const body = await readBody(req);
     const message = String(body.message || '').trim().slice(0, 4000);
@@ -1126,25 +1126,25 @@ async function handleAssistantChat(req, res) {
     const context = await buildAssistantContext(s.email);
     const systemPrompt = buildAssistantSystemPrompt(page, lang, context);
 
-    const apiMessages = history.slice(-20).map((m) => ({ role: m.role, content: m.content }));
+    const apiMessages = [{ role: "system", content: systemPrompt }]
+      .concat(history.slice(-20).map((m) => ({ role: m.role, content: m.content })));
     apiMessages.push({ role: 'user', content: message });
 
-    const model = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-5-20250929';
-    const r = await fetch('https://api.anthropic.com/v1/messages', {
+    const model = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
+    const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
+        'Authorization': 'Bearer ' + apiKey,
       },
-      body: JSON.stringify({ model: model, max_tokens: 700, system: systemPrompt, messages: apiMessages }),
+      body: JSON.stringify({ model: model, max_tokens: 700, messages: apiMessages }),
     });
     const d = await r.json().catch(() => ({}));
     if (!r.ok) {
       console.error('assistant chat failed:', d && d.error);
       return json(res, 502, { error: 'De assistent kon niet antwoorden. Probeer het zo nog eens.' });
     }
-    const replyText = ((d.content || []).map((b) => (b.type === 'text' ? b.text : '')).join('').trim()) || '(geen antwoord)';
+    const replyText = (d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content ? d.choices[0].message.content.trim() : "") || '(geen antwoord)';
 
     const now2 = Date.now();
     history.push({ role: 'user', content: message, at: now2 });
