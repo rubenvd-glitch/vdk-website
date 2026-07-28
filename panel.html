@@ -518,6 +518,57 @@ header { padding: 10px 16px; }
 .mz-toggle-ic { display:inline-flex; width:14px; height:14px; margin:0 3px 0 6px; opacity:.8; vertical-align:-2px; flex-shrink:0; }
 .mz-toggle-ic svg { width:100%; height:100%; }
 .mz-chevron { margin-left:4px; opacity:.65; }
+/* --- Base Assistant (AI chat widget) --- */
+.assistant-fab {
+  position: fixed; right: 18px; bottom: 18px; z-index: 300;
+  width: 52px; height: 52px; border-radius: 50%; border: none; cursor: pointer;
+  background: #2ea36f; color: #0b0f14; display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 6px 18px rgba(0,0,0,.35); transition: transform .18s ease, box-shadow .18s ease;
+}
+.assistant-fab:hover { transform: scale(1.06); box-shadow: 0 8px 22px rgba(0,0,0,.45); }
+.assistant-fab svg { width: 24px; height: 24px; }
+.assistant-panel {
+  position: fixed; right: 18px; bottom: 84px; z-index: 300;
+  width: 360px; max-width: calc(100vw - 32px); height: 520px; max-height: calc(100vh - 120px);
+  background: #12161d; border: 1px solid #232a33; border-radius: 16px;
+  display: flex; flex-direction: column; overflow: hidden;
+  transform: translateY(12px) scale(.98); opacity: 0; pointer-events: none;
+  transition: transform .18s ease, opacity .18s ease;
+  box-shadow: 0 12px 36px rgba(0,0,0,.5);
+}
+.assistant-panel.open { transform: translateY(0) scale(1); opacity: 1; pointer-events: auto; }
+.assistant-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 14px; border-bottom: 1px solid #232a33; flex-shrink: 0;
+}
+.assistant-head h3 { margin: 0; font-size: 15px; color: #e6e9ed; }
+.assistant-head-actions { display: flex; gap: 4px; }
+.assistant-head button { background: none; border: none; color: #8b94a1; cursor: pointer; padding: 6px; border-radius: 8px; display: flex; }
+.assistant-head button:hover { background: #1c222b; color: #e6e9ed; }
+.assistant-head button svg { width: 18px; height: 18px; }
+.assistant-messages { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.assistant-msg { max-width: 88%; padding: 9px 12px; border-radius: 12px; font-size: 13.5px; line-height: 1.45; white-space: pre-wrap; word-wrap: break-word; }
+.assistant-msg.user { align-self: flex-end; background: #2ea36f; color: #0b0f14; border-bottom-right-radius: 4px; }
+.assistant-msg.assistant { align-self: flex-start; background: #1c222b; color: #e6e9ed; border-bottom-left-radius: 4px; }
+.assistant-msg.pending { opacity: .6; }
+.assistant-msg.error { background: #3a1418; color: #f28b8b; }
+.assistant-empty { color: #8b94a1; font-size: 13px; text-align: center; margin: auto; padding: 0 12px; }
+.assistant-input-row { display: flex; gap: 8px; padding: 10px; border-top: 1px solid #232a33; flex-shrink: 0; }
+.assistant-input-row textarea {
+  flex: 1; resize: none; background: #0d1117; border: 1px solid #232a33; border-radius: 10px;
+  color: #e6e9ed; padding: 9px 11px; font-size: 13.5px; font-family: inherit; max-height: 90px;
+}
+.assistant-input-row textarea:focus { outline: none; border-color: #2ea36f; }
+.assistant-send-btn {
+  background: #2ea36f; border: none; border-radius: 10px; width: 38px; height: 38px; flex-shrink: 0;
+  cursor: pointer; color: #0b0f14; display: flex; align-items: center; justify-content: center;
+}
+.assistant-send-btn:disabled { opacity: .5; cursor: default; }
+.assistant-send-btn svg { width: 18px; height: 18px; }
+@media (max-width: 640px) {
+  .assistant-panel { right: 10px; left: 10px; width: auto; bottom: 78px; height: 70vh; max-height: 70vh; }
+  .assistant-fab { right: 14px; bottom: 14px; }
+}
 </style>
 </head>
 <body>
@@ -1149,6 +1200,24 @@ header { padding: 10px 16px; }
 </div>
 
 
+
+<button class="assistant-fab" id="assistantFab" title="Base Assistant" onclick="assistantToggle()">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l1.8 5.8L20 9.5l-5.8 1.7L12 17l-1.7-5.8L4 9.5l6.2-1.7L12 2z"/><path d="M19 15l.9 2.6L22 18.5l-2.1.9L19 22l-.9-2.6L16 18.5l2.1-.9L19 15z"/></svg>
+</button>
+<div class="assistant-panel" id="assistantPanel">
+<div class="assistant-head">
+<h3>Base Assistant</h3>
+<div class="assistant-head-actions">
+<button id="assistantClearBtn" title="Nieuw gesprek" onclick="assistantClear()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg></button>
+<button id="assistantCloseBtn" title="Sluiten" onclick="assistantToggle()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+</div>
+</div>
+<div class="assistant-messages" id="assistantMessages"><div class="assistant-empty" id="assistantEmptyHint">Vraag me iets over je Gym, herinneringen of doelen.</div></div>
+<div class="assistant-input-row">
+<textarea id="assistantInput" rows="1" placeholder="Typ een vraag..." onkeydown="assistantKeydown(event)"></textarea>
+<button class="assistant-send-btn" id="assistantSendBtn" onclick="assistantSend()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg></button>
+</div>
+</div>
 <script>
 
 const I18N = {
@@ -3702,6 +3771,100 @@ try { gymBodycomp = await api('/api/gym/bodycomp'); } catch (e) { /* opslag nog 
 try { gymGoals = await api('/api/gym/goals'); } catch (e) { /* opslag nog niet gekoppeld */ }
 try { gymSessionTemplates = await api('/api/gym/sessions'); } catch (e) { /* opslag nog niet gekoppeld */ }
 gymRenderAll();
+}
+
+// --- Base Assistant (AI chat widget) ---
+let assistantHistory = [];
+let assistantHistoryLoaded = false;
+let assistantSending = false;
+
+function assistantCurrentPage() {
+  let page = 'home';
+  for (const k in views) { if ($(views[k]).style.display === "block") { page = k; break; } }
+  if (page === 'gym') {
+    const sub = document.querySelector('.gym-sub.active');
+    if (sub && sub.id) page = "gym:" + sub.id.replace("gtab-", "");
+  }
+  return page;
+}
+
+function assistantEscape(str) {
+  const d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML;
+}
+
+function assistantRenderMessages() {
+  const el = $('assistantMessages');
+  if (!assistantHistory.length) {
+    el.innerHTML = '<div class="assistant-empty" id="assistantEmptyHint">Vraag me iets over je Gym, herinneringen of doelen.</div>';
+    return;
+  }
+  el.innerHTML = assistantHistory.map((m) => {
+    const cls = m.role === 'user' ? 'user' : (m.error ? 'assistant error' : 'assistant');
+    const pending = m.pending ? ' pending' : '';
+    return '<div class="assistant-msg ' + cls + pending + '">' + assistantEscape(m.content) + '</div>';
+  }).join('');
+  el.scrollTop = el.scrollHeight;
+}
+
+async function assistantLoadHistory() {
+  if (assistantHistoryLoaded) return;
+  assistantHistoryLoaded = true;
+  try {
+    const d = await api('/api/assistant/history');
+    assistantHistory = (d.history || []).map((m) => ({ role: m.role, content: m.content }));
+    assistantRenderMessages();
+  } catch (e) { /* stil laten, lege staat blijft */ }
+}
+
+function assistantToggle() {
+  const panel = $('assistantPanel');
+  const opening = !panel.classList.contains('open');
+  panel.classList.toggle('open');
+  if (opening) {
+    assistantLoadHistory();
+    setTimeout(() => $('assistantInput').focus(), 150);
+  }
+}
+
+function assistantKeydown(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); assistantSend(); }
+}
+
+async function assistantClear() {
+  if (!confirm('Dit gesprek wissen?')) return;
+  try { await api('/api/assistant/clear', { method: 'POST' }); } catch (e) { /* negeren */ }
+  assistantHistory = [];
+  assistantRenderMessages();
+}
+
+async function assistantSend() {
+  if (assistantSending) return;
+  const input = $('assistantInput');
+  const message = input.value.trim();
+  if (!message) return;
+  input.value = '';
+  assistantSending = true;
+  $('assistantSendBtn').disabled = true;
+  assistantHistory.push({ role: 'user', content: message });
+  assistantHistory.push({ role: 'assistant', content: '...', pending: true });
+  assistantRenderMessages();
+  try {
+    const d = await api('/api/assistant/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: message, page: assistantCurrentPage(), lang: LANG }),
+    });
+    assistantHistory.pop();
+    assistantHistory.push({ role: 'assistant', content: d.reply });
+  } catch (e) {
+    assistantHistory.pop();
+    assistantHistory.push({ role: 'assistant', content: e.message || 'Er ging iets mis.', error: true });
+  }
+  assistantSending = false;
+  $('assistantSendBtn').disabled = false;
+  assistantRenderMessages();
 }
 
 applyLang();
