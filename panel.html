@@ -11,6 +11,16 @@ from { opacity: 0; transform: translateY(8px); }
 to { opacity: 1; transform: none; }
 }
 .view-anim { animation: fadeUp .28s ease both; }
+@keyframes bootPulse { 0%, 100% { opacity: .55; transform: scale(1); } 50% { opacity: 1; transform: scale(1.04); } }
+@keyframes bootFadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.boot-screen { position: fixed; inset: 0; z-index: 9999; display: flex; align-items: center; justify-content: center; flex-direction: column; background: #0e1116; transition: opacity .5s ease, visibility .5s ease; }
+.boot-screen.hide { opacity: 0; visibility: hidden; pointer-events: none; }
+.boot-inner { display: flex; flex-direction: column; align-items: center; gap: 18px; animation: bootFadeIn .5s ease both; }
+.boot-logo { font-size: 15px; font-weight: 700; letter-spacing: .28em; text-transform: uppercase; color: #e6e9ed; animation: bootPulse 2.2s ease-in-out infinite; }
+.boot-greet { font-size: 15px; color: #8b96a5; min-height: 20px; text-align: center; }
+.boot-bar { width: 180px; height: 3px; border-radius: 3px; background: #1c222b; overflow: hidden; }
+.boot-bar-fill { height: 100%; width: 0%; border-radius: 3px; background: linear-gradient(90deg, #7fb4f0, #2ea36f); transition: width .35s ease; }
+@media (prefers-reduced-motion: reduce) { .boot-logo { animation: none; } .boot-screen, .boot-bar-fill { transition: opacity .01ms linear, width .01ms linear; } }
 button { transition: background .15s ease, border-color .15s ease, color .15s ease, opacity .15s ease, transform .12s ease; }
 button:active { transform: scale(.97); }
 .rem, .sug-card, .idea-card, .set-card, .name-card { transition: border-color .15s ease, transform .15s ease; }
@@ -593,6 +603,7 @@ header { padding: 10px 16px; }
 </style>
 </head>
 <body>
+<div id="bootScreen" class="boot-screen"><div class="boot-inner"><div class="boot-logo">VDK Base</div><div id="bootGreet" class="boot-greet">Base is aan het opstarten…</div><div class="boot-bar"><div id="bootBarFill" class="boot-bar-fill"></div></div></div></div>
 <header>
 <button id="menuBtn" class="icon-btn" title="Menu">
 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:20px;height:20px;"><path d="M3 6h18"/><path d="M3 12h18"/><path d="M3 18h18"/></svg>
@@ -1313,7 +1324,7 @@ en: {
 'cal.pushYes':'Yes, push','cal.pushSkip':'No thanks','cal.pushDone':'Pushed to your calendar.','cal.pushErr':'Could not push to the calendar.',
 'lock.on':'<strong>Locked:</strong> only your email can sign in','lock.off':'<strong>Open:</strong> others can create an account with their email',
 'lockCrm.on':'<strong>CRM locked:</strong> only your email can access the CRM','lockCrm.off':'<strong>CRM open:</strong> others can log in to the CRM with their email',
-'greet.night':'Good night','greet.morning':'Good morning','greet.afternoon':'Good afternoon','greet.evening':'Good evening',
+'greet.night':'Good night','greet.morning':'Good morning','greet.afternoon':'Good afternoon','greet.evening':'Good evening','boot.starting':'is starting up…',
 'due.today':'Due today','due.tomorrow':'Due tomorrow','due.inDays':'Due on {day} in {n} days',
 'due.overdueDay':'1 day overdue','due.overdueDays':'{n} days overdue',
 'locale':'en-GB'
@@ -1389,7 +1400,7 @@ nl: {
 'cal.pushYes':'Ja, push','cal.pushSkip':'Nee, bedankt','cal.pushDone':'Gepusht naar je agenda.','cal.pushErr':'Kon niet pushen naar de agenda.',
 'lock.on':'<strong>Vergrendeld:</strong> alleen jouw e-mail kan inloggen','lock.off':'<strong>Open:</strong> anderen kunnen een account aanmaken met hun e-mail',
 'lockCrm.on':'<strong>CRM vergrendeld:</strong> alleen jouw e-mail heeft toegang tot het CRM','lockCrm.off':'<strong>CRM open:</strong> anderen kunnen met hun e-mail inloggen op het CRM',
-'greet.night':'Goedenacht','greet.morning':'Goedemorgen','greet.afternoon':'Goedemiddag','greet.evening':'Goedenavond',
+'greet.night':'Goedenacht','greet.morning':'Goedemorgen','greet.afternoon':'Goedemiddag','greet.evening':'Goedenavond','boot.starting':'is aan het opstarten…',
 'due.today':'Vandaag','due.tomorrow':'Morgen','due.inDays':'Op {day} over {n} dagen',
 'due.overdueDay':'1 dag te laat','due.overdueDays':'{n} dagen te laat',
 'locale':'nl-NL'
@@ -2228,6 +2239,28 @@ if (!r.ok) throw new Error(d.error || 'Er ging iets mis');
 return d;
 }
 
+let bootTotal = 6, bootDone = 0, bootHidden = false;
+function bootGreet() {
+const h = new Date().getHours();
+const word = h < 6 ? t('greet.night') : h < 12 ? t('greet.morning') : h < 18 ? t('greet.afternoon') : t('greet.evening');
+const el = $('bootGreet');
+if (el) el.textContent = word + ', Base ' + t('boot.starting');
+}
+function bootTick() {
+bootDone++;
+const fill = $('bootBarFill');
+if (fill) fill.style.width = Math.min(100, Math.round(bootDone / bootTotal * 100)) + '%';
+if (bootDone >= bootTotal) bootHide();
+}
+function bootHide() {
+if (bootHidden) return;
+bootHidden = true;
+const el = $('bootScreen');
+if (!el) return;
+el.classList.add('hide');
+setTimeout(() => { el.style.display = 'none'; }, 550);
+}
+
 async function load() {
 try { me = await api('/api/me'); } catch { location.href = '/base'; return; }
 greet();
@@ -2237,26 +2270,32 @@ profileLoaded = true;
 LANG = profile.lang || 'en';
 applyLang();
 greet();
+bootGreet();
 fillSettings();
 render(); renderSug(); renderIdeas();
 if (!profile.name) $('nameCard').style.display = 'flex';
-} catch (e) { /* opslag nog niet gekoppeld */ }
+bootTick();
+} catch (e) { /* opslag nog niet gekoppeld */ bootTick(); }
 try {
 reminders = await api('/api/reminders');
 render();
+bootTick();
 } catch (e) {
 $('list').innerHTML = `<div class="empty">${esc(e.message)}</div>`;
+bootTick();
 }
 try {
 suggestions = await api('/api/suggestions');
 renderSug();
-} catch (e) { /* opslag nog niet gekoppeld */ }
+bootTick();
+} catch (e) { /* opslag nog niet gekoppeld */ bootTick(); }
 try {
 ideas = await api('/api/ideas');
 renderIdeas();
-} catch (e) { /* opslag nog niet gekoppeld */ }
-loadCalStatus();
-gymLoad();
+bootTick();
+} catch (e) { /* opslag nog niet gekoppeld */ bootTick(); }
+loadCalStatus().then(bootTick, bootTick);
+gymLoad().then(bootTick, bootTick);
 if (me.isAdmin) {
 $('logMenuBtn').style.display = 'block';
 loadTg();
@@ -3975,6 +4014,8 @@ async function assistantSend() {
 }
 
 applyLang();
+bootGreet();
+setTimeout(bootHide, 6000);
 load();
 if (location.hash.includes('settings')) showView('settings');
 </script>
