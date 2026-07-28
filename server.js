@@ -1025,6 +1025,141 @@ function gymLogKey(email) { return `gymlog:${email}`; }
 function gymBcKey(email) { return `gymbc:${email}`; }
 function gymGoalKey(email) { return `gymgoal:${email}`; }
 
+function assistantHistKey(email) { return 'asst:' + email; }
+
+async function buildAssistantContext(email) {
+  const [reminders, sugs, ideas, gymGoals, gymLog, gymPrefs] = await Promise.all([
+    kvGetJson('rem:' + email).catch(() => null),
+    kvGetJson('sug:' + email).catch(() => null),
+    kvGetJson('idea:' + email).catch(() => null),
+    kvGetJson(gymGoalKey(email)).catch(() => null),
+    kvGetJson(gymLogKey(email)).catch(() => null),
+    kvGetJson('gympref:' + email).catch(() => null),
+  ]);
+  const now = Date.now();
+  const todayISO = new Date(now).toISOString().slice(0, 10);
+  const weekAheadISO = new Date(now + 7 * 86400000).toISOString().slice(0, 10);
+  const twoWeeksAgoISO = new Date(now - 14 * 86400000).toISOString().slice(0, 10);
+  const upcomingReminders = (reminders || [])
+    .filter((r) => !r.done)
+    .filter((r) => !r.due || r.due <= weekAheadISO)
+    .slice(0, 30)
+    .map((r) => ({ title: r.title, due: r.due || null, time: r.time || null, prio: r.prio }));
+  const dueSuggestions = (sugs || [])
+    .filter((x) => x.nextDue && x.nextDue <= weekAheadISO)
+    .slice(0, 15)
+    .map((x) => ({ text: x.text, nextDue: x.nextDue }));
+  const openIdeas = (ideas || [])
+    .filter((x) => !x.archived)
+    .slice(0, 20)
+    .map((x) => ({ title: x.title, nextReview: x.nextReview }));
+  const openGoals = (gymGoals || [])
+    .filter((g) => !g.done)
+    .map((g) => (g.kind === 'exercise'
+      ? { type: "exercise", exercise: g.exercise, repMin: g.repMin, repMax: g.repMax, targetWeight: g.targetWeight }
+      : { type: "general", title: g.title, category: g.category, targetValue: g.targetValue, targetUnit: g.targetUnit }));
+  const recentSets = (gymLog || [])
+    .filter((x) => x.date >= twoWeeksAgoISO)
+    .slice(-150)
+    .map((x) => ({ exercise: x.exercise, date: x.date, weight: x.weight, reps: x.reps, muscle: x.muscle, restSeconds: x.restSeconds || null }));
+  return {
+    today: todayISO,
+    upcomingReminders: upcomingReminders,
+    dueSuggestions: dueSuggestions,
+    openIdeas: openIdeas,
+    gymGoals: openGoals,
+    gymRecentSets: recentSets,
+    gymPrefs: gymPrefs || {},
+  };
+}
+
+function buildAssistantSystemPrompt(page, lang, ctx) {
+  const langName = lang === 'nl' ? 'Dutch' : 'English';
+  return [
+    "You are \"Base Assistant\", a private personal-assistant chat embedded inside VDK Base, a personal admin app.",
+    "You can see ONLY this one user's own data below (reminders, suggestions, ideas, Gym goals/logs) \u2014 never claim to know anything else, and never invent data that isn't in this context.",
+    'Today is ' + ctx.today + ' (Europe/Amsterdam). The user is currently looking at the "' + (page || 'home') + '" section of the app.',
+    'Answer in ' + langName + ', concisely (a few sentences, or a short list only if genuinely useful), in a warm but efficient tone \u2014 like a real assistant, not a generic chatbot.',
+    "You currently CANNOT take actions or change any data \u2014 you can only read and answer questions. If asked to add/change/delete something, say that's not possible yet and is planned for later with a confirmation step first.",
+    'Context (JSON):',
+    JSON.stringify(ctx),
+  ].join('\n');
+}
+
+async function handleAssistantHistory(req, res) {
+  const s = await getSession(req, 'admin');
+  if (!s) return json(res, 401, { error: 'Not logged in' });
+  try {
+    const hist = (await kvGetJson(assistantHistKey(s.email))) || [];
+    return json(res, 200, { history: hist.slice(-40) });
+  } catch (e) {
+    return json(res, 500, { error: 'Kon het gesprek niet laden' });
+  }
+}
+
+async function handleAssistantClear(req, res) {
+  const s = await getSession(req, 'admin');
+  if (!s) return json(res, 401, { error: 'Not logged in' });
+  try {
+    await kvDel(assistantHistKey(s.email));
+    return json(res, 200, { ok: true });
+  } catch (e) {
+    return json(res, 500, { error: 'Kon het gesprek niet wissen' });
+  }
+}
+
+async function handleAssistantChat(req, res) {
+  const s = await getSession(req, 'admin');
+  if (!s) return json(res, 401, { error: 'Not logged in' });
+  const apiKey = (process.env.ANTHROPIC_API_KEY || '').trim();
+  if (!apiKey) return json(res, 503, { error: 'De assistent is nog niet ingesteld (ANTHROPIC_API_KEY ontbreekt in Render).' });
+  try {
+    const body = await readBody(req);
+    const message = String(body.message || '').trim().slice(0, 4000);
+    if (!message) return json(res, 400, { error: 'Typ eerst een vraag.' });
+    const page = String(body.page || '').slice(0, 40);
+    const lang = body.lang === 'nl' ? 'nl' : 'en';
+
+    const histKey = assistantHistKey(s.email);
+    let history = (await kvGetJson(histKey)) || [];
+
+    const context = await buildAssistantContext(s.email);
+    const systemPrompt = buildAssistantSystemPrompt(page, lang, context);
+
+    const apiMessages = history.slice(-20).map((m) => ({ role: m.role, content: m.content }));
+    apiMessages.push({ role: 'user', content: message });
+
+    const model = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-5-20250929';
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({ model: model, max_tokens: 700, system: systemPrompt, messages: apiMessages }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      console.error('assistant chat failed:', d && d.error);
+      return json(res, 502, { error: 'De assistent kon niet antwoorden. Probeer het zo nog eens.' });
+    }
+    const replyText = ((d.content || []).map((b) => (b.type === 'text' ? b.text : '')).join('').trim()) || '(geen antwoord)';
+
+    const now2 = Date.now();
+    history.push({ role: 'user', content: message, at: now2 });
+    history.push({ role: 'assistant', content: replyText, at: now2 });
+    history = history.slice(-60);
+    await kvSetJson(histKey, history);
+    bump('asst');
+
+    return json(res, 200, { reply: replyText });
+  } catch (e) {
+    console.error('assistant chat error:', e.message);
+    return json(res, 500, { error: 'Er ging iets mis.' });
+  }
+}
+
 async function handleGymExercises(req, res) {
 const s = await getSession(req, 'admin');
 if (!s) return json(res, 401, { error: 'Not logged in' });
@@ -1363,6 +1498,11 @@ if (p === '/api/gym/log') return handleGymLog(req, res);
 if (p === '/api/gym/bodycomp') return handleGymBodycomp(req, res);
 if (p === '/api/gym/goals') return handleGymGoals(req, res);
 if (p === '/api/gym/sessions') return handleGymSessions(req, res);
+
+// --- Base Assistant API (AI chat widget, same 'admin' session as Gym) ---
+if (p === '/api/assistant/history') return handleAssistantHistory(req, res);
+if (p === '/api/assistant/chat') return handleAssistantChat(req, res);
+if (p === '/api/assistant/clear') return handleAssistantClear(req, res);
 
 if (p === '/api/crm/companies') {
 const s = await getSession(req, 'crm');
