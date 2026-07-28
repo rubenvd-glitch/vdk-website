@@ -1077,6 +1077,7 @@ id: crypto.randomUUID(),
 exercise, date, weight, reps,
 muscle: MUSCLE_GROUPS.includes(body.muscle) ? body.muscle : 'Other',
 rpe: body.rpe !== undefined && body.rpe !== '' ? Math.min(10, Math.max(1, Number(body.rpe) || 0)) : null,
+restSeconds: body.restSeconds !== undefined && body.restSeconds !== null && body.restSeconds !== '' ? Math.max(0, Math.min(3600, Math.round(Number(body.restSeconds) || 0))) : null,
 note: String(body.note || '').trim().slice(0, 500),
 createdAt: Date.now(),
 });
@@ -1090,6 +1091,7 @@ if (body.weight !== undefined) it.weight = Number(body.weight) || 0;
 if (body.reps !== undefined) it.reps = Math.max(0, Math.min(200, Number(body.reps) || 0));
 if (body.muscle !== undefined) it.muscle = MUSCLE_GROUPS.includes(body.muscle) ? body.muscle : (it.muscle || 'Other');
 if (body.rpe !== undefined) it.rpe = body.rpe === '' ? null : Math.min(10, Math.max(1, Number(body.rpe) || 0));
+if (body.restSeconds !== undefined) it.restSeconds = (body.restSeconds === '' || body.restSeconds === null) ? null : Math.max(0, Math.min(3600, Math.round(Number(body.restSeconds) || 0)));
 if (body.note !== undefined) it.note = String(body.note).trim().slice(0, 500);
 } else if (body.action === 'delete') {
 list = list.filter((x) => x.id !== body.id);
