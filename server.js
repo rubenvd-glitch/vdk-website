@@ -1044,15 +1044,15 @@ async function buildAssistantContext(email) {
     .filter((r) => !r.done)
     .filter((r) => !r.due || r.due <= weekAheadISO)
     .slice(0, 30)
-    .map((r) => ({ title: r.title, due: r.due || null, time: r.time || null, prio: r.prio }));
+    .map((r) => ({ id: r.id, title: r.title, due: r.due || null, time: r.time || null, prio: r.prio }));
   const dueSuggestions = (sugs || [])
     .filter((x) => x.nextDue && x.nextDue <= weekAheadISO)
     .slice(0, 15)
-    .map((x) => ({ text: x.text, nextDue: x.nextDue }));
+    .map((x) => ({ id: x.id, text: x.text, nextDue: x.nextDue }));
   const openIdeas = (ideas || [])
     .filter((x) => !x.archived)
     .slice(0, 20)
-    .map((x) => ({ title: x.title, nextReview: x.nextReview }));
+    .map((x) => ({ id: x.id, title: x.title, nextReview: x.nextReview }));
   const openGoals = (gymGoals || [])
     .filter((g) => !g.done)
     .map((g) => (g.kind === 'exercise'
@@ -1073,14 +1073,105 @@ async function buildAssistantContext(email) {
   };
 }
 
+const ASSISTANT_ACTION_TYPES = ['reminder_create', 'reminder_done', 'gym_log', 'idea_action', 'suggestion_action'];
+
+function validateAssistantAction(action, ctx) {
+  if (!action || typeof action !== 'object') return null;
+  const type = action.type;
+  if (!ASSISTANT_ACTION_TYPES.includes(type)) return null;
+  const p = (action.params && typeof action.params === 'object') ? action.params : {};
+  if (type === 'reminder_create') {
+    const title = String(p.title || '').trim().slice(0, 200);
+    if (!title) return null;
+    return { type, params: {
+      title,
+      due: /^\d{4}-\d{2}-\d{2}$/.test(String(p.due || '')) ? String(p.due) : null,
+      time: /^\d{2}:\d{2}$/.test(String(p.time || '')) ? String(p.time) : null,
+      prio: Math.min(4, Math.max(1, Number(p.prio) || 4)),
+    } };
+  }
+  if (type === 'reminder_done') {
+    const id = String(p.id || '');
+    if (!id || !(ctx.upcomingReminders || []).some((r) => r.id === id)) return null;
+    return { type, params: { id } };
+  }
+  if (type === 'gym_log') {
+    const exercise = String(p.exercise || '').trim().slice(0, 100);
+    const reps = Math.max(0, Math.min(200, Number(p.reps) || 0));
+    if (!exercise || !reps) return null;
+    return { type, params: {
+      exercise,
+      reps,
+      weight: Number(p.weight) || 0,
+      date: /^\d{4}-\d{2}-\d{2}$/.test(String(p.date || '')) ? String(p.date) : null,
+    } };
+  }
+  if (type === 'idea_action') {
+    const id = String(p.id || '');
+    const act = ['keep', 'archive'].includes(p.action) ? p.action : null;
+    if (!id || !act || !(ctx.openIdeas || []).some((x) => x.id === id)) return null;
+    return { type, params: { id, action: act } };
+  }
+  if (type === 'suggestion_action') {
+    const id = String(p.id || '');
+    const act = ['done', 'skip', 'snooze'].includes(p.action) ? p.action : null;
+    if (!id || !act || !(ctx.dueSuggestions || []).some((x) => x.id === id)) return null;
+    return { type, params: { id, action: act, days: Math.min(30, Math.max(1, Number(p.days) || 3)) } };
+  }
+  return null;
+}
+
+function assistantConfirmText(lang, action, confirmed) {
+  const nl = lang === 'nl';
+  if (!confirmed) return nl ? 'Oké, niet aangemaakt.' : 'Okay, not created.';
+  const p = action.params;
+  if (action.type === 'reminder_create') {
+    return nl
+      ? 'Gedaan. Staat in je herinneringen' + (p.due ? ' voor ' + p.due : '') + '.'
+      : 'Done. It’s in your reminders' + (p.due ? ' for ' + p.due : '') + '.';
+  }
+  if (action.type === 'reminder_done') {
+    return nl ? 'Gedaan, afgevinkt.' : 'Done, marked complete.';
+  }
+  if (action.type === 'gym_log') {
+    return nl
+      ? 'Gelogd: ' + p.exercise + ', ' + p.reps + ' reps' + (p.weight ? ' @ ' + p.weight + 'kg' : '') + '.'
+      : 'Logged: ' + p.exercise + ', ' + p.reps + ' reps' + (p.weight ? ' @ ' + p.weight + 'kg' : '') + '.';
+  }
+  if (action.type === 'idea_action') {
+    if (p.action === 'archive') return nl ? 'Losgelaten.' : 'Let go.';
+    return nl ? 'Uitgesteld.' : 'Postponed.';
+  }
+  if (action.type === 'suggestion_action') {
+    if (p.action === 'done') return nl ? 'Afgerond.' : 'Done.';
+    if (p.action === 'skip') return nl ? 'Overgeslagen.' : 'Skipped.';
+    return nl ? 'Uitgesteld.' : 'Snoozed.';
+  }
+  return nl ? 'Gedaan.' : 'Done.';
+}
+
 function buildAssistantSystemPrompt(page, lang, ctx) {
   const langName = lang === 'nl' ? 'Dutch' : 'English';
   return [
-    "You are \"Base\", a private personal-assistant chat (your name IS \"Base\") embedded inside VDK Base, a personal admin app.",
-    "You can see ONLY this one user's own data below (reminders, suggestions, ideas, Gym goals/logs) \u2014 never claim to know anything else, and never invent data that isn't in this context.",
+    "You are \"Base\" (your name IS \"Base\"), a private personal assistant embedded inside VDK Base, a personal admin app for one user.",
+    "PERSONA: calm, short, to the point. Never use enthusiastic filler, exclamation marks, or a bulleted list when one sentence will do. You are allowed a dry, restrained sense of humor — but never at the cost of clarity; you are helpful, not an entertainer. You are not formally submissive (no \"Sir\", no over-apologizing) — you are direct and confident: you state things and act, you don't hedge or doubt out loud. You are proactive within limits: if the data already shows something worth flagging (a goal behind schedule, an idea untouched for weeks), you may mention it unprompted — but you never push, nag, or repeat a nudge the user didn't ask for. This character must come through naturally in BOTH Dutch and English — do not write one fixed sentence and translate it; write each reply directly in the target language, in the same tone.",
+    "Calibration examples (match this tone, don't reuse these exact words — write fresh replies for the actual conversation): " +
+      "Simple question — Q: \"Wat staat er deze week nog open?\" A: \"Drie dingen: de deadline donderdag, je gym sessie die je nog niet hebt gepland, en het nieuwsbrief-idee dat al vijf weken ligt te wachten.\" (EN equivalent tone: \"Three things: Thursday's deadline, the gym session you haven't scheduled yet, and the newsletter idea that's been sitting for five weeks.\") " +
+      "Unprompted but restrained: \"Je gym doel loopt drie dagen achter op schema. Wil je dat ik een sessie inplan, of laat je het lopen?\" " +
+      "Dry humor, never at the cost of clarity — Q: \"Ik heb weer drie dagen niet getraind\" A: \"Dat is dan drie dagen op rij dat 'morgen' de dag is. Sessie inplannen, of hou je het bij goede voornemens?\" " +
+      "Out of scope, no over-apologizing — Q: \"Verwijder die herinnering\" A: \"Verwijderen kan ik nog niet, dat komt in een latere ronde. Wil je dat ik 'm afvink in plaats van weglaten?\"",
+    "You can see ONLY this one user's own data below (reminders, suggestions, ideas, Gym goals/logs) — never claim to know anything else, and never invent data that isn't in this context.",
     'Today is ' + ctx.today + ' (Europe/Amsterdam). The user is currently looking at the "' + (page || 'home') + '" section of the app.',
-    'Answer in ' + langName + ', concisely (a few sentences, or a short list only if genuinely useful), in a warm but efficient tone \u2014 like a real assistant, not a generic chatbot.',
-    "You currently CANNOT take actions or change any data \u2014 you can only read and answer questions. If asked to add/change/delete something, say that's not possible yet and is planned for later with a confirmation step first.",
+    'Reply in ' + langName + '.',
+    "ACTIONS: you can now PROPOSE (never silently execute) a small set of actions. Reply with STRICT JSON only, no text outside it, shaped exactly as {\"reply\": string, \"action\": null or {\"type\": string, \"params\": object}}.",
+    "Allowed action types, EXACTLY these 5, never invent others: " +
+      "reminder_create {title, due: \"YYYY-MM-DD\"|null, time: \"HH:MM\"|null, prio: 1-4 (1=highest, default 4)}; " +
+      "reminder_done {id} (id must be one of upcomingReminders[].id below); " +
+      "gym_log {exercise, reps (number, required), weight (number, default 0), date: \"YYYY-MM-DD\"|null (default today)}; " +
+      "idea_action {id, action: \"keep\"|\"archive\"} (id must be one of openIdeas[].id; \"keep\" = postpone/Uitstellen, \"archive\" = let go/Loslaten; for \"Uitwerken\"/work-it-out, propose a reminder_create instead — ideas can't be converted directly yet); " +
+      "suggestion_action {id, action: \"done\"|\"skip\"|\"snooze\", days: number (only for snooze, default 3)} (id must be one of dueSuggestions[].id).",
+    "Only set \"action\" when the user asked for a concrete change AND you have enough detail to propose it (e.g. a title for a reminder). Otherwise set \"action\": null and just answer, or ask one short clarifying question. You NEVER execute anything yourself — the action is only a proposal; the user confirms or cancels it in the interface. Never treat conversational agreement (\"ja\", \"doe maar\", \"yes\") as if it already executed something — only an explicit UI confirmation does that; if the user agrees to a proposal you already made, just acknowledge briefly and set \"action\": null again (the same proposal stays visible for them to confirm).",
+    "Anything outside this action set (deleting, CRM, calendar, editing existing gym logs, etc.) is out of scope for now — say so briefly without over-apologizing, and suggest the closest thing you CAN do if there is one (see the calibration example above).",
     'Context (JSON):',
     JSON.stringify(ctx),
   ].join('\n');
@@ -1112,7 +1203,7 @@ async function handleAssistantChat(req, res) {
   const s = await getSession(req, 'admin');
   if (!s) return json(res, 401, { error: 'Not logged in' });
   const apiKey = (process.env.GROQ_API_KEY || '').trim();
-  if (!apiKey) return json(res, 503, { error: 'De assistent is nog niet ingesteld (GROQ_API_KEY ontbreekt in Render \u2014 gratis te maken op console.groq.com).' });
+  if (!apiKey) return json(res, 503, { error: 'De assistent is nog niet ingesteld (GROQ_API_KEY ontbreekt in Render — gratis te maken op console.groq.com).' });
   try {
     const body = await readBody(req);
     const message = String(body.message || '').trim().slice(0, 4000);
@@ -1137,26 +1228,75 @@ async function handleAssistantChat(req, res) {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer ' + apiKey,
       },
-      body: JSON.stringify({ model: model, max_tokens: 700, messages: apiMessages }),
+      body: JSON.stringify({ model: model, max_tokens: 700, response_format: { type: 'json_object' }, messages: apiMessages }),
     });
     const d = await r.json().catch(() => ({}));
     if (!r.ok) {
       console.error('assistant chat failed:', d && d.error);
       return json(res, 502, { error: 'De assistent kon niet antwoorden. Probeer het zo nog eens.' });
     }
-    const replyText = (d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content ? d.choices[0].message.content.trim() : "") || '(geen antwoord)';
+    const rawContent = (d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content) || '';
+    let replyText = '';
+    let action = null;
+    let parsed = null;
+    try { parsed = JSON.parse(rawContent); } catch (e) { parsed = null; }
+    if (parsed && typeof parsed === 'object' && typeof parsed.reply === 'string') {
+      replyText = parsed.reply.trim() || '(geen antwoord)';
+      action = validateAssistantAction(parsed.action, context);
+    } else {
+      replyText = (rawContent && String(rawContent).trim()) || '(geen antwoord)';
+    }
 
     const now2 = Date.now();
     history.push({ role: 'user', content: message, at: now2 });
-    history.push({ role: 'assistant', content: replyText, at: now2 });
+    history.push({ role: 'assistant', content: replyText, at: now2, action: action });
     history = history.slice(-60);
     await kvSetJson(histKey, history);
     bump('asst');
 
-    return json(res, 200, { reply: replyText });
+    return json(res, 200, { reply: replyText, action: action });
   } catch (e) {
     console.error('assistant chat error:', e.message);
     return json(res, 500, { error: 'Er ging iets mis.' });
+  }
+}
+
+async function handleAssistantAction(req, res) {
+  const s = await getSession(req, 'admin');
+  if (!s) return json(res, 401, { error: 'Not logged in' });
+  try {
+    const body = await readBody(req);
+    const lang = body.lang === 'nl' ? 'nl' : 'en';
+    const context = await buildAssistantContext(s.email);
+    const action = validateAssistantAction({ type: body.type, params: body.params }, context);
+    if (!action) return json(res, 400, { error: 'Onbekende of ongeldige actie' });
+    const histKey = assistantHistKey(s.email);
+    let history = (await kvGetJson(histKey)) || [];
+    const confirmed = !!body.confirmed;
+    let resultPayload = {};
+    if (confirmed) {
+      if (action.type === 'reminder_create') {
+        resultPayload.reminders = await applyReminderAction(s.email, { action: 'create', title: action.params.title, due: action.params.due, time: action.params.time, prio: action.params.prio });
+      } else if (action.type === 'reminder_done') {
+        resultPayload.reminders = await applyReminderAction(s.email, { action: 'update', id: action.params.id, done: true });
+      } else if (action.type === 'gym_log') {
+        resultPayload.log = await applyGymLogAction(s.email, { action: 'create', exercise: action.params.exercise, reps: action.params.reps, weight: action.params.weight, date: action.params.date });
+      } else if (action.type === 'idea_action') {
+        resultPayload.ideas = await applyIdeaAction(s.email, { action: action.params.action, id: action.params.id });
+      } else if (action.type === 'suggestion_action') {
+        resultPayload.suggestions = await applySuggestionAction(s.email, { action: action.params.action, id: action.params.id, days: action.params.days });
+      }
+    }
+    const replyText = assistantConfirmText(lang, action, confirmed);
+    const now3 = Date.now();
+    history.push({ role: 'assistant', content: replyText, at: now3, actionResult: confirmed ? 'confirmed' : 'cancelled' });
+    history = history.slice(-60);
+    await kvSetJson(histKey, history);
+    return json(res, 200, Object.assign({ ok: true, reply: replyText }, resultPayload));
+  } catch (e) {
+    if (e && e.httpStatus) return json(res, e.httpStatus, { error: e.message });
+    console.error('assistant action error:', e.message);
+    return json(res, 500, { error: 'Actie kon niet worden uitgevoerd.' });
   }
 }
 
@@ -1190,23 +1330,168 @@ return json(res, 500, { error: 'Opslag niet bereikbaar. Is Upstash gekoppeld?' }
 }
 }
 
-async function handleGymLog(req, res) {
-const s = await getSession(req, 'admin');
-if (!s) return json(res, 401, { error: 'Not logged in' });
-const key = gymLogKey(s.email);
-try {
-if (req.method === 'GET') return json(res, 200, (await kvGetJson(key)) || []);
-if (req.method === 'POST') {
-const body = await readBody(req);
+function apiError(status, message) {
+const e = new Error(message);
+e.httpStatus = status;
+return e;
+}
+
+async function applyReminderAction(email, body) {
+const key = `rem:${email}`;
 let list = (await kvGetJson(key)) || [];
 if (body.action === 'create') {
+const title = String(body.title || '').trim().slice(0, 200);
+if (!title) throw apiError(400, 'Titel is verplicht');
+list.push({
+id: crypto.randomUUID(),
+title,
+note: String(body.note || '').trim().slice(0, 2000),
+due: String(body.due || '').slice(0, 10),
+time: /^\d{2}:\d{2}$/.test(String(body.time || '')) ? String(body.time) : '',
+prio: Math.min(4, Math.max(1, Number(body.prio) || 4)),
+icon: REMINDER_ICONS.includes(body.icon) ? body.icon : '',
+color: isHexColor(body.color) ? String(body.color).toLowerCase() : '',
+duration: Math.min(480, Math.max(0, Number(body.duration) || 0)), // minutes; 0 = unspecified (timeline defaults to 1h)
+done: false,
+createdAt: Date.now(),
+});
+bump('rc');
+} else if (body.action === 'update') {
+const r = list.find((x) => x.id === body.id);
+if (!r) throw apiError(404, 'Niet gevonden');
+if (body.title !== undefined) r.title = String(body.title).trim().slice(0, 200) || r.title;
+if (body.note !== undefined) r.note = String(body.note).trim().slice(0, 2000);
+if (body.due !== undefined) r.due = String(body.due).slice(0, 10);
+if (body.time !== undefined) r.time = /^\d{2}:\d{2}$/.test(String(body.time)) ? String(body.time) : '';
+if (body.prio !== undefined) r.prio = Math.min(4, Math.max(1, Number(body.prio) || 4));
+if (body.icon !== undefined) r.icon = REMINDER_ICONS.includes(body.icon) ? body.icon : '';
+if (body.color !== undefined) r.color = isHexColor(body.color) ? String(body.color).toLowerCase() : '';
+if (body.duration !== undefined) r.duration = Math.min(480, Math.max(0, Number(body.duration) || 0));
+if (body.done !== undefined) {
+if (body.done && !r.done) bump('rd');
+r.done = !!body.done;
+}
+} else if (body.action === 'delete') {
+list = list.filter((x) => x.id !== body.id);
+} else {
+throw apiError(400, 'Onbekende actie');
+}
+await kvSetJson(key, list);
+return list;
+}
+
+async function applySuggestionAction(email, body) {
+const key = `sug:${email}`;
+let list = (await kvGetJson(key)) || [];
+const todayISO = new Date().toISOString().slice(0, 10);
+const addCycle = (r, fromISO) => {
+const d = new Date(fromISO + 'T00:00:00Z');
+if (r.ftype === 'months') {
+const day = r.fday || 1;
+d.setUTCDate(1);
+d.setUTCMonth(d.getUTCMonth() + (r.fn || 1));
+const max = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();
+d.setUTCDate(Math.min(day, max));
+} else {
+d.setUTCDate(d.getUTCDate() + (r.fn || 1) * (r.ftype === 'weeks' ? 7 : 1));
+}
+return d.toISOString().slice(0, 10);
+};
+const sanitize = (r, body) => {
+if (body.text !== undefined) r.text = String(body.text).trim().slice(0, 300) || r.text;
+if (body.ftype !== undefined) r.ftype = ['days', 'weeks', 'months'].includes(body.ftype) ? body.ftype : 'months';
+if (body.fn !== undefined) r.fn = Math.min(365, Math.max(1, Number(body.fn) || 1));
+if (body.fday !== undefined) r.fday = Math.min(31, Math.max(1, Number(body.fday) || 1));
+if (body.first !== undefined && /^\d{4}-\d{2}-\d{2}$/.test(String(body.first))) r.nextDue = body.first;
+};
+if (body.action === 'create') {
+const text = String(body.text || '').trim().slice(0, 300);
+if (!text) throw apiError(400, 'Tekst is verplicht');
+const r = { id: crypto.randomUUID(), text, ftype: 'months', fn: 1, fday: 1, nextDue: todayISO, createdAt: Date.now() };
+sanitize(r, body);
+list.push(r);
+} else {
+const r = list.find((x) => x.id === body.id);
+if (body.action === 'delete') {
+if (!r) throw apiError(404, 'Niet gevonden');
+list = list.filter((x) => x.id !== body.id);
+} else if (body.action === 'update') {
+if (!r) throw apiError(404, 'Niet gevonden');
+sanitize(r, body);
+} else if (body.action === 'done' || body.action === 'skip') {
+if (!r) throw apiError(404, 'Niet gevonden');
+r.nextDue = addCycle(r, r.nextDue > todayISO ? r.nextDue : todayISO);
+} else if (body.action === 'snooze') {
+if (!r) throw apiError(404, 'Niet gevonden');
+const d = new Date(todayISO + 'T00:00:00Z');
+d.setUTCDate(d.getUTCDate() + Math.min(30, Math.max(1, Number(body.days) || 3)));
+r.nextDue = d.toISOString().slice(0, 10);
+} else {
+throw apiError(400, 'Onbekende actie');
+}
+}
+await kvSetJson(key, list);
+return list;
+}
+
+async function applyIdeaAction(email, body) {
+const key = `idea:${email}`;
+let list = (await kvGetJson(key)) || [];
+const todayISO = new Date().toISOString().slice(0, 10);
+const plus = (n) => {
+const d = new Date(todayISO + 'T00:00:00Z');
+d.setUTCDate(d.getUTCDate() + n);
+return d.toISOString().slice(0, 10);
+};
+if (body.action === 'create') {
+const title = String(body.title || '').trim().slice(0, 200);
+if (!title) throw apiError(400, 'Titel is verplicht');
+list.push({
+id: crypto.randomUUID(),
+title,
+desc: String(body.desc || '').trim().slice(0, 3000),
+createdAt: Date.now(),
+nextReview: plus(14),
+reviews: 0,
+archived: false,
+});
+bump('id');
+} else {
+const r = list.find((x) => x.id === body.id);
+if (!r) throw apiError(404, 'Niet gevonden');
+if (body.action === 'update') {
+if (body.title !== undefined) r.title = String(body.title).trim().slice(0, 200) || r.title;
+if (body.desc !== undefined) r.desc = String(body.desc).trim().slice(0, 3000);
+} else if (body.action === 'keep') {
+r.reviews = (r.reviews || 0) + 1;
+r.nextReview = plus(r.reviews === 1 ? 42 : 90);
+} else if (body.action === 'archive') {
+r.archived = true;
+} else if (body.action === 'restore') {
+r.archived = false;
+r.reviews = 0;
+r.nextReview = plus(14);
+} else if (body.action === 'delete') {
+list = list.filter((x) => x.id !== body.id);
+} else {
+throw apiError(400, 'Onbekende actie');
+}
+}
+await kvSetJson(key, list);
+return list;
+}
+
+async function applyGymLogAction(email, body) {
+const key = gymLogKey(email);
+let list = (await kvGetJson(key)) || [];
+const MUSCLE_GROUPS = ['Legs', 'Push', 'Pull', 'Core', 'Other'];
+if (body.action === 'create') {
 const exercise = String(body.exercise || '').trim().slice(0, 100);
-if (!exercise) return json(res, 400, { error: 'Kies een oefening.' });
+if (!exercise) throw apiError(400, 'Kies een oefening.');
 const date = /^\d{4}-\d{2}-\d{2}$/.test(String(body.date || '')) ? String(body.date) : new Date().toISOString().slice(0, 10);
 const weight = Number(body.weight) || 0;
 const reps = Math.max(0, Math.min(200, Number(body.reps) || 0));
-if (!reps) return json(res, 400, { error: 'Vul het aantal reps in.' });
-const MUSCLE_GROUPS = ['Legs', 'Push', 'Pull', 'Core', 'Other'];
+if (!reps) throw apiError(400, 'Vul het aantal reps in.');
 list.push({
 id: crypto.randomUUID(),
 exercise, date, weight, reps,
@@ -1218,8 +1503,7 @@ createdAt: Date.now(),
 });
 } else if (body.action === 'update') {
 const it = list.find((x) => x.id === body.id);
-if (!it) return json(res, 404, { error: 'Niet gevonden' });
-const MUSCLE_GROUPS = ['Legs', 'Push', 'Pull', 'Core', 'Other'];
+if (!it) throw apiError(404, 'Niet gevonden');
 if (body.exercise !== undefined) it.exercise = String(body.exercise).trim().slice(0, 100) || it.exercise;
 if (body.date !== undefined) it.date = /^\d{4}-\d{2}-\d{2}$/.test(String(body.date)) ? String(body.date) : it.date;
 if (body.weight !== undefined) it.weight = Number(body.weight) || 0;
@@ -1231,12 +1515,25 @@ if (body.note !== undefined) it.note = String(body.note).trim().slice(0, 500);
 } else if (body.action === 'delete') {
 list = list.filter((x) => x.id !== body.id);
 } else {
-return json(res, 400, { error: 'Onbekende actie' });
+throw apiError(400, 'Onbekende actie');
 }
 await kvSetJson(key, list);
+return list;
+}
+
+async function handleGymLog(req, res) {
+const s = await getSession(req, 'admin');
+if (!s) return json(res, 401, { error: 'Not logged in' });
+const key = gymLogKey(s.email);
+try {
+if (req.method === 'GET') return json(res, 200, (await kvGetJson(key)) || []);
+if (req.method === 'POST') {
+const body = await readBody(req);
+const list = await applyGymLogAction(s.email, body);
 return json(res, 200, { ok: true, log: list });
 }
 } catch (e) {
+if (e && e.httpStatus) return json(res, e.httpStatus, { error: e.message });
 console.error('gym log API error:', e.message);
 return json(res, 500, { error: 'Opslag niet bereikbaar. Is Upstash gekoppeld?' });
 }
@@ -1503,6 +1800,7 @@ if (p === '/api/gym/sessions') return handleGymSessions(req, res);
 if (p === '/api/assistant/history') return handleAssistantHistory(req, res);
 if (p === '/api/assistant/chat') return handleAssistantChat(req, res);
 if (p === '/api/assistant/clear') return handleAssistantClear(req, res);
+if (p === '/api/assistant/action') return handleAssistantAction(req, res);
 
 if (p === '/api/crm/companies') {
 const s = await getSession(req, 'crm');
@@ -1700,53 +1998,15 @@ return json(res, 500, { error: 'Opslag niet bereikbaar. Is Upstash gekoppeld?' }
 if (p === '/api/reminders') {
 const s = await getSession(req, 'admin');
 if (!s) return json(res, 401, { error: 'Not logged in' });
-const key = `rem:${s.email}`;
 try {
-if (req.method === 'GET') return json(res, 200, (await kvGetJson(key)) || []);
+if (req.method === 'GET') return json(res, 200, (await kvGetJson(`rem:${s.email}`)) || []);
 if (req.method === 'POST') {
 const body = await readBody(req);
-let list = (await kvGetJson(key)) || [];
-if (body.action === 'create') {
-const title = String(body.title || '').trim().slice(0, 200);
-if (!title) return json(res, 400, { error: 'Titel is verplicht' });
-list.push({
-id: crypto.randomUUID(),
-title,
-note: String(body.note || '').trim().slice(0, 2000),
-due: String(body.due || '').slice(0, 10),
-time: /^\d{2}:\d{2}$/.test(String(body.time || '')) ? String(body.time) : '',
-prio: Math.min(4, Math.max(1, Number(body.prio) || 4)),
-icon: REMINDER_ICONS.includes(body.icon) ? body.icon : '',
-color: isHexColor(body.color) ? String(body.color).toLowerCase() : '',
-duration: Math.min(480, Math.max(0, Number(body.duration) || 0)), // minutes; 0 = unspecified (timeline defaults to 1h)
-done: false,
-createdAt: Date.now(),
-});
-bump('rc');
-} else if (body.action === 'update') {
-const r = list.find((x) => x.id === body.id);
-if (!r) return json(res, 404, { error: 'Niet gevonden' });
-if (body.title !== undefined) r.title = String(body.title).trim().slice(0, 200) || r.title;
-if (body.note !== undefined) r.note = String(body.note).trim().slice(0, 2000);
-if (body.due !== undefined) r.due = String(body.due).slice(0, 10);
-if (body.time !== undefined) r.time = /^\d{2}:\d{2}$/.test(String(body.time)) ? String(body.time) : '';
-if (body.prio !== undefined) r.prio = Math.min(4, Math.max(1, Number(body.prio) || 4));
-if (body.icon !== undefined) r.icon = REMINDER_ICONS.includes(body.icon) ? body.icon : '';
-if (body.color !== undefined) r.color = isHexColor(body.color) ? String(body.color).toLowerCase() : '';
-if (body.duration !== undefined) r.duration = Math.min(480, Math.max(0, Number(body.duration) || 0));
-if (body.done !== undefined) {
-if (body.done && !r.done) bump('rd');
-r.done = !!body.done;
-}
-} else if (body.action === 'delete') {
-list = list.filter((x) => x.id !== body.id);
-} else {
-return json(res, 400, { error: 'Onbekende actie' });
-}
-await kvSetJson(key, list);
+const list = await applyReminderAction(s.email, body);
 return json(res, 200, { ok: true, reminders: list });
 }
 } catch (e) {
+if (e && e.httpStatus) return json(res, e.httpStatus, { error: e.message });
 console.error('reminders API error:', e.message);
 return json(res, 500, { error: 'Opslag niet bereikbaar. Is Upstash gekoppeld?' });
 }
@@ -1755,63 +2015,15 @@ return json(res, 500, { error: 'Opslag niet bereikbaar. Is Upstash gekoppeld?' }
 if (p === '/api/suggestions') {
 const s = await getSession(req, 'admin');
 if (!s) return json(res, 401, { error: 'Not logged in' });
-const key = `sug:${s.email}`;
 try {
-if (req.method === 'GET') return json(res, 200, (await kvGetJson(key)) || []);
+if (req.method === 'GET') return json(res, 200, (await kvGetJson(`sug:${s.email}`)) || []);
 if (req.method === 'POST') {
 const body = await readBody(req);
-let list = (await kvGetJson(key)) || [];
-const todayISO = new Date().toISOString().slice(0, 10);
-const addCycle = (r, fromISO) => {
-const d = new Date(fromISO + 'T00:00:00Z');
-if (r.ftype === 'months') {
-const day = r.fday || 1;
-d.setUTCDate(1);
-d.setUTCMonth(d.getUTCMonth() + (r.fn || 1));
-const max = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();
-d.setUTCDate(Math.min(day, max));
-} else {
-d.setUTCDate(d.getUTCDate() + (r.fn || 1) * (r.ftype === 'weeks' ? 7 : 1));
-}
-return d.toISOString().slice(0, 10);
-};
-const sanitize = (r, body) => {
-if (body.text !== undefined) r.text = String(body.text).trim().slice(0, 300) || r.text;
-if (body.ftype !== undefined) r.ftype = ['days', 'weeks', 'months'].includes(body.ftype) ? body.ftype : 'months';
-if (body.fn !== undefined) r.fn = Math.min(365, Math.max(1, Number(body.fn) || 1));
-if (body.fday !== undefined) r.fday = Math.min(31, Math.max(1, Number(body.fday) || 1));
-if (body.first !== undefined && /^\d{4}-\d{2}-\d{2}$/.test(String(body.first))) r.nextDue = body.first;
-};
-if (body.action === 'create') {
-const text = String(body.text || '').trim().slice(0, 300);
-if (!text) return json(res, 400, { error: 'Tekst is verplicht' });
-const r = { id: crypto.randomUUID(), text, ftype: 'months', fn: 1, fday: 1, nextDue: todayISO, createdAt: Date.now() };
-sanitize(r, body);
-list.push(r);
-} else {
-const r = list.find((x) => x.id === body.id);
-if (body.action === 'delete') {
-if (!r) return json(res, 404, { error: 'Niet gevonden' });
-list = list.filter((x) => x.id !== body.id);
-} else if (body.action === 'update') {
-if (!r) return json(res, 404, { error: 'Niet gevonden' });
-sanitize(r, body);
-} else if (body.action === 'done' || body.action === 'skip') {
-if (!r) return json(res, 404, { error: 'Niet gevonden' });
-r.nextDue = addCycle(r, r.nextDue > todayISO ? r.nextDue : todayISO);
-} else if (body.action === 'snooze') {
-if (!r) return json(res, 404, { error: 'Niet gevonden' });
-const d = new Date(todayISO + 'T00:00:00Z');
-d.setUTCDate(d.getUTCDate() + Math.min(30, Math.max(1, Number(body.days) || 3)));
-r.nextDue = d.toISOString().slice(0, 10);
-} else {
-return json(res, 400, { error: 'Onbekende actie' });
-}
-}
-await kvSetJson(key, list);
+const list = await applySuggestionAction(s.email, body);
 return json(res, 200, { ok: true, suggestions: list });
 }
 } catch (e) {
+if (e && e.httpStatus) return json(res, e.httpStatus, { error: e.message });
 console.error('suggestions API error:', e.message);
 return json(res, 500, { error: 'Opslag niet bereikbaar. Is Upstash gekoppeld?' });
 }
@@ -1820,56 +2032,15 @@ return json(res, 500, { error: 'Opslag niet bereikbaar. Is Upstash gekoppeld?' }
 if (p === '/api/ideas') {
 const s = await getSession(req, 'admin');
 if (!s) return json(res, 401, { error: 'Not logged in' });
-const key = `idea:${s.email}`;
 try {
-if (req.method === 'GET') return json(res, 200, (await kvGetJson(key)) || []);
+if (req.method === 'GET') return json(res, 200, (await kvGetJson(`idea:${s.email}`)) || []);
 if (req.method === 'POST') {
 const body = await readBody(req);
-let list = (await kvGetJson(key)) || [];
-const todayISO = new Date().toISOString().slice(0, 10);
-const plus = (n) => {
-const d = new Date(todayISO + 'T00:00:00Z');
-d.setUTCDate(d.getUTCDate() + n);
-return d.toISOString().slice(0, 10);
-};
-if (body.action === 'create') {
-const title = String(body.title || '').trim().slice(0, 200);
-if (!title) return json(res, 400, { error: 'Titel is verplicht' });
-list.push({
-id: crypto.randomUUID(),
-title,
-desc: String(body.desc || '').trim().slice(0, 3000),
-createdAt: Date.now(),
-nextReview: plus(14),
-reviews: 0,
-archived: false,
-});
-bump('id');
-} else {
-const r = list.find((x) => x.id === body.id);
-if (!r) return json(res, 404, { error: 'Niet gevonden' });
-if (body.action === 'update') {
-if (body.title !== undefined) r.title = String(body.title).trim().slice(0, 200) || r.title;
-if (body.desc !== undefined) r.desc = String(body.desc).trim().slice(0, 3000);
-} else if (body.action === 'keep') {
-r.reviews = (r.reviews || 0) + 1;
-r.nextReview = plus(r.reviews === 1 ? 42 : 90);
-} else if (body.action === 'archive') {
-r.archived = true;
-} else if (body.action === 'restore') {
-r.archived = false;
-r.reviews = 0;
-r.nextReview = plus(14);
-} else if (body.action === 'delete') {
-list = list.filter((x) => x.id !== body.id);
-} else {
-return json(res, 400, { error: 'Onbekende actie' });
-}
-}
-await kvSetJson(key, list);
+const list = await applyIdeaAction(s.email, body);
 return json(res, 200, { ok: true, ideas: list });
 }
 } catch (e) {
+if (e && e.httpStatus) return json(res, e.httpStatus, { error: e.message });
 console.error('ideas API error:', e.message);
 return json(res, 500, { error: 'Opslag niet bereikbaar. Is Upstash gekoppeld?' });
 }
