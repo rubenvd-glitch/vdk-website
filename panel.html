@@ -606,6 +606,48 @@ header { padding: 10px 16px; }
 }
 .assistant-send-btn:disabled { opacity: .5; cursor: default; }
 .assistant-send-btn svg { width: 18px; height: 18px; }
+.assistant-action-card {
+  margin: 6px 0 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.12);
+}
+.assistant-action-title {
+  font-weight: 600;
+  font-size: 13px;
+  margin-bottom: 2px;
+}
+.assistant-action-detail {
+  font-size: 12.5px;
+  opacity: 0.75;
+  margin-bottom: 8px;
+}
+.assistant-action-btns {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+.assistant-action-btns button {
+  border: none;
+  border-radius: 8px;
+  padding: 6px 14px;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.assistant-action-btns button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.aa-cancel {
+  background: rgba(255,255,255,0.1);
+  color: inherit;
+}
+.aa-confirm {
+  background: #4f8cff;
+  color: #fff;
+}
+
 @media (max-width: 640px) {
   .assistant-panel { right: 10px; left: 10px; width: auto; bottom: 78px; height: 70vh; max-height: 70vh; }
   .assistant-fab { right: 14px; bottom: 14px; }
@@ -4068,16 +4110,76 @@ function assistantEscape(str) {
   return d.innerHTML;
 }
 
+function assistantActionLabel(action) {
+  const nl = LANG !== 'en';
+  const t = action.type;
+  if (t === 'reminder_create') return nl ? 'Nieuwe herinnering' : 'New reminder';
+  if (t === 'reminder_done') return nl ? 'Herinnering afvinken' : 'Mark reminder done';
+  if (t === 'gym_log') return nl ? 'Set loggen' : 'Log set';
+  if (t === 'idea_action') return action.params.action === 'archive' ? (nl ? 'Idee loslaten' : 'Let idea go') : (nl ? 'Idee uitstellen' : 'Postpone idea');
+  if (t === 'suggestion_action') {
+    const a = action.params.action;
+    if (a === 'done') return nl ? 'Suggestie afronden' : 'Complete suggestion';
+    if (a === 'skip') return nl ? 'Suggestie overslaan' : 'Skip suggestion';
+    return nl ? 'Suggestie uitstellen' : 'Snooze suggestion';
+  }
+  return nl ? 'Actie' : 'Action';
+}
+
+function assistantActionDetail(action) {
+  const p = action.params;
+  const t = action.type;
+  if (t === 'reminder_create') {
+    const bits = [p.title];
+    if (p.due) bits.push(p.due);
+    if (p.time) bits.push(p.time);
+    bits.push('P' + p.prio);
+    return bits.join(', ');
+  }
+  if (t === 'reminder_done') {
+    const r = (typeof reminders !== 'undefined' ? reminders : []).find((x) => x.id === p.id);
+    return r ? r.title : p.id;
+  }
+  if (t === 'gym_log') {
+    const bits = [p.exercise, p.reps + ' reps'];
+    if (p.weight) bits.push(p.weight + 'kg');
+    return bits.join(', ');
+  }
+  if (t === 'idea_action') {
+    const it = (typeof ideas !== 'undefined' ? ideas : []).find((x) => x.id === p.id);
+    return it ? it.title : p.id;
+  }
+  if (t === 'suggestion_action') {
+    const sg = (typeof suggestions !== 'undefined' ? suggestions : []).find((x) => x.id === p.id);
+    return sg ? sg.text : p.id;
+  }
+  return '';
+}
+
+function assistantActionCardHtml(m, idx) {
+  if (!m.action || m.actionState === 'confirmed' || m.actionState === 'cancelled') return '';
+  const busy = m.actionState === 'resolving';
+  const cancelLabel = LANG === 'en' ? 'Cancel' : 'Annuleren';
+  const confirmLabel = LANG === 'en' ? 'Confirm' : 'Bevestigen';
+  return '<div class="assistant-action-card">' +
+    '<div class="assistant-action-title">' + assistantEscape(assistantActionLabel(m.action)) + '</div>' +
+    '<div class="assistant-action-detail">' + assistantEscape(assistantActionDetail(m.action)) + '</div>' +
+    '<div class="assistant-action-btns">' +
+    '<button class="aa-cancel"' + (busy ? ' disabled' : '') + ' onclick="assistantCancelAction(' + idx + ')">' + cancelLabel + '</button>' +
+    '<button class="aa-confirm"' + (busy ? ' disabled' : '') + ' onclick="assistantConfirmAction(' + idx + ')">' + confirmLabel + '</button>' +
+    '</div></div>';
+}
+
 function assistantRenderMessages() {
   const el = $('assistantMessages');
   if (!assistantHistory.length) {
     el.innerHTML = '<div class="assistant-empty" id="assistantEmptyHint">Vraag me iets over je Gym, herinneringen of doelen.</div>';
     return;
   }
-  el.innerHTML = assistantHistory.map((m) => {
+  el.innerHTML = assistantHistory.map((m, idx) => {
     const cls = m.role === 'user' ? 'user' : (m.error ? 'assistant error' : 'assistant');
     const pending = m.pending ? ' pending' : '';
-    return '<div class="assistant-msg ' + cls + pending + '">' + assistantEscape(m.content) + '</div>';
+    return '<div class="assistant-msg ' + cls + pending + '">' + assistantEscape(m.content) + '</div>' + assistantActionCardHtml(m, idx);
   }).join('');
   el.scrollTop = el.scrollHeight;
 }
@@ -4131,13 +4233,40 @@ async function assistantSend() {
       body: JSON.stringify({ message: message, page: assistantCurrentPage(), lang: LANG }),
     });
     assistantHistory.pop();
-    assistantHistory.push({ role: 'assistant', content: d.reply });
+    assistantHistory.push({ role: 'assistant', content: d.reply, action: d.action || null, actionState: d.action ? 'pending' : undefined });
   } catch (e) {
     assistantHistory.pop();
     assistantHistory.push({ role: 'assistant', content: e.message || 'Er ging iets mis.', error: true });
   }
   assistantSending = false;
   $('assistantSendBtn').disabled = false;
+  assistantRenderMessages();
+}
+
+window.assistantConfirmAction = function (idx) { assistantResolveAction(idx, true); };
+window.assistantCancelAction = function (idx) { assistantResolveAction(idx, false); };
+
+async function assistantResolveAction(idx, confirmed) {
+  const m = assistantHistory[idx];
+  if (!m || !m.action || m.actionState !== 'pending') return;
+  m.actionState = 'resolving';
+  assistantRenderMessages();
+  try {
+    const d = await api('/api/assistant/action', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: m.action.type, params: m.action.params, confirmed: confirmed, lang: LANG }),
+    });
+    m.actionState = confirmed ? 'confirmed' : 'cancelled';
+    assistantHistory.push({ role: 'assistant', content: d.reply });
+    if (d.reminders) { reminders = d.reminders; if (typeof render === 'function') render(); }
+    if (d.suggestions) { suggestions = d.suggestions; if (typeof renderSug === 'function') renderSug(); }
+    if (d.ideas) { ideas = d.ideas; if (typeof renderIdeas === 'function') renderIdeas(); }
+    if (d.log) { gymLog = d.log; if (typeof gymRenderAll === 'function') gymRenderAll(); }
+  } catch (e) {
+    m.actionState = 'pending';
+    assistantHistory.push({ role: 'assistant', content: e.message || 'Er ging iets mis.', error: true });
+  }
   assistantRenderMessages();
 }
 
