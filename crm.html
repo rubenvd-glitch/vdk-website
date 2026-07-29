@@ -5,6 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>VDK CRM</title>
 <style>
+@keyframes bootPulse { 0%, 100% { opacity: .55; transform: scale(1); } 50% { opacity: 1; transform: scale(1.04); } }
+@keyframes bootFadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.boot-screen { position: fixed; inset: 0; z-index: 9999; display: flex; align-items: center; justify-content: center; flex-direction: column; background: #0e1116; transition: opacity .5s ease, visibility .5s ease; }
+.boot-screen.hide { opacity: 0; visibility: hidden; pointer-events: none; }
+.boot-inner { display: flex; flex-direction: column; align-items: center; gap: 18px; animation: bootFadeIn .5s ease both; }
+.boot-logo { font-size: 15px; font-weight: 700; letter-spacing: .28em; text-transform: uppercase; color: #e6e9ed; animation: bootPulse 2.2s ease-in-out infinite; }
+.boot-greet { font-size: 15px; color: #8b96a5; min-height: 20px; text-align: center; }
+.boot-bar { width: 180px; height: 3px; border-radius: 3px; background: #1c222b; overflow: hidden; }
+.boot-bar-fill { height: 100%; width: 0%; border-radius: 3px; background: linear-gradient(90deg, #7fb4f0, #2ea36f); transition: width .35s ease; }
+@media (prefers-reduced-motion: reduce) { .boot-logo { animation: none; } .boot-screen, .boot-bar-fill { transition: opacity .01ms linear, width .01ms linear; } }
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
 min-height: 100vh; background: #0e1116; color: #e6e9ed;
@@ -182,6 +192,7 @@ padding: 9px 14px; border-radius: 8px; font-size: 13px; font-family: inherit;
 </style>
 </head>
 <body>
+<div id="bootScreen" class="boot-screen"><div class="boot-inner"><div class="boot-logo">VDK CRM</div><div id="bootGreet" class="boot-greet">CRM is aan het opstarten…</div><div class="boot-bar"><div id="bootBarFill" class="boot-bar-fill"></div></div></div></div>
 <header>
 <button id="menuBtn" class="icon-btn-header" title="Menu">
 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:20px;height:20px;"><path d="M3 6h18"/><path d="M3 12h18"/><path d="M3 18h18"/></svg>
@@ -566,6 +577,7 @@ en: {
 'set.name': 'Name', 'set.nameHint': 'How the CRM addresses you.',
 'save': 'Save', 'set.saved': 'Saved.', 'set.nameSaved': 'Name saved.',
 'greet.night': 'Good night', 'greet.morning': 'Good morning', 'greet.afternoon': 'Good afternoon', 'greet.evening': 'Good evening',
+'boot.starting': 'is starting up…',
 'locale': 'en-US',
 },
 nl: {
@@ -575,6 +587,7 @@ nl: {
 'set.name': 'Naam', 'set.nameHint': 'Zo spreekt het CRM je aan.',
 'save': 'Opslaan', 'set.saved': 'Opgeslagen.', 'set.nameSaved': 'Naam opgeslagen.',
 'greet.night': 'Goedenacht', 'greet.morning': 'Goedemorgen', 'greet.afternoon': 'Goedemiddag', 'greet.evening': 'Goedenavond',
+'boot.starting': 'is aan het opstarten…',
 'locale': 'nl-NL',
 },
 };
@@ -1232,22 +1245,46 @@ try { await saveProfile({ name: $('crmSetName').value }); flashSetMsg(t('set.nam
 catch (e) { flashSetMsg(e.message); }
 };
 
+let bootTotal = 6, bootDone = 0, bootHidden = false;
+function bootGreet() {
+const h = new Date().getHours();
+const word = h < 6 ? t('greet.night') : h < 12 ? t('greet.morning') : h < 18 ? t('greet.afternoon') : t('greet.evening');
+const el = $('bootGreet');
+if (el) el.textContent = word + ', CRM ' + t('boot.starting');
+}
+function bootTick() {
+bootDone++;
+const fill = $('bootBarFill');
+if (fill) fill.style.width = Math.min(100, Math.round(bootDone / bootTotal * 100)) + '%';
+if (bootDone >= bootTotal) bootHide();
+}
+function bootHide() {
+if (bootHidden) return;
+bootHidden = true;
+const el = $('bootScreen');
+if (!el) return;
+el.classList.add('hide');
+setTimeout(() => { el.style.display = 'none'; }, 550);
+}
+
 async function load() {
 fillSectorSelects();
-try { me = await api('/api/crm/me'); } catch { location.href = '/crm'; return; }
-try { profile = await api('/api/crm/profile'); } catch (e) { /* opslag nog niet gekoppeld */ }
+try { me = await api('/api/crm/me'); bootTick(); } catch { location.href = '/crm'; return; }
+try { profile = await api('/api/crm/profile'); bootTick(); } catch (e) { /* opslag nog niet gekoppeld */ bootTick(); }
 LANG = profile.lang || 'en';
 applyLang();
 fillSettings();
 greet();
-try { companies = await api('/api/crm/companies'); } catch (e) { /* opslag nog niet gekoppeld */ }
-try { actions = await api('/api/crm/actions'); } catch (e) { /* opslag nog niet gekoppeld */ }
-try { ideas = await api('/api/crm/ideas'); } catch (e) { /* opslag nog niet gekoppeld */ }
+try { companies = await api('/api/crm/companies'); bootTick(); } catch (e) { /* opslag nog niet gekoppeld */ bootTick(); }
+try { actions = await api('/api/crm/actions'); bootTick(); } catch (e) { /* opslag nog niet gekoppeld */ bootTick(); }
+try { ideas = await api('/api/crm/ideas'); bootTick(); } catch (e) { /* opslag nog niet gekoppeld */ bootTick(); }
 renderActs(); renderReminders(); renderDashboard(); renderCoList(); renderIdeas();
-loadCalStatus();
+loadCalStatus().then(bootTick, bootTick);
 }
 $('logoutBtn').onclick = async () => { await fetch('/crm/logout', { method: 'POST' }); location.href = '/crm'; };
 
+bootGreet();
+setTimeout(bootHide, 6000);
 load();
 if (location.hash.includes('settings')) showView('settings');
 </script>
