@@ -757,6 +757,19 @@ header { padding: 10px 16px; }
 <!-- Sessie samenstellen: kies spiergroepen + oefeningen, zie live welke
      spieren goed gedekt zijn (poppetje) en welke je nog mist. -->
 <div class="gym-sub" id="gtab-session" style="display:none;">
+<div id="gymListView">
+<div class="section-head">
+<h2 style="font-size:16px;">Mijn workouts</h2>
+<button class="btn-primary" id="gymNewSessionBtn">+ Sessie toevoegen</button>
+</div>
+<div id="gymTmplList"></div>
+</div>
+
+<div id="gymBuilderView" style="display:none;">
+<div class="section-head">
+<button class="btn-ghost" id="gymBackToListBtn">← Terug naar overzicht</button>
+</div>
+<h3 id="gymBuilderTitle" style="margin:4px 0 4px;font-size:15px;"></h3>
 <div class="section-sub">Stel samen welke spiergroepen je vandaag traint, voeg oefeningen toe, en zie meteen welke spieren goed gedekt zijn en welke je nog mist — met suggesties om aan te vullen.</div>
 
 <div class="planner-box">
@@ -792,12 +805,12 @@ header { padding: 10px 16px; }
 </div>
 
 <div class="planner-box">
-<h4>Sessie opslaan als sjabloon</h4>
+<h4>Sessie opslaan</h4>
 <div class="plan-add-row">
 <input id="gymPlanNameInput" autocomplete="off" placeholder="bijv. Chest &amp; Tricep dag">
-<button class="btn-ghost" id="gymPlanSaveTmplBtn">Opslaan</button>
+<button class="btn-primary" id="gymPlanSaveTmplBtn">Opslaan</button>
 </div>
-<div id="gymTmplList"></div>
+</div>
 </div>
 </div>
 
@@ -2887,6 +2900,8 @@ let gymActiveTab = 'overview';
 let gymGoalKind = 'exercise';
 let gymPlanGroups = [], gymPlanExercises = [];
 let gymPlanTargets = {};
+let gymComposerView = 'list';
+let gymEditingTemplateId = null;
 let gymActiveSession = null;
 const GYM_PLAN_GROUP_OPTIONS = GYM_MUSCLE_MAP.map((g) => g.key);
 
@@ -3693,6 +3708,28 @@ return `<div class="tmpl-row">
 </div>
 </div>`;
 }
+function gymResetComposerState() {
+gymPlanGroups = [];
+gymPlanExercises = [];
+gymPlanTargets = {};
+gymEditingTemplateId = null;
+$('gymPlanNameInput').value = '';
+}
+function gymShowListView() {
+gymComposerView = 'list';
+$('gymListView').style.display = 'block';
+$('gymBuilderView').style.display = 'none';
+gymRenderTemplates();
+}
+function gymShowBuilderView() {
+gymComposerView = 'builder';
+$('gymListView').style.display = 'none';
+$('gymBuilderView').style.display = 'block';
+$('gymBuilderTitle').textContent = gymEditingTemplateId ? 'Sessie bewerken' : 'Nieuwe sessie samenstellen';
+$('gymPlanSaveTmplBtn').textContent = gymEditingTemplateId ? 'Wijzigingen opslaan' : 'Opslaan';
+gymRenderPlanGroupChips();
+gymRenderSessionPlanner();
+}
 function gymRenderTemplates() {
 $('gymTmplList').innerHTML = gymSessionTemplates.length ? gymSessionTemplates.map(gymTmplRowHtml).join('') : '<div class="plan-empty">Nog geen opgeslagen sessies.</div>';
 }
@@ -3702,8 +3739,9 @@ if (!tp) return;
 gymPlanGroups = [...(tp.groups || [])];
 gymPlanExercises = [...(tp.exercises || [])];
 gymPlanTargets = JSON.parse(JSON.stringify(tp.targets || {}));
-gymRenderPlanGroupChips();
-gymRenderSessionPlanner();
+gymEditingTemplateId = tp.id;
+$('gymPlanNameInput').value = tp.name;
+gymShowBuilderView();
 };
 window.gymRemoveTemplate = async (id) => {
 if (!confirm('Deze sjabloon verwijderen?')) return;
@@ -3716,13 +3754,23 @@ const name = $('gymPlanNameInput').value.trim();
 if (!name) { flashSetMsg('Geef je sessie een naam.'); return; }
 if (!gymPlanExercises.length) { flashSetMsg('Voeg eerst een oefening toe.'); return; }
 try {
-const d = await api('/api/gym/sessions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'create', name, groups: gymPlanGroups, exercises: gymPlanExercises, targets: gymPlanTargets }) });
+const action = gymEditingTemplateId ? 'update' : 'create';
+const body = { action, name, groups: gymPlanGroups, exercises: gymPlanExercises, targets: gymPlanTargets };
+if (gymEditingTemplateId) body.id = gymEditingTemplateId;
+const d = await api('/api/gym/sessions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 gymSessionTemplates = d.sessions;
-$('gymPlanNameInput').value = '';
-gymPlanTargets = {};
-gymRenderTemplates();
 flashSetMsg(t('set.saved'));
+gymResetComposerState();
+gymShowListView();
 } catch (e) { flashSetMsg(e.message); }
+};
+$('gymNewSessionBtn').onclick = () => {
+gymResetComposerState();
+gymShowBuilderView();
+};
+$('gymBackToListBtn').onclick = () => {
+gymResetComposerState();
+gymShowListView();
 };
 
 const GYM_REP_RANGES = {
@@ -3925,7 +3973,7 @@ document.querySelectorAll('#gymTabs button').forEach((x) => x.classList.toggle('
 document.querySelectorAll('.gym-sub').forEach((x) => { x.style.display = 'none'; });
 $('gtab-' + gymActiveTab).style.display = 'block';
 if (gymActiveTab === 'progress') gymRenderExercisesTab();
-if (gymActiveTab === 'session') gymRenderSessionPlanner();
+if (gymActiveTab === 'session') gymShowListView();
 };
 
 async function gymSaveProfile(partial) {
