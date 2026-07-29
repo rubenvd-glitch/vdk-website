@@ -3517,6 +3517,44 @@ gymRenderSessionPlanner();
 };
 window.gymAddSuggested = (name) => gymAddPlanExercise(name);
 
+function gymRepTargetFor(name, goal) {
+const g = GYM_REP_RANGES[goal] ? goal : 'spiergroei';
+const base = GYM_REP_RANGES[g].topset;
+if (g !== 'spiergroei') return { range: base, note: '' };
+const targets = gymTargetsFor(name);
+const groups = new Set(targets.filter((t) => t[2] >= 0.3).map((t) => t[0]));
+const compound = groups.size >= 2;
+const range = compound ? [6, 10] : [10, 15];
+let note = compound
+? 'Compound oefening — iets lagere reps met meer gewicht is hier het meest tijdsefficiënt.'
+: 'Isolatie-oefening — hogere reps dicht bij spierfalen geven hier extra hypertrofie.';
+const primary = [...targets].sort((a, b) => b[2] - a[2])[0];
+if (primary) {
+const aggKey = primary[0] === 'legs' ? (primary[0] + ':' + primary[1]) : primary[0];
+const match = gymSessionMuscleVolume().find((v) => v.key === aggKey);
+if (match && match.level === 'high') note += ' Deze spiergroep zit al aan veel volume deze sessie — houd het bij de onderkant van deze range.';
+else if (match && match.level === 'low') note += ' Deze spiergroep heeft nog weinig volume deze sessie — de bovenkant van de range pakt dat op.';
+}
+return { range, note };
+}
+function gymComposerWeightAdvice(name, goal) {
+const sessions = gymSessionsFor(name);
+if (!sessions.length) {
+return { text: 'Nog niet gelogd. Het gewicht wordt automatisch bijgehouden zodra je deze oefening voor het eerst logt.' };
+}
+const latest = sessions[0];
+const weight = Math.max(...latest.sets.map((s) => s.weight));
+const g = GYM_REP_RANGES[goal] ? goal : 'spiergroei';
+const top = GYM_REP_RANGES[g].topset[1];
+const allAtTop = latest.sets.every((s) => s.reps >= top);
+const wStr = (w) => (w % 1 ? w.toFixed(1) : w) + gymUnit();
+if (allAtTop) {
+const inc = gymSuggestedIncrement(name, weight);
+const next = Math.round((weight + inc) * 10) / 10;
+return { text: 'Huidig gewicht: ' + wStr(weight) + ' (laatst gelogd ' + latest.date + '). Je haalde overal ' + top + '+ reps — probeer volgende keer ' + wStr(next) + '.' };
+}
+return { text: 'Huidig gewicht: ' + wStr(weight) + ' (laatst gelogd ' + latest.date + '). Blijf op dit gewicht tot je overal ' + top + '+ reps haalt.' };
+}
 function gymRenderPlanList() {
 $('gymPlanList').innerHTML = gymPlanExercises.length
 ? gymPlanExercises.map((n, idx) => {
@@ -3524,9 +3562,9 @@ const tgt = gymPlanTargets[n] || {};
 const goal = tgt.goal || 'spiergroei';
 const warmups = tgt.warmups != null ? tgt.warmups : 2;
 const topsets = tgt.topsets != null ? tgt.topsets : 1;
-const dropset = !!tgt.dropset; const enc = esc(n).replace(/'/g, "\\'"); const vol = gymVolumeAdvice(goal, warmups, topsets, dropset); const volKey = 'vol:' + enc; const volOpen = gymAdviceOpen.has(volKey); const volHtml = `<div class="plan-vol-advice" onclick="gymToggleAdvice('${volKey}','plan')"><span class="plan-vol-dot"></span>Techniek-advies <span class="mz-chevron">${volOpen ? '▾' : '▸'}</span></div>${volOpen ? `<div class="plan-vol-detail">${esc(vol.text)}</div>` : ''}`; const upDisabled = idx === 0 ? ' disabled' : '';
+const dropset = !!tgt.dropset; const enc = esc(n).replace(/'/g, "\\'"); const vol = gymVolumeAdvice(goal, warmups, topsets, dropset); const volKey = 'vol:' + enc; const volOpen = gymAdviceOpen.has(volKey); const volHtml = `<div class="plan-vol-advice" onclick="gymToggleAdvice('${volKey}','plan')"><span class="plan-vol-dot"></span>Techniek-advies <span class="mz-chevron">${volOpen ? '▾' : '▸'}</span></div>${volOpen ? `<div class="plan-vol-detail">${esc(vol.text)}</div>` : ''}`; const upDisabled = idx === 0 ? ' disabled' : ''; const progKey = 'prog:' + enc; const progOpen = gymAdviceOpen.has(progKey); const repInfo = gymRepTargetFor(n, goal); const weightInfo = gymComposerWeightAdvice(n, goal); const repLine = goal === 'spiergroei' ? ('Streefreps voor spiergroei: ' + repInfo.range[0] + '-' + repInfo.range[1] + ' reps. ' + repInfo.note) : ('Streefreps voor dit doel: ' + repInfo.range[0] + '-' + repInfo.range[1] + ' reps.'); const progHtml = `<div class="plan-vol-advice" onclick="gymToggleAdvice('${progKey}','plan')"><span class="plan-vol-dot"></span>Reps &amp; gewicht-advies <span class="mz-chevron">${progOpen ? '▾' : '▸'}</span></div>${progOpen ? `<div class="plan-vol-detail">${esc(repLine)} ${esc(weightInfo.text)}</div>` : ''}`;
 const downDisabled = idx === gymPlanExercises.length - 1 ? ' disabled' : '';
-return `<div class="plan-pill-wrap"><div class="plan-pill"><span class="plan-reorder"><button type="button" title="Naar boven" onclick="gymMovePlanExercise('${enc}',-1)"${upDisabled}>▲</button><button type="button" title="Naar beneden" onclick="gymMovePlanExercise('${enc}',1)"${downDisabled}>▼</button></span>${esc(n)}<button type="button" onclick="gymRemovePlanExercise('${enc}')">×</button></div><div class="plan-target-row"><label class="icon-lbl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></svg>Doel</label><select onchange="gymSetPlanTarget('${enc}','goal',this.value)"><option value="kracht"${goal === 'kracht' ? ' selected' : ''}>Kracht</option><option value="spiergroei"${goal === 'spiergroei' ? ' selected' : ''}>Spiergroei</option><option value="uithouding"${goal === 'uithouding' ? ' selected' : ''}>Uithouding</option></select><label>Warmups</label><input type="number" step="1" min="0" value="${warmups}" onchange="gymSetPlanTarget('${enc}','warmups',this.value)"><label>Topsets</label><input type="number" step="1" min="1" value="${topsets}" onchange="gymSetPlanTarget('${enc}','topsets',this.value)"><label><input type="checkbox" ${dropset ? 'checked' : ''} onchange="gymSetPlanTarget('${enc}','dropset',this.checked?1:0)">Dropset</label></div>${volHtml}</div>`;
+return `<div class="plan-pill-wrap"><div class="plan-pill"><span class="plan-reorder"><button type="button" title="Naar boven" onclick="gymMovePlanExercise('${enc}',-1)"${upDisabled}>▲</button><button type="button" title="Naar beneden" onclick="gymMovePlanExercise('${enc}',1)"${downDisabled}>▼</button></span>${esc(n)}<button type="button" onclick="gymRemovePlanExercise('${enc}')">×</button></div><div class="plan-target-row"><label class="icon-lbl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></svg>Doel</label><select onchange="gymSetPlanTarget('${enc}','goal',this.value)"><option value="kracht"${goal === 'kracht' ? ' selected' : ''}>Kracht</option><option value="spiergroei"${goal === 'spiergroei' ? ' selected' : ''}>Spiergroei</option><option value="uithouding"${goal === 'uithouding' ? ' selected' : ''}>Uithouding</option></select><label>Warmups</label><input type="number" step="1" min="0" value="${warmups}" onchange="gymSetPlanTarget('${enc}','warmups',this.value)"><label>Topsets</label><input type="number" step="1" min="1" value="${topsets}" onchange="gymSetPlanTarget('${enc}','topsets',this.value)"><label><input type="checkbox" ${dropset ? 'checked' : ''} onchange="gymSetPlanTarget('${enc}','dropset',this.checked?1:0)">Dropset</label></div>${volHtml}${progHtml}</div>`;
 }).join('')
 : '<div class="plan-empty">Nog geen oefeningen toegevoegd.</div>';
 }
