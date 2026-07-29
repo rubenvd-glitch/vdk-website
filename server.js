@@ -1261,6 +1261,58 @@ async function handleAssistantChat(req, res) {
   }
 }
 
+async function handleAssistantProactive(req, res) {
+  const s = await getSession(req, 'admin');
+  if (!s) return json(res, 401, { error: 'Not logged in' });
+  const apiKey = (process.env.GROQ_API_KEY || '').trim();
+  if (!apiKey) return json(res, 200, { ok: true, reply: null });
+  try {
+    const body = await readBody(req);
+    const page = String(body.page || '').slice(0, 40);
+    const lang = body.lang === 'nl' ? 'nl' : 'en';
+
+    const histKey = assistantHistKey(s.email);
+    let history = (await kvGetJson(histKey)) || [];
+
+    const context = await buildAssistantContext(s.email);
+    const systemPrompt = buildAssistantSystemPrompt(page, lang, context) + '\n' +
+      'PROACTIVE CHECK: you are not responding to a user message right now. Look only at the context above and decide, independently, whether there is exactly ONE thing worth proactively flagging to the user right now (something overdue, a suggestion that has been waiting, a Gym goal falling behind, an idea untouched for a long time). Be selective and restrained - most checks should find nothing worth mentioning. If nothing clears that bar, reply with exactly {"reply": null, "action": null}. If something does, phrase it the same short, calm way as your other replies, and only set "action" if you have enough detail to concretely propose one from the allowed set.';
+
+    const apiMessages = [{ role: 'system', content: systemPrompt }];
+
+    const model = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
+    const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
+      body: JSON.stringify({ model: model, max_tokens: 300, response_format: { type: 'json_object' }, messages: apiMessages }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      console.error('assistant proactive failed:', d && d.error);
+      return json(res, 200, { ok: true, reply: null });
+    }
+    const rawContent = (d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content) || '';
+    let parsed = null;
+    try { parsed = JSON.parse(rawContent); } catch (e) { parsed = null; }
+    if (!parsed || typeof parsed !== 'object' || typeof parsed.reply !== 'string' || !parsed.reply.trim()) {
+      return json(res, 200, { ok: true, reply: null });
+    }
+    const replyText = parsed.reply.trim();
+    const action = validateAssistantAction(parsed.action, context);
+
+    const now2 = Date.now();
+    history.push({ role: 'assistant', content: replyText, at: now2, action: action, proactive: true });
+    history = history.slice(-60);
+    await kvSetJson(histKey, history);
+    bump('asst');
+
+    return json(res, 200, { ok: true, reply: replyText, action: action });
+  } catch (e) {
+    console.error('assistant proactive error:', e.message);
+    return json(res, 200, { ok: true, reply: null });
+  }
+}
+
 async function handleAssistantAction(req, res) {
   const s = await getSession(req, 'admin');
   if (!s) return json(res, 401, { error: 'Not logged in' });
@@ -1801,6 +1853,7 @@ if (p === '/api/assistant/history') return handleAssistantHistory(req, res);
 if (p === '/api/assistant/chat') return handleAssistantChat(req, res);
 if (p === '/api/assistant/clear') return handleAssistantClear(req, res);
 if (p === '/api/assistant/action') return handleAssistantAction(req, res);
+if (p === '/api/assistant/proactive') return handleAssistantProactive(req, res);
 
 if (p === '/api/crm/companies') {
 const s = await getSession(req, 'crm');
