@@ -1450,6 +1450,8 @@ $('setLang').value = LANG;
 let me = null, reminders = [], suggestions = [], ideas = [], view = 'active', ideaView = 'box';
 let profile = { name: '', sugSnoozeDays: 3, showSugCards: true, showIdeaCards: true };
 let profileLoaded = false;
+let logCache = null;
+let tlEventsCache = { date: null, events: null };
 let editing = null, sugEditing = null, ideaEditing = null, sugFreq = 'm1';
 let pendingConvert = null, pendingIdeaConvert = null;
 let selDays = 0, selPrio = 4, pickedDate = null, noDate = false, selIcon = '', selColor = '';
@@ -1936,7 +1938,8 @@ else allDayItems.push({ kind: 'reminder', id: r.id, title: r.title, prio: r.prio
 });
 if (calStatus.apple) {
 try {
-const d = await api(`/api/calendar/events?range=day&date=${tlDate}`);
+let d;
+if (tlEventsCache.date === tlDate && tlEventsCache.events) { d = { events: tlEventsCache.events }; } else { d = await api(`/api/calendar/events?range=day&date=${tlDate}`); }
 d.events.forEach((ev) => {
 if (ev.allDay) {
 allDayItems.push({ kind: 'apple', title: ev.title });
@@ -2167,9 +2170,7 @@ $('newIdeaBtn').onclick = () => openIdeaModal(null);
 $('ideaTabBox').onclick = () => { ideaView = 'box'; $('ideaTabBox').classList.add('active'); $('ideaTabArch').classList.remove('active'); renderIdeas(); };
 $('ideaTabArch').onclick = () => { ideaView = 'arch'; $('ideaTabArch').classList.add('active'); $('ideaTabBox').classList.remove('active'); renderIdeas(); };
 
-async function loadLog() {
-try {
-const d = await api('/api/log');
+function renderLogData(d) {
 const today = d.days[0] || { v: 0, u: 0, l: 0, rd: 0 };
 $('statGrid').innerHTML = `
 <div class="stat"><div class="num">${today.v}</div><div class="cap">${t('log.visits')}</div></div>
@@ -2181,6 +2182,18 @@ $('statTable').innerHTML = `
 <tr><th>${t('log.date')}</th><th>${t('log.thVisits')}</th><th>${t('log.thUniq')}</th><th>${t('log.thLogins')}</th><th>${t('log.thDone')}</th></tr>
 ${d.days.map((x) => `<tr><td>${x.date}</td><td>${x.v}</td><td>${x.u}</td><td>${x.l}</td><td>${x.rd}</td></tr>`).join('')}
 </table>`;
+}
+
+async function loadLog() {
+if (logCache) {
+renderLogData(logCache);
+api('/api/log').then((d) => { logCache = d; renderLogData(d); }).catch(() => {});
+return;
+}
+try {
+const d = await api('/api/log');
+logCache = d;
+renderLogData(d);
 } catch (e) {
 $('statGrid').innerHTML = `<div class="empty">${esc(e.message)}</div>`;
 }
@@ -2318,11 +2331,21 @@ ideas = await api('/api/ideas');
 renderIdeas();
 bootTick();
 } catch (e) { /* opslag nog niet gekoppeld */ bootTick(); }
-loadCalStatus().then(bootTick, bootTick);
+loadCalStatus().then(() => {
+bootTick();
+if (calStatus.apple) {
+api(`/api/calendar/events?range=day&date=${tlDate}`).then((d) => {
+tlEventsCache = { date: tlDate, events: d.events };
+if ($('view-timeline').style.display === 'block') loadTimeline();
+}).catch(() => {});
+}
+}, bootTick);
 gymLoad().then(bootTick, bootTick);
+assistantLoadHistory();
 if (me.isAdmin) {
 $('logMenuBtn').style.display = 'block';
 loadTg();
+api('/api/log').then((d) => { logCache = d; if ($('view-log').style.display === 'block') renderLogData(d); }).catch(() => {});
 try {
 const st = await api('/api/settings');
 $('lockToggle').checked = st.lockedToAdmin !== false;
