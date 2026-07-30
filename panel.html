@@ -560,66 +560,74 @@ header { padding: 10px 16px; }
 .mz-toggle-ic svg { width:100%; height:100%; }
 .mz-chevron { margin-left:4px; opacity:.65; }
 /* --- Base Assistant (AI chat widget) --- */
-.assistant-backdrop {
-  position: fixed; inset: 0; z-index: 299;
-  background: rgba(5,7,10,.55);
-  opacity: 0; pointer-events: none;
-  transition: opacity .18s ease;
-}
-.assistant-backdrop.open { opacity: 1; pointer-events: auto; }
 .assistant-panel {
-  position: fixed; bottom: 28px; left: 50%; z-index: 300;
-  width: 560px; max-width: calc(100vw - 32px); height: 64px; max-height: calc(100vh - 120px);
-  background: rgba(18,22,29,.94); -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px);
-  border: 1px solid #232a33; border-radius: 20px;
-  display: flex; flex-direction: column; overflow: hidden;
-  transform: translateX(-50%) translateY(12px) scale(.98); opacity: 0; pointer-events: none;
-  transition: transform .18s ease, opacity .18s ease, height .22s ease;
-  box-shadow: 0 20px 60px rgba(0,0,0,.55);
+  position: fixed; top: 110px; right: 24px; z-index: 300;
+  width: auto; max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 48px);
+  display: flex; flex-direction: column; align-items: flex-end;
+  opacity: 0; pointer-events: none; transform: translateY(6px) scale(.98);
+  transition: opacity .16s ease, transform .16s ease;
 }
-.assistant-panel.open { transform: translateX(-50%) translateY(0) scale(1); opacity: 1; pointer-events: auto; }
-.assistant-panel.has-messages { height: 520px; }
-.assistant-panel:not(.has-messages) .assistant-head,
-.assistant-panel:not(.has-messages) .assistant-messages { display: none; }
-.assistant-head {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 12px 14px; border-bottom: 1px solid #232a33; flex-shrink: 0;
+.assistant-panel.open { opacity: 1; pointer-events: auto; transform: translateY(0) scale(1); }
+.assistant-panel.expanded { width: 320px; align-items: stretch; }
+
+.assistant-tag {
+  display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0;
+  background: #1c222b; border: 1px solid #232a33; border-radius: 999px;
+  padding: 7px 8px 7px 10px; cursor: grab; user-select: none;
+  box-shadow: 0 8px 20px rgba(0,0,0,.4);
+  touch-action: none;
 }
-.assistant-head h3 { margin: 0; font-size: 15px; color: #e6e9ed; display: flex; align-items: center; gap: 8px; }
-.assistant-spark { width: 16px; height: 16px; color: #2ea36f; animation: assistantGlow 2.6s ease-in-out infinite; }
-.assistant-panel.thinking .assistant-spark { animation-duration: 1s; }
-.assistant-head-actions { display: flex; gap: 4px; }
-.assistant-head button { background: none; border: none; color: #8b94a1; cursor: pointer; padding: 6px; border-radius: 8px; display: flex; }
-.assistant-head button:hover { background: #1c222b; color: #e6e9ed; }
-.assistant-head button svg { width: 18px; height: 18px; }
-.assistant-messages { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
-.assistant-msg { max-width: 88%; padding: 9px 12px; border-radius: 12px; font-size: 13.5px; line-height: 1.45; white-space: pre-wrap; word-wrap: break-word; }
+.assistant-tag:active { cursor: grabbing; }
+.assistant-tag .assistant-spark { width: 14px; height: 14px; color: #2ea36f; animation: assistantGlow 2.6s ease-in-out infinite; flex-shrink: 0; }
+.assistant-panel.thinking .assistant-tag .assistant-spark { animation-duration: 1s; }
+.assistant-tag-label { font-size: 12.5px; font-weight: 600; color: #e6e9ed; }
+.assistant-tag button { background: none; border: none; color: #8b94a1; cursor: pointer; padding: 3px; border-radius: 6px; display: flex; margin-left: 2px; }
+.assistant-tag button:hover { background: #262e39; color: #e6e9ed; }
+.assistant-tag button svg { width: 14px; height: 14px; }
+
+.assistant-messages {
+  margin-top: 8px; max-width: 320px; max-height: 40vh; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 8px; align-items: flex-end;
+  cursor: pointer;
+}
+.assistant-panel.expanded .assistant-messages { max-width: none; max-height: 46vh; align-items: stretch; cursor: default; }
+.assistant-msg { max-width: 100%; padding: 9px 12px; border-radius: 12px; font-size: 13.5px; line-height: 1.45; white-space: pre-wrap; word-wrap: break-word; }
 .assistant-msg.user { align-self: flex-end; background: #2ea36f; color: #0b0f14; border-bottom-right-radius: 4px; }
-.assistant-msg.assistant { align-self: flex-start; background: #1c222b; color: #e6e9ed; border-bottom-left-radius: 4px; }
+.assistant-msg.assistant { align-self: flex-start; background: #1c222b; color: #e6e9ed; border-bottom-left-radius: 4px; border: 1px solid #232a33; }
 .assistant-msg.pending { opacity: .6; }
 .assistant-msg.error { background: #3a1418; color: #f28b8b; }
-.assistant-empty { color: #8b94a1; font-size: 13px; text-align: center; margin: auto; padding: 0 12px; }
+.assistant-empty { color: #8b94a1; font-size: 13px; padding: 4px 2px; align-self: stretch; text-align: right; }
+.assistant-panel.expanded .assistant-empty { text-align: center; }
 .assistant-thinking { display: flex; gap: 4px; align-items: center; padding: 4px 2px; }
 .assistant-thinking span { width: 6px; height: 6px; border-radius: 50%; background: #8b94a1; animation: assistantDot 1.2s ease-in-out infinite; }
 .assistant-thinking span:nth-child(2) { animation-delay: .15s; }
 .assistant-thinking span:nth-child(3) { animation-delay: .3s; }
 .assistant-caret { display: inline-block; width: 2px; height: 1em; background: currentColor; margin-left: 1px; vertical-align: text-bottom; animation: assistantBlink 1s step-end infinite; }
-.assistant-input-row { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-top: 1px solid #232a33; flex-shrink: 0; }
-.assistant-panel:not(.has-messages) .assistant-input-row { border-top: none; }
+
+.assistant-input-row {
+  display: none; align-items: center; gap: 8px; margin-top: 8px; padding: 8px 10px;
+  background: #12161d; border: 1px solid #232a33; border-radius: 14px;
+}
+.assistant-panel.expanded .assistant-input-row { display: flex; }
+.assistant-input-row button#assistantClearBtn { background: none; border: none; color: #8b94a1; cursor: pointer; padding: 6px; border-radius: 8px; display: flex; flex-shrink: 0; }
+.assistant-input-row button#assistantClearBtn:hover { background: #1c222b; color: #e6e9ed; }
+.assistant-input-row button#assistantClearBtn svg { width: 16px; height: 16px; }
 .assistant-input-icon { display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: #2ea36f; }
-.assistant-input-icon svg { width: 20px; height: 20px; }
+.assistant-input-icon svg { width: 18px; height: 18px; }
 .assistant-input-row textarea {
   flex: 1; resize: none; background: transparent; border: none;
-  color: #e6e9ed; padding: 8px 2px; font-size: 14px; font-family: inherit; max-height: 90px;
+  color: #e6e9ed; padding: 6px 2px; font-size: 14px; font-family: inherit; max-height: 90px;
 }
 .assistant-input-row textarea:focus { outline: none; }
 .assistant-send-btn {
-  background: #2ea36f; border: none; border-radius: 50%; width: 36px; height: 36px; flex-shrink: 0;
+  background: #2ea36f; border: none; border-radius: 50%; width: 32px; height: 32px; flex-shrink: 0;
   cursor: pointer; color: #0b0f14; display: flex; align-items: center; justify-content: center;
 }
 .assistant-send-btn:disabled { opacity: .5; cursor: default; }
-.assistant-send-btn svg { width: 18px; height: 18px; }
-.assistant-action-card { margin: 6px 0 10px; padding: 10px 12px; border-radius: 10px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); }
+.assistant-send-btn svg { width: 16px; height: 16px; }
+.assistant-action-card { margin: 6px 0 2px; padding: 10px 12px; border-radius: 10px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); width: 260px; max-width: 100%; }
+.assistant-panel.expanded .assistant-action-card { width: auto; }
 .assistant-action-title { font-weight: 600; font-size: 13px; margin-bottom: 2px; }
 .assistant-action-detail { font-size: 12.5px; opacity: 0.75; margin-bottom: 8px; }
 .assistant-action-btns { display: flex; gap: 8px; justify-content: flex-end; }
@@ -633,12 +641,12 @@ header { padding: 10px 16px; }
 @keyframes assistantBlink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
 
 @media (prefers-reduced-motion: reduce) {
-  .assistant-spark, .assistant-thinking span, .assistant-caret { animation: none !important; }
+  .assistant-tag .assistant-spark, .assistant-thinking span, .assistant-caret { animation: none !important; }
 }
 
 @media (max-width: 640px) {
-  .assistant-panel { top: 8vh; left: 10px; right: 10px; width: auto; height: 78vh; max-height: 78vh; transform: translateY(12px) scale(.98); }
-  .assistant-panel.open { transform: translateY(0) scale(1); }
+  .assistant-panel { top: auto; bottom: 16px; right: 16px; }
+  .assistant-panel.expanded { width: calc(100vw - 32px); max-width: 360px; }
 }
 </style>
 </head>
@@ -1315,17 +1323,15 @@ header { padding: 10px 16px; }
 
 
 
-<div class="assistant-backdrop" id="assistantBackdrop" onclick="assistantClose()"></div>
 <div class="assistant-panel" id="assistantPanel">
-<div class="assistant-head">
-<h3><svg class="assistant-spark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l1.8 5.8L20 9.5l-5.8 1.7L12 17l-1.7-5.8L4 9.5l6.2-1.7L12 2z"/><path d="M19 15l.9 2.6L22 18.5l-2.1.9L19 22l-.9-2.6L16 18.5l2.1-.9L19 15z"/></svg><span>Base</span></h3>
-<div class="assistant-head-actions">
-<button id="assistantClearBtn" title="Nieuw gesprek" onclick="assistantClear()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg></button>
+<div class="assistant-tag" id="assistantTag">
+<svg class="assistant-spark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l1.8 5.8L20 9.5l-5.8 1.7L12 17l-1.7-5.8L4 9.5l6.2-1.7L12 2z"/><path d="M19 15l.9 2.6L22 18.5l-2.1.9L19 22l-.9-2.6L16 18.5l2.1-.9L19 15z"/></svg>
+<span class="assistant-tag-label">Base</span>
 <button id="assistantCloseBtn" title="Sluiten" onclick="assistantClose()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
 </div>
-</div>
-<div class="assistant-messages" id="assistantMessages"></div>
+<div class="assistant-messages" id="assistantMessages" onclick="assistantExpand()"></div>
 <div class="assistant-input-row">
+<button id="assistantClearBtn" title="Nieuw gesprek" onclick="event.stopPropagation(); assistantClear();"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg></button>
 <span class="assistant-input-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l1.8 5.8L20 9.5l-5.8 1.7L12 17l-1.7-5.8L4 9.5l6.2-1.7L12 2z"/><path d="M19 15l.9 2.6L22 18.5l-2.1.9L19 22l-.9-2.6L16 18.5l2.1-.9L19 15z"/></svg></span>
 <textarea id="assistantInput" rows="1" onkeydown="assistantKeydown(event)"></textarea>
 <button class="assistant-send-btn" id="assistantSendBtn" onclick="assistantSend()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg></button>
@@ -4381,13 +4387,15 @@ function assistantActionCardHtml(m, idx) {
 function assistantRenderMessages() {
   const el = $('assistantMessages');
   const panelEl = $('assistantPanel');
+  const expanded = panelEl && panelEl.classList.contains('expanded');
   if (!assistantHistory.length) {
-    el.innerHTML = '<div class="assistant-empty" id="assistantEmptyHint">' + assistantEscape(t('assistant.emptyHint')) + '</div>';
-    if (panelEl) panelEl.classList.remove('has-messages');
+    el.innerHTML = expanded ? '<div class="assistant-empty" id="assistantEmptyHint">' + assistantEscape(t('assistant.emptyHint')) + '</div>' : '';
     return;
   }
-  if (panelEl) panelEl.classList.add('has-messages');
-  el.innerHTML = assistantHistory.map((m, idx) => {
+  const items = expanded ? assistantHistory.map((m, i) => [i, m]) : [[assistantHistory.length - 1, assistantHistory[assistantHistory.length - 1]]];
+  el.innerHTML = items.map((pair) => {
+    const idx = pair[0];
+    const m = pair[1];
     const cls = m.role === 'user' ? 'user' : (m.error ? 'assistant error' : 'assistant');
     const pending = m.pending ? ' pending' : '';
     let body;
@@ -4421,20 +4429,54 @@ function assistantIsEditableTarget(el) {
   return false;
 }
 
+let assistantIdleTimer = null;
+function assistantClearIdleTimer() { clearTimeout(assistantIdleTimer); assistantIdleTimer = null; }
+function assistantResetIdleTimer() {
+  assistantClearIdleTimer();
+  const panel = $('assistantPanel');
+  if (!panel || !panel.classList.contains('open') || panel.classList.contains('expanded')) return;
+  assistantIdleTimer = setTimeout(() => { assistantClose(); }, 9000);
+}
+function assistantApplySavedPosition() {
+  const panel = $('assistantPanel');
+  let pos = null;
+  try { pos = JSON.parse(localStorage.getItem('assistantPos') || 'null'); } catch (e) { pos = null; }
+  if (pos && typeof pos.left === 'number' && typeof pos.top === 'number') {
+    const maxLeft = window.innerWidth - panel.offsetWidth - 8;
+    const maxTop = window.innerHeight - 60;
+    panel.style.left = Math.max(8, Math.min(pos.left, maxLeft)) + 'px';
+    panel.style.top = Math.max(8, Math.min(pos.top, maxTop)) + 'px';
+    panel.style.right = 'auto';
+    panel.style.bottom = 'auto';
+  }
+}
 function assistantOpen() {
   const panel = $('assistantPanel');
-  const backdrop = $('assistantBackdrop');
+  panel.classList.remove('expanded');
   panel.classList.add('open');
-  backdrop.classList.add('open');
+  assistantApplySavedPosition();
   assistantLoadHistory();
+  assistantRenderMessages();
   const input = $('assistantInput');
   input.placeholder = t('assistant.placeholder');
-  setTimeout(() => input.focus(), 150);
+  assistantResetIdleTimer();
+}
+
+function assistantExpand() {
+  const panel = $('assistantPanel');
+  if (!panel.classList.contains('open')) return;
+  panel.classList.add('expanded');
+  assistantClearIdleTimer();
+  assistantRenderMessages();
+  const input = $('assistantInput');
+  setTimeout(() => input.focus(), 80);
 }
 
 function assistantClose() {
-  $('assistantPanel').classList.remove('open');
-  $('assistantBackdrop').classList.remove('open');
+  assistantClearIdleTimer();
+  const panel = $('assistantPanel');
+  panel.classList.remove('open');
+  panel.classList.remove('expanded');
   if (assistantProactivePending) {
     assistantSendFeedback(assistantProactivePending.category, false);
     assistantProactivePending = null;
@@ -4472,6 +4514,46 @@ document.addEventListener('keydown', function (e) {
     assistantWordBuffer = '';
   }
 });
+
+(function assistantSetupDrag() {
+  let dragging = false, moved = false, startX = 0, startY = 0, startLeft = 0, startTop = 0;
+  function onMove(e) {
+    if (!dragging) return;
+    const dx = e.clientX - startX, dy = e.clientY - startY;
+    if (Math.abs(dx) > 4 || Math.abs(dy) > 4) moved = true;
+    const panel = $('assistantPanel');
+    const maxLeft = window.innerWidth - panel.offsetWidth - 8;
+    const maxTop = window.innerHeight - 40;
+    panel.style.left = Math.max(8, Math.min(startLeft + dx, maxLeft)) + 'px';
+    panel.style.top = Math.max(8, Math.min(startTop + dy, maxTop)) + 'px';
+    panel.style.right = 'auto';
+    panel.style.bottom = 'auto';
+  }
+  function onUp() {
+    if (!dragging) return;
+    dragging = false;
+    document.removeEventListener('pointermove', onMove);
+    document.removeEventListener('pointerup', onUp);
+    const panel = $('assistantPanel');
+    if (moved) {
+      const rect = panel.getBoundingClientRect();
+      localStorage.setItem('assistantPos', JSON.stringify({ left: rect.left, top: rect.top }));
+    } else {
+      assistantExpand();
+    }
+  }
+  const tag = $('assistantTag');
+  if (!tag) return;
+  tag.addEventListener('pointerdown', function (e) {
+    if (e.target.closest('#assistantCloseBtn')) return;
+    const panel = $('assistantPanel');
+    const rect = panel.getBoundingClientRect();
+    dragging = true; moved = false;
+    startX = e.clientX; startY = e.clientY; startLeft = rect.left; startTop = rect.top;
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
+  });
+})();
 
 async function assistantClear() {
   if (!confirm(t('assistant.clearConfirm'))) return;
