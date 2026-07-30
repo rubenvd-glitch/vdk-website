@@ -568,15 +568,19 @@ header { padding: 10px 16px; }
 }
 .assistant-backdrop.open { opacity: 1; pointer-events: auto; }
 .assistant-panel {
-  position: fixed; top: 12vh; left: 50%; z-index: 300;
-  width: 480px; max-width: calc(100vw - 32px); height: 520px; max-height: calc(100vh - 120px);
-  background: #12161d; border: 1px solid #232a33; border-radius: 16px;
+  position: fixed; bottom: 28px; left: 50%; z-index: 300;
+  width: 560px; max-width: calc(100vw - 32px); height: 64px; max-height: calc(100vh - 120px);
+  background: rgba(18,22,29,.94); -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px);
+  border: 1px solid #232a33; border-radius: 20px;
   display: flex; flex-direction: column; overflow: hidden;
   transform: translateX(-50%) translateY(12px) scale(.98); opacity: 0; pointer-events: none;
-  transition: transform .18s ease, opacity .18s ease;
-  box-shadow: 0 12px 36px rgba(0,0,0,.5);
+  transition: transform .18s ease, opacity .18s ease, height .22s ease;
+  box-shadow: 0 20px 60px rgba(0,0,0,.55);
 }
 .assistant-panel.open { transform: translateX(-50%) translateY(0) scale(1); opacity: 1; pointer-events: auto; }
+.assistant-panel.has-messages { height: 520px; }
+.assistant-panel:not(.has-messages) .assistant-head,
+.assistant-panel:not(.has-messages) .assistant-messages { display: none; }
 .assistant-head {
   display: flex; align-items: center; justify-content: space-between;
   padding: 12px 14px; border-bottom: 1px solid #232a33; flex-shrink: 0;
@@ -600,14 +604,17 @@ header { padding: 10px 16px; }
 .assistant-thinking span:nth-child(2) { animation-delay: .15s; }
 .assistant-thinking span:nth-child(3) { animation-delay: .3s; }
 .assistant-caret { display: inline-block; width: 2px; height: 1em; background: currentColor; margin-left: 1px; vertical-align: text-bottom; animation: assistantBlink 1s step-end infinite; }
-.assistant-input-row { display: flex; gap: 8px; padding: 10px; border-top: 1px solid #232a33; flex-shrink: 0; }
+.assistant-input-row { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-top: 1px solid #232a33; flex-shrink: 0; }
+.assistant-panel:not(.has-messages) .assistant-input-row { border-top: none; }
+.assistant-input-icon { display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: #2ea36f; }
+.assistant-input-icon svg { width: 20px; height: 20px; }
 .assistant-input-row textarea {
-  flex: 1; resize: none; background: #0d1117; border: 1px solid #232a33; border-radius: 10px;
-  color: #e6e9ed; padding: 9px 11px; font-size: 13.5px; font-family: inherit; max-height: 90px;
+  flex: 1; resize: none; background: transparent; border: none;
+  color: #e6e9ed; padding: 8px 2px; font-size: 14px; font-family: inherit; max-height: 90px;
 }
-.assistant-input-row textarea:focus { outline: none; border-color: #2ea36f; }
+.assistant-input-row textarea:focus { outline: none; }
 .assistant-send-btn {
-  background: #2ea36f; border: none; border-radius: 10px; width: 38px; height: 38px; flex-shrink: 0;
+  background: #2ea36f; border: none; border-radius: 50%; width: 36px; height: 36px; flex-shrink: 0;
   cursor: pointer; color: #0b0f14; display: flex; align-items: center; justify-content: center;
 }
 .assistant-send-btn:disabled { opacity: .5; cursor: default; }
@@ -1300,6 +1307,7 @@ header { padding: 10px 16px; }
 </div>
 <div class="assistant-messages" id="assistantMessages"></div>
 <div class="assistant-input-row">
+<span class="assistant-input-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l1.8 5.8L20 9.5l-5.8 1.7L12 17l-1.7-5.8L4 9.5l6.2-1.7L12 2z"/><path d="M19 15l.9 2.6L22 18.5l-2.1.9L19 22l-.9-2.6L16 18.5l2.1-.9L19 15z"/></svg></span>
 <textarea id="assistantInput" rows="1" onkeydown="assistantKeydown(event)"></textarea>
 <button class="assistant-send-btn" id="assistantSendBtn" onclick="assistantSend()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg></button>
 </div>
@@ -4207,10 +4215,13 @@ function assistantActionCardHtml(m, idx) {
 
 function assistantRenderMessages() {
   const el = $('assistantMessages');
+  const panelEl = $('assistantPanel');
   if (!assistantHistory.length) {
     el.innerHTML = '<div class="assistant-empty" id="assistantEmptyHint">' + assistantEscape(t('assistant.emptyHint')) + '</div>';
+    if (panelEl) panelEl.classList.remove('has-messages');
     return;
   }
+  if (panelEl) panelEl.classList.add('has-messages');
   el.innerHTML = assistantHistory.map((m, idx) => {
     const cls = m.role === 'user' ? 'user' : (m.error ? 'assistant error' : 'assistant');
     const pending = m.pending ? ' pending' : '';
