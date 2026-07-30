@@ -770,6 +770,7 @@ header { padding: 10px 16px; }
 <button data-gtab="progress">Progressie</button>
 <button data-gtab="bodycomp">Lichaam</button>
 <button data-gtab="goals">Doelen</button>
+<button data-gtab="schema">Schema</button>
 </div>
 
 <!-- Overzicht -->
@@ -880,6 +881,24 @@ header { padding: 10px 16px; }
 <div id="gymGoalList"></div>
 <div class="section-head" style="margin-top:18px;"><h2 style="font-size:14px;color:#8b94a1;">Algemeen</h2></div>
 <div id="gymGoalGeneralList"></div>
+</div>
+
+<!-- Schema: vaste rotatie door opgeslagen sessies (dag 1, dag 2, ... dan weer dag 1),
+     niet gekoppeld aan specifieke weekdagen. -->
+<div class="gym-sub" id="gtab-schema" style="display:none;">
+<div class="section-head"><h2 style="font-size:16px;">Trainingsschema</h2></div>
+<div class="section-sub" style="margin-bottom:16px;">Een vaste volgorde van opgeslagen sessies die je blijft herhalen (dag 1, dag 2, ... dan weer dag 1) — niet gekoppeld aan specifieke weekdagen.</div>
+<div id="gymSplitToday" style="background:#151a21;border:1px solid #232a33;border-radius:12px;padding:18px;margin-bottom:20px;"></div>
+<div class="section-head" style="margin-top:4px;">
+<h2 style="font-size:16px;">Volgorde</h2>
+<button class="btn-primary" id="gymSplitSuggestBtn" onclick="gymSplitApplySuggestion()">Laat Base voorstellen</button>
+</div>
+<div id="gymSplitAdvice" style="margin-bottom:12px;"></div>
+<div id="gymSplitOrderList"></div>
+<div class="section-head" style="margin-top:20px;">
+<h2 style="font-size:16px;">Opgeslagen sessies toevoegen</h2>
+</div>
+<div id="gymSplitAvailableList"></div>
 </div>
 </div>
 
@@ -2970,6 +2989,7 @@ let gymPlanTargets = {};
 let gymComposerView = 'list';
 let gymEditingTemplateId = null;
 let gymActiveSession = null;
+let gymSplitSchedule = { order: [], currentIndex: 0 };
 const GYM_PLAN_GROUP_OPTIONS = GYM_MUSCLE_MAP.map((g) => g.key);
 
 function gymUnit() { return gymProfile.unit || 'kg'; }
@@ -3840,6 +3860,149 @@ gymRenderSessionPlanner();
 function gymRenderTemplates() {
 $('gymTmplList').innerHTML = gymSessionTemplates.length ? gymSessionTemplates.map(gymTmplRowHtml).join('') : '<div class="plan-empty">Nog geen opgeslagen sessies.</div>';
 }
+
+function gymSplitTemplateVolume(tp) {
+const totals = {};
+(tp.exercises || []).forEach((n) => {
+const tgt = (tp.targets || {})[n] || {};
+const topsets = tgt.topsets != null ? tgt.topsets : 1;
+const dropset = !!tgt.dropset;
+const effSets = topsets + (dropset ? 1 : 0);
+gymTargetsFor(n).forEach(([g, r, w]) => {
+const key = g === 'legs' ? `${g}:${r}` : g;
+totals[key] = (totals[key] || 0) + effSets * w;
+});
+});
+return totals;
+}
+function gymSplitGroupLabel(key) {
+const groupKey = key.includes(':') ? key.split(':')[0] : key;
+const region = key.includes(':') ? key.split(':')[1] : null;
+const group = GYM_MUSCLE_MAP.find((g) => g.key === groupKey);
+if (region) return ((group && group.regions.find((x) => x.key === region)) || {}).label || region;
+return group ? group.label : key;
+}
+function gymSplitOverlapScore(tpA, tpB) {
+const volA = gymSplitTemplateVolume(tpA);
+const volB = gymSplitTemplateVolume(tpB);
+let score = 0;
+Object.keys(volA).forEach((key) => { if (volB[key] !== undefined) score += Math.min(volA[key], volB[key]); });
+return score;
+}
+function gymSplitOverlapWarnings(tpA, tpB) {
+const volA = gymSplitTemplateVolume(tpA);
+const volB = gymSplitTemplateVolume(tpB);
+const warnings = [];
+Object.keys(volA).forEach((key) => {
+if (volB[key] === undefined) return;
+if (volA[key] > 6 && volB[key] > 6) warnings.push(gymSplitGroupLabel(key));
+});
+return warnings;
+}
+function gymSplitCritiqueOrder(order) {
+const tpls = order.map((id) => gymSessionTemplates.find((x) => x.id === id)).filter(Boolean);
+if (tpls.length < 2) return [];
+const n = tpls.length;
+const pairsToCheck = n === 2 ? 1 : n;
+const msgs = [];
+for (let i = 0; i < pairsToCheck; i++) {
+const a = tpls[i];
+const b = tpls[(i + 1) % n];
+const warn = gymSplitOverlapWarnings(a, b);
+if (warn.length) msgs.push(`Dag ${i + 1} (${a.name}) en dag ${((i + 1) % n) + 1} (${b.name}) trainen allebei zwaar: ${warn.join(', ')}. Overweeg een andere volgorde of extra rust ertussen.`);
+}
+return msgs;
+}
+function gymSplitSuggestOrder() {
+const tpls = gymSessionTemplates.slice();
+if (tpls.length < 2) return tpls.map((x) => x.id);
+const remaining = new Set(tpls.map((x) => x.id));
+let current = tpls[0];
+const order = [current.id];
+remaining.delete(current.id);
+while (remaining.size) {
+let best = null, bestScore = Infinity;
+remaining.forEach((id) => {
+const cand = tpls.find((x) => x.id === id);
+const score = gymSplitOverlapScore(current, cand);
+if (score < bestScore) { bestScore = score; best = cand; }
+});
+order.push(best.id);
+remaining.delete(best.id);
+current = best;
+}
+return order;
+}
+async function gymSplitSaveOrder(order) {
+try {
+const d = await api('/api/gym/split', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'setOrder', order }) });
+gymSplitSchedule = d;
+gymRenderSplitTab();
+} catch (e) { flashSetMsg(e.message); }
+}
+window.gymSplitAddToOrder = (id) => { gymSplitSaveOrder([...(gymSplitSchedule.order || []), id]); };
+window.gymSplitRemoveFromOrder = (idx) => { gymSplitSaveOrder((gymSplitSchedule.order || []).filter((_, i) => i !== idx)); };
+window.gymSplitMoveOrder = (idx, dir) => {
+const order = [...(gymSplitSchedule.order || [])];
+const j = idx + dir;
+if (j < 0 || j >= order.length) return;
+[order[idx], order[j]] = [order[j], order[idx]];
+gymSplitSaveOrder(order);
+};
+window.gymSplitGoto = async (idx) => {
+try {
+const d = await api('/api/gym/split', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'setIndex', index: idx }) });
+gymSplitSchedule = d;
+gymRenderSplitTab();
+} catch (e) { flashSetMsg(e.message); }
+};
+window.gymSplitApplySuggestion = () => {
+if (gymSessionTemplates.length < 2) { flashSetMsg('Je hebt minstens 2 opgeslagen sessies nodig om een schema voor te stellen.'); return; }
+gymSplitSaveOrder(gymSplitSuggestOrder());
+};
+function gymRenderSplitTab() {
+if (!$('gymSplitToday')) return;
+const order = gymSplitSchedule.order || [];
+const tpls = order.map((id) => gymSessionTemplates.find((x) => x.id === id)).filter(Boolean);
+const idx = tpls.length ? Math.min(gymSplitSchedule.currentIndex || 0, tpls.length - 1) : 0;
+if (!tpls.length) {
+$('gymSplitToday').innerHTML = '<div class="plan-empty">Nog geen schema ingesteld. Voeg hieronder opgeslagen sessies toe aan je volgorde.</div>';
+} else {
+const tp = tpls[idx];
+$('gymSplitToday').innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+<div>
+<div style="font-size:12.5px;color:#8b94a1;">Vandaag ben je aan dag ${idx + 1} van ${tpls.length} toe</div>
+<div style="font-size:20px;font-weight:800;margin-top:2px;">${esc(tp.name)}</div>
+<div style="font-size:12.5px;color:#8b94a1;margin-top:4px;">${tp.exercises.length} oefening(en)</div>
+</div>
+<div style="display:flex;gap:8px;">
+<button class="icon-btn" onclick="gymSplitGoto(${(idx - 1 + tpls.length) % tpls.length})" title="Vorige dag">◀</button>
+<button class="icon-btn" onclick="gymSplitGoto(${(idx + 1) % tpls.length})" title="Volgende dag">▶</button>
+</div>
+</div>`;
+}
+const critique = gymSplitCritiqueOrder(order);
+$('gymSplitAdvice').innerHTML = critique.length
+? critique.map((m) => `<div class="plan-vol-detail" style="margin-bottom:8px;">⚠️ ${esc(m)}</div>`).join('')
+: (tpls.length >= 2 ? '<div class="plan-vol-detail">✅ Geen overlappende zware spiergroepen tussen opeenvolgende dagen.</div>' : '');
+$('gymSplitOrderList').innerHTML = tpls.length
+? tpls.map((row, i) => `<div class="tmpl-row">
+<div><div class="tname">Dag ${i + 1}: ${esc(row.name)}</div><div class="tmeta">${row.exercises.length} oefening(en)</div></div>
+<div class="tmpl-actions">
+<button class="icon-btn" onclick="gymSplitMoveOrder(${i},-1)"${i === 0 ? ' disabled' : ''} title="Omhoog">↑</button>
+<button class="icon-btn" onclick="gymSplitMoveOrder(${i},1)"${i === tpls.length - 1 ? ' disabled' : ''} title="Omlaag">↓</button>
+<button class="icon-btn icon-btn-danger" onclick="gymSplitRemoveFromOrder(${i})" title="Verwijderen">${IC.trash}</button>
+</div>
+</div>`).join('')
+: '<div class="plan-empty">Nog geen dagen toegevoegd.</div>';
+const available = gymSessionTemplates.filter((tp) => !order.includes(tp.id));
+$('gymSplitAvailableList').innerHTML = available.length
+? available.map((tp) => `<div class="tmpl-row">
+<div><div class="tname">${esc(tp.name)}</div><div class="tmeta">${tp.exercises.length} oefening(en)</div></div>
+<div class="tmpl-actions"><button class="icon-btn" onclick="gymSplitAddToOrder('${tp.id}')" title="Toevoegen aan schema">+</button></div>
+</div>`).join('')
+: (gymSessionTemplates.length ? '<div class="plan-empty">Alle opgeslagen sessies zitten al in je schema.</div>' : '<div class="plan-empty">Je hebt nog geen opgeslagen sessies. Maak er eerst een bij "Sessie samenstellen".</div>');
+}
 window.gymLoadTemplate = (id) => {
 const tp = gymSessionTemplates.find((x) => x.id === id);
 if (!tp) return;
@@ -4114,6 +4277,7 @@ gymRenderGoals();
 gymRenderHomeCard();
 gymRenderPlanGroupChips();
 gymRenderTemplates();
+gymRenderSplitTab();
 if (gymActiveTab === 'progress') gymRenderExercisesTab();
 if (gymActiveTab === 'session') gymRenderSessionPlanner();
 }
@@ -4129,6 +4293,7 @@ try { gymLog = await api('/api/gym/log'); } catch (e) { /* opslag nog niet gekop
 try { gymBodycomp = await api('/api/gym/bodycomp'); } catch (e) { /* opslag nog niet gekoppeld */ }
 try { gymGoals = await api('/api/gym/goals'); } catch (e) { /* opslag nog niet gekoppeld */ }
 try { gymSessionTemplates = await api('/api/gym/sessions'); } catch (e) { /* opslag nog niet gekoppeld */ }
+try { gymSplitSchedule = await api('/api/gym/split'); } catch (e) { /* opslag nog niet gekoppeld */ }
 gymRenderAll();
 }
 
