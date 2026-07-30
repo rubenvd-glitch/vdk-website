@@ -4,6 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>VDK Base</title>
+<link rel="manifest" href="/base/manifest.webmanifest">
+<meta name="theme-color" content="#11151c">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Base">
+<link rel="apple-touch-icon" href="/base/apple-touch-icon.png">
+
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 @keyframes fadeUp {
@@ -1023,6 +1031,17 @@ header { padding: 10px 16px; }
 </div>
 </div>
 <div class="set-card">
+<h3 data-i18n="set.push">Pushmeldingen</h3>
+<div class="section-sub" data-i18n="set.pushSub" style="margin:8px 0 4px;">Krijg meldingen van Base op dit apparaat, bijvoorbeeld wanneer een reminder met tijd verloopt.</div>
+<div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;">
+<button class="btn-primary" id="pushEnableBtn" style="padding:9px 14px; cursor:pointer;" data-i18n="set.pushEnable">Zet aan op dit apparaat</button>
+<button class="btn-ghost-border" id="pushDisableBtn" style="display:none; cursor:pointer;" data-i18n="set.pushDisable">Uitzetten</button>
+<button class="btn-ghost-border" id="pushTestBtn" style="display:none; cursor:pointer;" data-i18n="set.pushTest">Testmelding</button>
+</div>
+<div class="hint" id="pushHint" style="font-size:12.5px; color:#8b94a1; line-height:1.6; margin-top:10px;"></div>
+<div class="hint" style="font-size:12.5px; color:#8b94a1; line-height:1.6; margin-top:6px;" data-i18n="set.pushIosHelp">iPhone/iPad: zet Base eerst op je beginscherm (Deel-knop, Zet op beginscherm) en open de app vanaf daar; daarna kun je meldingen aanzetten.</div>
+</div>
+<div class="set-card">
 <h3 data-i18n="set.privacy">Privacy — Base</h3>
 <div class="hint" data-i18n="set.privacySub" style="margin:2px 0 10px;">Wat Base van je opslaat en hoe daarmee wordt omgegaan.</div>
 <div class="hint" data-i18n="privacy.p1" style="margin:0 0 10px; line-height:1.6;">Je gesprekken met Base worden opgeslagen in jouw eigen beveiligde database (Upstash), gekoppeld aan jouw account. Niemand anders kan ze zien.</div>
@@ -1398,6 +1417,8 @@ en: {
 'set.tgHelp':'One-time setup: create a bot via @BotFather in Telegram, put the token in Render as TELEGRAM_BOT_TOKEN, send your bot a message and click Link here.',
 'set.status':'Status','set.link':'Link','set.test':'Test message','set.soon':'Coming soon',
 'set.cal':'Connect calendar','set.calSub':'Import your calendar and push reminders to it (always with a confirmation first).',
+'set.push':'Push notifications','set.pushSub':'Get Base notifications on this device, for example when a timed reminder is due.','set.pushEnable':'Enable on this device','set.pushDisable':'Disable','set.pushTest':'Send test','set.pushOn':'Push notifications are enabled on this device.','set.pushOff':'Not enabled on this device yet.','set.pushDenied':'Notifications are blocked for Base in your browser or system settings.','set.pushUnsupported':'This browser does not support push here. On iPhone: add Base to your home screen first (Share, Add to Home Screen) and open it from there.','set.pushOnMsg':'Push notifications enabled.','set.pushTestSent':'Test notification sent.','set.pushTestNone':'No devices are registered yet.','set.pushIosHelp':'iPhone/iPad: first add Base to your home screen (Share, Add to Home Screen) and open the app from there; then you can enable notifications.',
+
 'set.connect':'Connect','set.disconnect':'Disconnect',
 'set.calAppleHelp':'Create a free app-specific password at appleid.apple.com → Sign-In and Security → App-Specific Passwords.',
 'set.saved':'Saved.','set.nameSaved':'Name saved.','set.tgSent':'Test message sent.','set.tgLinked':'Telegram linked. Check your app for the confirmation.',
@@ -1477,6 +1498,8 @@ nl: {
 'set.tgHelp':'Eenmalig instellen: maak een bot via @BotFather in Telegram, zet het token in Render als TELEGRAM_BOT_TOKEN, stuur je bot een berichtje en klik hier op Koppelen.',
 'set.status':'Status','set.link':'Koppelen','set.test':'Testbericht','set.soon':'Binnenkort beschikbaar',
 'set.cal':'Agenda koppelen','set.calSub':'Importeer je agenda en push herinneringen ernaartoe (altijd eerst met bevestiging).',
+'set.push':'Pushmeldingen','set.pushSub':'Krijg meldingen van Base op dit apparaat, bijvoorbeeld wanneer een reminder met tijd verloopt.','set.pushEnable':'Zet aan op dit apparaat','set.pushDisable':'Uitzetten','set.pushTest':'Testmelding','set.pushOn':'Pushmeldingen staan aan op dit apparaat.','set.pushOff':'Nog niet aan op dit apparaat.','set.pushDenied':'Meldingen zijn voor Base geblokkeerd in je browser- of systeeminstellingen.','set.pushUnsupported':'Deze browser ondersteunt hier geen push. Op iPhone: zet Base eerst op je beginscherm (Deel, Zet op beginscherm) en open hem vanaf daar.','set.pushOnMsg':'Pushmeldingen aangezet.','set.pushTestSent':'Testmelding verstuurd.','set.pushTestNone':'Er zijn nog geen apparaten aangemeld.','set.pushIosHelp':'iPhone/iPad: zet Base eerst op je beginscherm (Deel-knop, Zet op beginscherm) en open de app vanaf daar; daarna kun je meldingen aanzetten.',
+
 'set.connect':'Koppelen','set.disconnect':'Ontkoppelen',
 'set.calAppleHelp':'Maak een gratis app-specifiek wachtwoord op appleid.apple.com → Aanmelden en beveiliging → App-specifieke wachtwoorden.',
 'set.saved':'Opgeslagen.','set.nameSaved':'Naam opgeslagen.','set.tgSent':'Testbericht verstuurd.','set.tgLinked':'Telegram gekoppeld. Check je app voor het bevestigingsbericht.',
@@ -4717,12 +4740,89 @@ async function assistantProactiveCheck() {
   } catch (e) { /* stil negeren, proactieve check mag falen */ }
 }
 
+// ---------- PWA: service worker + pushmeldingen ----------
+let pushReg = null;
+function pushSupported() { return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window; }
+function pushUrlB64ToU8(b64) {
+const pad = '='.repeat((4 - (b64.length % 4)) % 4);
+const raw = atob((b64 + pad).replace(/-/g, '+').replace(/_/g, '/'));
+return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
+}
+async function pushRefreshUi() {
+const hint = $('pushHint');
+if (!hint) return;
+if (!pushSupported()) {
+$('pushEnableBtn').style.display = 'none';
+$('pushDisableBtn').style.display = 'none';
+$('pushTestBtn').style.display = 'none';
+hint.textContent = t('set.pushUnsupported');
+return;
+}
+let sub = null;
+try { sub = pushReg ? await pushReg.pushManager.getSubscription() : null; } catch (e) {}
+const denied = Notification.permission === 'denied';
+$('pushEnableBtn').style.display = (sub || denied) ? 'none' : 'inline-block';
+$('pushDisableBtn').style.display = sub ? 'inline-block' : 'none';
+$('pushTestBtn').style.display = sub ? 'inline-block' : 'none';
+hint.textContent = denied ? t('set.pushDenied') : (sub ? t('set.pushOn') : t('set.pushOff'));
+}
+async function pushInit() {
+if (!('serviceWorker' in navigator)) { pushRefreshUi(); return; }
+try { pushReg = await navigator.serviceWorker.register('/sw.js', { scope: '/base' }); } catch (e) {}
+pushRefreshUi();
+}
+if ($('pushEnableBtn')) {
+$('pushEnableBtn').onclick = async () => {
+try {
+if (!pushReg) pushReg = await navigator.serviceWorker.register('/sw.js', { scope: '/base' });
+const perm = await Notification.requestPermission();
+if (perm !== 'granted') { pushRefreshUi(); return; }
+const d = await api('/api/push/vapid-public');
+const sub = await pushReg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: pushUrlB64ToU8(d.key) });
+await api('/api/push/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscription: sub.toJSON(), ua: navigator.userAgent.slice(0, 120) }) });
+pushRefreshUi();
+flashSetMsg(t('set.pushOnMsg'));
+} catch (e) { const hint = $('pushHint'); if (hint) hint.textContent = e.message || 'Error'; }
+};
+$('pushDisableBtn').onclick = async () => {
+try {
+const sub = pushReg ? await pushReg.pushManager.getSubscription() : null;
+if (sub) {
+await api('/api/push/unsubscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ endpoint: sub.endpoint }) });
+await sub.unsubscribe();
+}
+pushRefreshUi();
+} catch (e) { const hint = $('pushHint'); if (hint) hint.textContent = e.message || 'Error'; }
+};
+$('pushTestBtn').onclick = async () => {
+try {
+const out = await api('/api/push/test', { method: 'POST' });
+flashSetMsg(out.delivered ? t('set.pushTestSent') : t('set.pushTestNone'));
+} catch (e) { const hint = $('pushHint'); if (hint) hint.textContent = e.message || 'Error'; }
+};
+}
+
 applyLang();
 $('assistantInput').placeholder = t('assistant.placeholder');
 bootGreet();
 setTimeout(bootHide, 6000);
-load();
+const loadDone = load();
 if (location.hash.includes('settings')) showView('settings');
+// Deep links (widget/pushmelding): #tijdlijn opent de Tijdlijn, optioneel
+// met ?d=YYYY-MM-DD (specifieke dag) en ?add=1 (nieuw item direct open).
+(function handleDeepLink() {
+const m = /^#(tijdlijn|timeline)(?:\?(.*))?$/.exec(location.hash || '');
+if (!m) return;
+const q = new URLSearchParams(m[2] || '');
+const d = q.get('d');
+if (d && /^\d{4}-\d{2}-\d{2}$/.test(d)) tlDate = d;
+showView('timeline');
+Promise.resolve(loadDone).then(() => {
+showView('timeline');
+if (q.get('add') === '1') setTimeout(() => openModal(null, { due: tlDate }), 300);
+});
+})();
+pushInit();
 setTimeout(assistantProactiveCheck, 2500);
 </script>
 </body>
