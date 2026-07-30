@@ -1811,6 +1811,7 @@ return json(res, 500, { error: 'Opslag niet bereikbaar. Is Upstash gekoppeld?' }
 // coverage/suggestion logic lives client-side (it only needs the exercise
 // names, no new taxonomy data needs to live server-side).
 function gymSessionKey(email) { return `gymsessions:${email}`; }
+function gymSplitKey(email) { return `gymsplit:${email}`; }
 
 function gymSanitizeTargets(targets, exercises) {
 const out = {};
@@ -1875,6 +1876,34 @@ return json(res, 500, { error: 'Opslag niet bereikbaar. Is Upstash gekoppeld?' }
 }
 }
 
+async function handleGymSplit(req, res) {
+const s = await getSession(req, 'admin');
+if (!s) return json(res, 401, { error: 'Not logged in' });
+const key = gymSplitKey(s.email);
+try {
+if (req.method === 'GET') return json(res, 200, (await kvGetJson(key)) || { order: [], currentIndex: 0 });
+if (req.method === 'POST') {
+const body = await readBody(req);
+let sched = (await kvGetJson(key)) || { order: [], currentIndex: 0 };
+if (body.action === 'setOrder') {
+const order = Array.isArray(body.order) ? body.order.map((x) => String(x).slice(0, 100)).slice(0, 20) : [];
+sched = { order, currentIndex: sched.currentIndex >= order.length ? 0 : sched.currentIndex };
+} else if (body.action === 'setIndex') {
+const idx = Number(body.index);
+const max = Math.max(0, sched.order.length - 1);
+sched = { order: sched.order, currentIndex: sched.order.length ? Math.min(max, Math.max(0, Number.isFinite(idx) ? idx : 0)) : 0 };
+} else {
+return json(res, 400, { error: 'Onbekende actie' });
+}
+await kvSetJson(key, sched);
+return json(res, 200, sched);
+}
+} catch (e) {
+console.error('gym split API error:', e.message);
+return json(res, 500, { error: 'Opslag niet bereikbaar. Is Upstash gekoppeld?' });
+}
+}
+
 // ---------- Server ----------
 
 const server = http.createServer(async (req, res) => {
@@ -1934,6 +1963,7 @@ if (p === '/api/gym/log') return handleGymLog(req, res);
 if (p === '/api/gym/bodycomp') return handleGymBodycomp(req, res);
 if (p === '/api/gym/goals') return handleGymGoals(req, res);
 if (p === '/api/gym/sessions') return handleGymSessions(req, res);
+if (p === '/api/gym/split') return handleGymSplit(req, res);
 
 // --- Base Assistant API (AI chat widget, same 'admin' session as Gym) ---
 if (p === '/api/assistant/history') return handleAssistantHistory(req, res);
