@@ -988,6 +988,15 @@ header { padding: 10px 16px; }
 <button class="btn-ghost-border" id="calAppleDisconnectBtn" style="display:none; cursor:pointer; margin-top:10px;" data-i18n="set.disconnect">Ontkoppelen</button>
 </div>
 </div>
+<div class="set-card">
+<h3 data-i18n="set.privacy">Privacy — Base</h3>
+<div class="hint" data-i18n="set.privacySub" style="margin:2px 0 10px;">Wat Base van je opslaat en hoe daarmee wordt omgegaan.</div>
+<div class="hint" data-i18n="privacy.p1" style="margin:0 0 10px; line-height:1.6;">Je gesprekken met Base worden opgeslagen in jouw eigen beveiligde database (Upstash), gekoppeld aan jouw account. Niemand anders kan ze zien.</div>
+<div class="hint" data-i18n="privacy.p2" style="margin:0 0 10px; line-height:1.6;">Om te kunnen antwoorden stuurt Base je vraag en relevante gegevens (zoals openstaande herinneringen of Gym-doelen) naar Groq, de AI-provider die de antwoorden genereert. Groq gebruikt deze gegevens nooit om zijn modellen te trainen — dat was een bewuste keuze bij het kiezen van deze provider.</div>
+<div class="hint" data-i18n="privacy.p3" style="margin:0 0 10px; line-height:1.6;">Base houdt bij op welk type proactieve melding (een herinnering, een Gym-doel, een idee, enz.) je reageert of juist niet, puur om te leren wat voor  jou belangrijk is. Deze gegevens verlaten nooit je eigen account en worden nergens anders voor gebruikt dan om te bepalen wat Base je in het vervolg wel of niet voorlegt — nooit om zelf iets te doen of te delen.</div>
+<div class="hint" data-i18n="privacy.p4" style="margin:0 0 10px; line-height:1.6;">Base voert nooit zelf iets uit. Bij elke voorgestelde actie (een herinnering aanmaken, een set loggen, enz.) vraagt hij altijd eerst om bevestiging via een knop.</div>
+<div class="hint" data-i18n="privacy.p5" style="margin:0; line-height:1.6;">Je kunt je gesprek met Base op elk moment wissen via de prullenbak-knop in de chatbalk.</div>
+</div>
 <div class="empty" id="setMsg" style="padding:8px 0;"></div>
 </div>
 </main>
@@ -1373,6 +1382,7 @@ en: {
 'due.overdueDay':'1 day overdue','due.overdueDays':'{n} days overdue',
 'assistant.placeholder':'Ask a question...','assistant.emptyHint':'Ask me something about your Gym, reminders, or goals.',
 'assistant.clearConfirm':'Clear this conversation?','assistant.genericError':'Something went wrong.','assistant.thinking':'Base is typing\u2026',
+'set.privacy':'Privacy — Base','set.privacySub':'What Base stores about you and how it is handled.','privacy.p1':'Your conversations with Base are stored in your own secured database (Upstash), tied to your account. No one else can see them.','privacy.p2':'To reply, Base sends your question and relevant context (like open reminders or Gym goals) to Groq, the AI provider that generates the replies. Groq never uses this data to train its models — that was a deliberate choice when picking this provider.','privacy.p3':'Base tracks which type of proactive nudge (a reminder, a Gym goal, an idea, etc.) you respond to or ignore, purely to learn what matters to you. This data never leaves your own account and is never used for anything other than deciding what Base brings up going forward — never to act on its own or share anything.','privacy.p4':'Base never executes anything on its own. For every proposed action (creating a reminder, logging a set, etc.) it always asks for confirmation via a button first.','privacy.p5':'You can clear your conversation with Base at any time via the trash icon in the chat bar.',
 'locale':'en-GB'
 },
 nl: {
@@ -1451,6 +1461,7 @@ nl: {
 'due.overdueDay':'1 dag te laat','due.overdueDays':'{n} dagen te laat',
 'assistant.placeholder':'Typ een vraag...','assistant.emptyHint':'Vraag me iets over je Gym, herinneringen of doelen.',
 'assistant.clearConfirm':'Dit gesprek wissen?','assistant.genericError':'Er ging iets mis.','assistant.thinking':'Base is aan het typen\u2026',
+'set.privacy':'Privacy — Base','set.privacySub':'Wat Base van je opslaat en hoe daarmee wordt omgegaan.','privacy.p1':'Je gesprekken met Base worden opgeslagen in jouw eigen beveiligde database (Upstash), gekoppeld aan jouw account. Niemand anders kan ze zien.','privacy.p2':'Om te kunnen antwoorden stuurt Base je vraag en relevante gegevens (zoals openstaande herinneringen of Gym-doelen) naar Groq, de AI-provider die de antwoorden genereert. Groq gebruikt deze gegevens nooit om zijn modellen te trainen — dat was een bewuste keuze bij het kiezen van deze provider.','privacy.p3':'Base houdt bij op welk type proactieve melding (een herinnering, een Gym-doel, een idee, enz.) je reageert of juist niet, puur om te leren wat voor jou belangrijk is. Deze gegevens verlaten nooit je eigen account en worden nergens anders voor gebruikt dan om te bepalen wat Base je in het vervolg wel of niet voorlegt — nooit om zelf iets te doen of te delen.','privacy.p4':'Base voert nooit zelf iets uit. Bij elke voorgestelde actie (een herinnering aanmaken, een set loggen, enz.) vraagt hij altijd eerst om bevestiging via een knop.','privacy.p5':'Je kunt je gesprek met Base op elk moment wissen via de prullenbak-knop in de chatbalk.',
 'locale':'nl-NL'
 }
 };
@@ -4248,6 +4259,10 @@ function assistantOpen() {
 function assistantClose() {
   $('assistantPanel').classList.remove('open');
   $('assistantBackdrop').classList.remove('open');
+  if (assistantProactivePending) {
+    assistantSendFeedback(assistantProactivePending.category, false);
+    assistantProactivePending = null;
+  }
 }
 
 function assistantKeydown(e) {
@@ -4321,6 +4336,10 @@ async function assistantSend() {
   const input = $('assistantInput');
   const message = input.value.trim();
   if (!message) return;
+  if (assistantProactivePending) {
+    assistantSendFeedback(assistantProactivePending.category, true);
+    assistantProactivePending = null;
+  }
   input.value = '';
   assistantSending = true;
   $('assistantSendBtn').disabled = true;
@@ -4358,6 +4377,10 @@ window.assistantCancelAction = function (idx) { assistantResolveAction(idx, fals
 async function assistantResolveAction(idx, confirmed) {
   const m = assistantHistory[idx];
   if (!m || !m.action || m.actionState !== 'pending') return;
+  if (assistantProactivePending) {
+    assistantSendFeedback(assistantProactivePending.category, true);
+    assistantProactivePending = null;
+  }
   m.actionState = 'resolving';
   assistantRenderMessages();
   try {
@@ -4383,12 +4406,19 @@ async function assistantResolveAction(idx, confirmed) {
 }
 
 const ASSISTANT_PROACTIVE_THROTTLE_MS = 6 * 60 * 60 * 1000;
+let assistantProactivePending = null;
+async function assistantSendFeedback(category, engaged) {
+  if (!category) return;
+  try {
+    await api('/api/assistant/feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ category: category, engaged: engaged }),
+    });
+  } catch (e) { /* mag falen, alleen advies-signaal */ }
+}
 async function assistantProactiveCheck() {
   try {
-    const last = Number(localStorage.getItem('assistantProactiveLast') || 0);
-    const now = Date.now();
-    if (now - last < ASSISTANT_PROACTIVE_THROTTLE_MS) return;
-    localStorage.setItem('assistantProactiveLast', String(now));
     if ($('assistantPanel').classList.contains('open')) return;
     const d = await api('/api/assistant/proactive', {
       method: 'POST',
@@ -4396,9 +4426,15 @@ async function assistantProactiveCheck() {
       body: JSON.stringify({ page: assistantCurrentPage(), lang: LANG }),
     });
     if (!d || !d.reply) return;
+    const last = Number(localStorage.getItem('assistantProactiveLast') || 0);
+    const now = Date.now();
+    const throttled = (now - last) < ASSISTANT_PROACTIVE_THROTTLE_MS;
+    if (throttled && !d.urgent) return;
+    localStorage.setItem('assistantProactiveLast', String(now));
     assistantHistoryLoaded = false;
     await assistantLoadHistory();
     assistantOpen();
+    assistantProactivePending = d.category ? { category: d.category } : null;
     assistantTypewriter(assistantHistory.length - 1);
   } catch (e) { /* stil negeren, proactieve check mag falen */ }
 }
