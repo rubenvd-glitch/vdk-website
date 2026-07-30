@@ -1028,13 +1028,14 @@ function gymGoalKey(email) { return `gymgoal:${email}`; }
 function assistantHistKey(email) { return 'asst:' + email; }
 
 async function buildAssistantContext(email) {
-  const [reminders, sugs, ideas, gymGoals, gymLog, gymPrefs] = await Promise.all([
+  const [reminders, sugs, ideas, gymGoals, gymLog, gymPrefs, pref] = await Promise.all([
     kvGetJson('rem:' + email).catch(() => null),
     kvGetJson('sug:' + email).catch(() => null),
     kvGetJson('idea:' + email).catch(() => null),
     kvGetJson(gymGoalKey(email)).catch(() => null),
     kvGetJson(gymLogKey(email)).catch(() => null),
     kvGetJson('gympref:' + email).catch(() => null),
+    kvGetJson('pref:' + email).catch(() => null),
   ]);
   const now = Date.now();
   const todayISO = new Date(now).toISOString().slice(0, 10);
@@ -1070,6 +1071,11 @@ async function buildAssistantContext(email) {
     gymGoals: openGoals,
     gymRecentSets: recentSets,
     gymPrefs: gymPrefs || {},
+    onboarding: {
+      hasAccountName: !!(pref && pref.name),
+      hasAnyReminders: (reminders || []).length > 0,
+      hasGymSetup: (gymGoals || []).length > 0 || (gymLog || []).length > 0,
+    },
   };
 }
 
@@ -1262,7 +1268,7 @@ async function handleAssistantChat(req, res) {
   }
 }
 
-const ASSISTANT_PROACTIVE_CATEGORIES = ['reminder', 'gym', 'idea', 'suggestion', 'other'];
+const ASSISTANT_PROACTIVE_CATEGORIES = ['reminder', 'gym', 'idea', 'suggestion', 'onboarding_account', 'onboarding_gym', 'onboarding_reminders', 'other'];
 
 function assistantLearnKey(email) { return 'asstlearn:' + email; }
 
@@ -1319,12 +1325,19 @@ async function handleAssistantProactive(req, res) {
     const learningText = await assistantLearningSummary(s.email);
 
     let systemPrompt = buildAssistantSystemPrompt(page, lang, context) + '\n' +
-      'PROACTIVE CHECK: you are not responding to a user message right now. Look only at the context above and decide, independently, whether there is exactly ONE thing worth proactively flagging to the user right now (something overdue, a suggestion that has been waiting, a Gym goal falling behind, an idea untouched for a long time). Be selective and restrained - most checks should find nothing worth mentioning. If nothing clears that bar, reply with exactly {"reply": null, "action": null, "category": null}. If something does, phrase it the same short, calm way as your other replies, and only set "action" if you have enough detail to concretely propose one from the allowed set. Also include a "category" field in your JSON reply, chosen from exactly one of: reminder, gym, idea, suggestion, other - matching what your reply is mainly about.';
+      'PROACTIVE CHECK: you are not responding to a user message right now. Look only at the context above and decide, independently, whether there is exactly ONE thing worth proactively flagging to the user right now (something overdue, a suggestion that has been waiting, a Gym goal falling behind, an idea untouched for a long time, or - only if nothing more pressing applies - a calm, low-key nudge toward a part of Base the user has not set up yet, see ONBOARDING below). Be selective and restrained - most checks should find nothing worth mentioning. If nothing clears that bar, reply with exactly {"reply": null, "action": null, "category": null}. If something does, phrase it the same short, calm way as your other replies, and only set "action" if you have enough detail to concretely propose one from the allowed set. Also include a "category" field in your JSON reply, chosen from exactly one of: reminder, gym, idea, suggestion, onboarding_account, onboarding_gym, onboarding_reminders, other - matching what your reply is mainly about.';
+    if (context.onboarding && (!context.onboarding.hasAccountName || !context.onboarding.hasGymSetup || !context.onboarding.hasAnyReminders)) {
+      const missing = [];
+      if (!context.onboarding.hasAccountName) missing.push('the user has not set their name yet (category onboarding_account) - you could ask how they would like to be addressed');
+      if (!context.onboarding.hasGymSetup) missing.push('the user has never logged a Gym goal or session (category onboarding_gym) - you could ask if they want to set one up');
+      if (!context.onboarding.hasAnyReminders) missing.push('the user has no reminders at all yet (category onboarding_reminders) - you could ask if there is something they want a reminder for');
+      systemPrompt += '\nONBOARDING (lowest priority - only surface this if nothing more urgent applies, at most once per check, and phrase it as a genuine, low-pressure question, never a checklist or sales pitch): ' + missing.join('; ') + '.';
+    }
     if (overdue.length > 0) {
       systemPrompt += '\nURGENT: the user has ' + overdue.length + ' overdue reminder(s) - you MUST mention at least one of them in your reply, this takes priority over anything else you might otherwise flag.';
     }
     if (learningText) {
-      systemPrompt += '\nENGAGEMENT HISTORY (how often the user actually engaged with your past proactive check-ins, per category - use this to judge what still seems worth surfacing; a category with low engagement should only be raised again if it is clearly important or urgent): ' + learningText;
+      systemPrompt += '\nENGAGEMENT HISTORY (how often the user actually engaged with your past proactive check-ins, per category - use this to judge what still seems worth surfacing; a category with low engagement should only be raised again if it is clearly important or urgent): ' + learningText + '. If a category shows 0% engagement across 2 or more check-ins, treat that as a clear decline - do not suggest that category again unless something genuinely urgent applies.';
     }
 
     const apiMessages = [{ role: 'system', content: systemPrompt }];
