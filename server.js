@@ -1493,6 +1493,7 @@ async function handleAssistantChat(req, res) {
 const ASSISTANT_PROACTIVE_CATEGORIES = ['reminder', 'gym', 'idea', 'suggestion', 'onboarding_account', 'onboarding_gym', 'onboarding_reminders', 'other'];
 
 function assistantLearnKey(email) { return 'asstlearn:' + email; }
+function assistantSnoozeKey(email) { return 'asstsnooze:' + email; }
 
 function assistantOverdueReminders(context) {
   const now = Date.now();
@@ -1516,17 +1517,61 @@ function assistantOverdueFallbackText(lang, overdue) {
     : 'You have ' + overdue.length + ' overdue reminders: ' + titles + more + '.';
 }
 
+function assistantTopicKey(category, overdueTop, action) {
+  if (category === 'reminder' && overdueTop && overdueTop.id != null) {
+    return 'reminder:' + overdueTop.id;
+  }
+  if (action && action.type) {
+    const p = action.params || {};
+    const idPart = (p.id != null) ? String(p.id) : (p.title ? String(p.title).slice(0, 60) : '');
+    if (idPart) return action.type + ':' + idPart;
+  }
+  return null;
+}
+
+function assistantIsSnoozed(snoozeMap, topicKey) {
+  if (!topicKey || !snoozeMap) return false;
+  const s = snoozeMap[topicKey];
+  if (!s) return false;
+  const COOLDOWN_MS = 4 * 60 * 60 * 1000;
+  return s.streak >= 3 && (Date.now() - s.lastAt) < COOLDOWN_MS;
+}
+
+function assistantDedupeTrailingProactive(history) {
+  if (!Array.isArray(history) || history.length < 2) return history;
+  const last = history[history.length - 1];
+  if (!last || last.role !== 'assistant' || !last.proactive) return history;
+  let cut = history.length - 1;
+  while (cut > 0) {
+    const prev = history[cut - 1];
+    if (prev && prev.role === 'assistant' && prev.proactive && prev.category === last.category) {
+      cut--;
+    } else break;
+  }
+  if (cut === history.length - 1) return history;
+  return history.slice(0, cut).concat([last]);
+}
+
 async function assistantLearningSummary(email) {
   const counts = (await kvGetJson(assistantLearnKey(email)).catch(() => null)) || {};
   const lines = [];
+  let anyLowEngagement = false;
   for (const cat of ASSISTANT_PROACTIVE_CATEGORIES) {
     const c = counts[cat];
-    if (c && c.shown >= 3) {
-      const pct = Math.round((c.engaged / c.shown) * 100);
-      lines.push(cat + ': ' + c.engaged + '/' + c.shown + ' (' + pct + '%)');
+    const events = (c && Array.isArray(c.events)) ? c.events : [];
+    if (events.length >= 3) {
+      const engaged = events.filter((e) => e.engaged).length;
+      const pct = Math.round((engaged / events.length) * 100);
+      lines.push(cat + ': ' + engaged + '/' + events.length + ' (' + pct + '%)');
+      if (pct < 30) anyLowEngagement = true;
     }
   }
-  return lines.length ? lines.join(', ') : null;
+  if (!lines.length) return null;
+  let summary = lines.join(', ');
+  if (anyLowEngagement) {
+    summary += '. Even a low-engagement category should still be raised occasionally (roughly 1 in 5 times) if there is nothing more pressing to say, in case priorities have changed.';
+  }
+  return summary;
 }
 
 async function handleAssistantProactive(req, res) {
@@ -1542,9 +1587,40 @@ async function handleAssistantProactive(req, res) {
     const histKey = assistantHistKey(s.email);
     let history = (await kvGetJson(histKey)) || [];
 
+    let historyChanged = false;
+    const deduped = assistantDedupeTrailingProactive(history);
+    if (deduped !== history) {
+      history = deduped;
+      historyChanged = true;
+    }
+
     const context = await buildAssistantContext(s.email);
-    const overdue = assistantOverdueReminders(context);
+    const overdueAll = assistantOverdueReminders(context);
+    const snoozeMap = (await kvGetJson(assistantSnoozeKey(s.email)).catch(() => null)) || {};
+    const overdue = overdueAll.filter((r) => !assistantIsSnoozed(snoozeMap, 'reminder:' + r.id));
     const learningText = await assistantLearningSummary(s.email);
+
+    // Migrate a pre-existing (pre-topicKey) trailing reminder nudge so future boots
+    // recognize it as the same topic instead of generating yet another duplicate.
+    if (overdue.length > 0 && history.length > 0) {
+      const tail = history[history.length - 1];
+      if (tail && tail.role === 'assistant' && tail.proactive && tail.category === 'reminder' && !tail.topicKey) {
+        tail.topicKey = 'reminder:' + overdue[0].id;
+        historyChanged = true;
+      }
+    }
+
+    if (historyChanged) {
+      await kvSetJson(histKey, history);
+    }
+
+    if (overdue.length > 0) {
+      const topTopicKey = 'reminder:' + overdue[0].id;
+      const lastMsg = history[history.length - 1];
+      if (lastMsg && lastMsg.role === 'assistant' && lastMsg.proactive && lastMsg.category === 'reminder' && lastMsg.topicKey === topTopicKey) {
+        return json(res, 200, { ok: true, reply: lastMsg.content, action: lastMsg.action || null, urgent: true, category: 'reminder', topicKey: topTopicKey });
+      }
+    }
 
     let systemPrompt = buildAssistantSystemPrompt(page, lang, context) + '\n' +
       'PROACTIVE CHECK: you are not responding to a user message right now. Look only at the context above and decide, independently, whether there is exactly ONE thing worth proactively flagging to the user right now (something overdue, a suggestion that has been waiting, a Gym goal falling behind, an idea untouched for a long time, or - only if nothing more pressing applies - a calm, low-key nudge toward a part of Base the user has not set up yet, see ONBOARDING below). Be selective and restrained - most checks should find nothing worth mentioning. If nothing clears that bar, reply with exactly {"reply": null, "action": null, "category": null}. If something does, phrase it the same short, calm way as your other replies, and only set "action" if you have enough detail to concretely propose one from the allowed set. Also include a "category" field in your JSON reply, chosen from exactly one of: reminder, gym, idea, suggestion, onboarding_account, onboarding_gym, onboarding_reminders, other - matching what your reply is mainly about.';
@@ -1559,7 +1635,7 @@ async function handleAssistantProactive(req, res) {
       systemPrompt += '\nURGENT: the user has ' + overdue.length + ' overdue reminder(s) - you MUST mention at least one of them in your reply, this takes priority over anything else you might otherwise flag.';
     }
     if (learningText) {
-      systemPrompt += '\nENGAGEMENT HISTORY (how often the user actually engaged with your past proactive check-ins, per category - use this to judge what still seems worth surfacing; a category with low engagement should only be raised again if it is clearly important or urgent): ' + learningText + '. If a category shows 0% engagement across 2 or more check-ins, treat that as a clear decline - do not suggest that category again unless something genuinely urgent applies.';
+      systemPrompt += '\nENGAGEMENT HISTORY (how often the user actually engaged with your past proactive check-ins, per category - use this to judge what still seems worth surfacing; a category with low engagement should only be raised again if it is clearly important or urgent): ' + learningText + '.';
     }
 
     const apiMessages = [{ role: 'system', content: systemPrompt }];
@@ -1575,12 +1651,13 @@ async function handleAssistantProactive(req, res) {
       console.error('assistant proactive failed:', d && d.error);
       if (overdue.length > 0) {
         const fallback = assistantOverdueFallbackText(lang, overdue);
+        const topicKey = 'reminder:' + overdue[0].id;
         const now2f = Date.now();
-        history.push({ role: 'assistant', content: fallback, at: now2f, action: null, proactive: true, category: 'reminder' });
+        history.push({ role: 'assistant', content: fallback, at: now2f, action: null, proactive: true, category: 'reminder', topicKey: topicKey });
         history = history.slice(-60);
         await kvSetJson(histKey, history);
         bump('asst');
-        return json(res, 200, { ok: true, reply: fallback, action: null, urgent: true, category: 'reminder' });
+        return json(res, 200, { ok: true, reply: fallback, action: null, urgent: true, category: 'reminder', topicKey: topicKey });
       }
       return json(res, 200, { ok: true, reply: null });
     }
@@ -1601,14 +1678,15 @@ async function handleAssistantProactive(req, res) {
     }
     if (!category) category = 'other';
     const urgent = overdue.length > 0;
+    const topicKey = assistantTopicKey(category, overdue[0] || null, action);
 
     const now2 = Date.now();
-    history.push({ role: 'assistant', content: replyText, at: now2, action: action, proactive: true, category: category });
+    history.push({ role: 'assistant', content: replyText, at: now2, action: action, proactive: true, category: category, topicKey: topicKey });
     history = history.slice(-60);
     await kvSetJson(histKey, history);
     bump('asst');
 
-    return json(res, 200, { ok: true, reply: replyText, action: action, urgent: urgent, category: category });
+    return json(res, 200, { ok: true, reply: replyText, action: action, urgent: urgent, category: category, topicKey: topicKey });
   } catch (e) {
     console.error('assistant proactive error:', e.message);
     return json(res, 200, { ok: true, reply: null });
@@ -1622,13 +1700,34 @@ async function handleAssistantFeedback(req, res) {
     const body = await readBody(req);
     const category = ASSISTANT_PROACTIVE_CATEGORIES.includes(body.category) ? body.category : 'other';
     const engaged = !!body.engaged;
-    const key = assistantLearnKey(s.email);
-    const counts = (await kvGetJson(key).catch(() => null)) || {};
-    const c = counts[category] || { shown: 0, engaged: 0 };
-    c.shown += 1;
-    if (engaged) c.engaged += 1;
+    const strong = !!body.strong;
+    const topicKey = (typeof body.topicKey === 'string' && body.topicKey.slice(0, 120)) || null;
+
+    const learnKey = assistantLearnKey(s.email);
+    const counts = (await kvGetJson(learnKey).catch(() => null)) || {};
+    const c = counts[category] || { events: [] };
+    if (!Array.isArray(c.events)) c.events = [];
+    const now = Date.now();
+    c.events.push({ engaged: engaged, at: now });
+    if (strong && !engaged) c.events.push({ engaged: false, at: now });
+    c.events = c.events.slice(-20);
     counts[category] = c;
-    await kvSetJson(key, counts);
+    await kvSetJson(learnKey, counts);
+
+    if (topicKey) {
+      const snoozeKeyName = assistantSnoozeKey(s.email);
+      const snoozeMap = (await kvGetJson(snoozeKeyName).catch(() => null)) || {};
+      if (engaged) {
+        delete snoozeMap[topicKey];
+      } else {
+        const entry = snoozeMap[topicKey] || { streak: 0, lastAt: 0 };
+        entry.streak = Math.min(10, entry.streak + (strong ? 2 : 1));
+        entry.lastAt = now;
+        snoozeMap[topicKey] = entry;
+      }
+      await kvSetJson(snoozeKeyName, snoozeMap);
+    }
+
     return json(res, 200, { ok: true });
   } catch (e) {
     console.error('assistant feedback error:', e.message);
