@@ -1437,7 +1437,7 @@ en: {
 'due.today':'Due today','due.tomorrow':'Due tomorrow','due.inDays':'Due on {day} in {n} days',
 'due.overdueDay':'1 day overdue','due.overdueDays':'{n} days overdue',
 'assistant.placeholder':'Ask a question...','assistant.emptyHint':'Ask me something about your Gym, reminders, or goals.',
-'assistant.clearConfirm':'Clear this conversation?','assistant.genericError':'Something went wrong.','assistant.thinking':'Base is typing\u2026',
+'assistant.clearConfirm':'Clear this conversation?','assistant.genericError':'Something went wrong.','assistant.thinking':'Base is typing\u2026','assistant.notRelevant':'Not relevant',
 'set.privacy':'Privacy — Base','set.privacySub':'What Base stores about you and how it is handled.','privacy.p1':'Your conversations with Base are stored in your own secured database (Upstash), tied to your account. No one else can see them.','privacy.p2':'To reply, Base sends your question and relevant context (like open reminders or Gym goals) to Groq, the AI provider that generates the replies. Groq never uses this data to train its models — that was a deliberate choice when picking this provider.','privacy.p3':'Base tracks which type of proactive nudge (a reminder, a Gym goal, an idea, etc.) you respond to or ignore, purely to learn what matters to you. This data never leaves your own account and is never used for anything other than deciding what Base brings up going forward — never to act on its own or share anything.','privacy.p4':'Base never executes anything on its own. For every proposed action (creating a reminder, logging a set, etc.) it always asks for confirmation via a button first.','privacy.p5':'You can clear your conversation with Base at any time via the trash icon in the chat bar.',
 'locale':'en-GB'
 },
@@ -1518,7 +1518,7 @@ nl: {
 'due.today':'Vandaag','due.tomorrow':'Morgen','due.inDays':'Op {day} over {n} dagen',
 'due.overdueDay':'1 dag te laat','due.overdueDays':'{n} dagen te laat',
 'assistant.placeholder':'Typ een vraag...','assistant.emptyHint':'Vraag me iets over je Gym, herinneringen of doelen.',
-'assistant.clearConfirm':'Dit gesprek wissen?','assistant.genericError':'Er ging iets mis.','assistant.thinking':'Base is aan het typen\u2026',
+'assistant.clearConfirm':'Dit gesprek wissen?','assistant.genericError':'Er ging iets mis.','assistant.thinking':'Base is aan het typen\u2026','assistant.notRelevant':'Niet relevant',
 'set.privacy':'Privacy — Base','set.privacySub':'Wat Base van je opslaat en hoe daarmee wordt omgegaan.','privacy.p1':'Je gesprekken met Base worden opgeslagen in jouw eigen beveiligde database (Upstash), gekoppeld aan jouw account. Niemand anders kan ze zien.','privacy.p2':'Om te kunnen antwoorden stuurt Base je vraag en relevante gegevens (zoals openstaande herinneringen of Gym-doelen) naar Groq, de AI-provider die de antwoorden genereert. Groq gebruikt deze gegevens nooit om zijn modellen te trainen — dat was een bewuste keuze bij het kiezen van deze provider.','privacy.p3':'Base houdt bij op welk type proactieve melding (een herinnering, een Gym-doel, een idee, enz.) je reageert of juist niet, puur om te leren wat voor jou belangrijk is. Deze gegevens verlaten nooit je eigen account en worden nergens anders voor gebruikt dan om te bepalen wat Base je in het vervolg wel of niet voorlegt — nooit om zelf iets te doen of te delen.','privacy.p4':'Base voert nooit zelf iets uit. Bij elke voorgestelde actie (een herinnering aanmaken, een set loggen, enz.) vraagt hij altijd eerst om bevestiging via een knop.','privacy.p5':'Je kunt je gesprek met Base op elk moment wissen via de prullenbak-knop in de chatbalk.',
 'locale':'nl-NL'
 }
@@ -4436,7 +4436,7 @@ function assistantRenderMessages() {
       body = assistantEscape(m.content);
     }
     const notRelevantBtn = (assistantProactivePending && idx === assistantHistory.length - 1 && m.role === 'assistant' && !m.pending)
-      ? '<button type="button" class="assistant-not-relevant-btn" onclick="window.assistantMarkNotRelevant()">' + assistantEscape(LANG === 'nl' ? 'Niet relevant' : 'Not relevant') + '</button>'
+      ? '<button type="button" class="assistant-not-relevant-btn" onclick="window.assistantMarkNotRelevant()">' + assistantEscape(t('assistant.notRelevant')) + '</button>'
       : '';
     return '<div class="assistant-msg ' + cls + pending + '" data-idx="' + idx + '">' + body + '</div>' + assistantActionCardHtml(m, idx) + notRelevantBtn;
   }).join('');
