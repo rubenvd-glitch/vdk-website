@@ -980,7 +980,7 @@ try { reminders = await kvGetJson('rem:' + ADMIN_EMAIL); } catch (e) {}
 reminders = reminders || [];
 const remFor = (d) => reminders
 .filter((r) => !r.done && r.due === d)
-.map((r) => ({ title: r.title, time: r.time || null, prio: r.prio, icon: r.icon || null }))
+.map((r) => ({ title: r.title, time: r.time || null, prio: r.prio, icon: r.icon || null, color: r.color || null, duration: r.duration || 0 }))
 .sort((a, b) => String(a.time || '99').localeCompare(String(b.time || '99')));
 let events = [];
 try {
