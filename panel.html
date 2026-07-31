@@ -2659,6 +2659,7 @@ $('logoutBtn').onclick = async () => { await fetch('/base/logout', { method: 'PO
 // Lives entirely inside Base — same session, same login, just its own view
 // (like Suggestions or the Idea box). No separate app, no separate 2FA.
 const GYM_DEFAULT_EXERCISES = {
+'Smith machine shoulder press': 'Push', 'Bicep focussed pull up': 'Pull', 'Torso rotation': 'Core',
 'Ab Wheel Rollout': 'Core', 'Adductor Machine': 'Legs', 'Alternating Dumbbell Curl': 'Pull',
 'Arnold Press': 'Push', 'Assisted Pull-up': 'Pull', 'Back Extension': 'Pull',
 'Back Squat': 'Legs', 'Barbell Bench Press': 'Push', 'Barbell Curl': 'Pull',
@@ -2768,6 +2769,9 @@ const GYM_MUSCLE_MAP = [
 ];
 
 const GYM_EXERCISE_TARGETS = {
+'smith machine shoulder press': [['shoulders', 'delt_front', 1], ['shoulders', 'delt_side', 0.5], ['triceps', 'tri_lateral', 0.3]],
+'bicep focussed pull up': [['biceps', 'biceps', 0.8], ['back', 'lats', 0.7], ['back', 'teres_major', 0.2]],
+'torso rotation': [['core', 'obliques', 1]],
 'ab wheel rollout': [['core', 'abs_upper', 0.6], ['core', 'abs_lower', 0.9], ['core', 'obliques', 0.4]],
 'adductor machine': [['legs', 'adductors', 1]],
 'alternating dumbbell curl': [['biceps', 'biceps', 1]],
