@@ -643,6 +643,8 @@ header { padding: 10px 16px; }
 .assistant-action-btns button:disabled { opacity: 0.5; cursor: default; }
 .aa-cancel { background: rgba(255,255,255,0.1); color: inherit; }
 .aa-confirm { background: #4f8cff; color: #fff; }
+.assistant-not-relevant-btn { display: block; margin: 4px 0 0 auto; background: transparent; border: none; color: rgba(255,255,255,0.5); font-size: 11.5px; cursor: pointer; text-decoration: underline; padding: 2px 0; }
+.assistant-not-relevant-btn:hover { color: rgba(255,255,255,0.8); }
 
 @keyframes assistantGlow { 0%, 100% { opacity: .55; filter: drop-shadow(0 0 0 rgba(166,124,82,0)); } 50% { opacity: 1; filter: drop-shadow(0 0 4px rgba(166,124,82,.8)); } }
 @keyframes assistantDot { 0%, 60%, 100% { opacity: .3; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-3px); } }
@@ -4429,7 +4431,10 @@ function assistantRenderMessages() {
     } else {
       body = assistantEscape(m.content);
     }
-    return '<div class="assistant-msg ' + cls + pending + '" data-idx="' + idx + '">' + body + '</div>' + assistantActionCardHtml(m, idx);
+    const notRelevantBtn = (assistantProactivePending && idx === assistantHistory.length - 1 && m.role === 'assistant' && !m.pending)
+      ? '<button type="button" class="assistant-not-relevant-btn" onclick="window.assistantMarkNotRelevant()">' + assistantEscape(LANG === 'nl' ? 'Niet relevant' : 'Not relevant') + '</button>'
+      : '';
+    return '<div class="assistant-msg ' + cls + pending + '" data-idx="' + idx + '">' + body + '</div>' + assistantActionCardHtml(m, idx) + notRelevantBtn;
   }).join('');
   el.scrollTop = el.scrollHeight;
 }
@@ -4520,10 +4525,7 @@ function assistantClose() {
   const panel = $('assistantPanel');
   panel.classList.remove('open');
   panel.classList.remove('expanded');
-  if (assistantProactivePending) {
-    assistantSendFeedback(assistantProactivePending.category, false);
-    assistantProactivePending = null;
-  }
+  assistantClearPending(false);
 }
 
 function assistantKeydown(e) {
@@ -4637,10 +4639,7 @@ async function assistantSend() {
   const input = $('assistantInput');
   const message = input.value.trim();
   if (!message) return;
-  if (assistantProactivePending) {
-    assistantSendFeedback(assistantProactivePending.category, true);
-    assistantProactivePending = null;
-  }
+  assistantClearPending(true);
   input.value = '';
   assistantSending = true;
   $('assistantSendBtn').disabled = true;
@@ -4678,10 +4677,7 @@ window.assistantCancelAction = function (idx) { assistantResolveAction(idx, fals
 async function assistantResolveAction(idx, confirmed) {
   const m = assistantHistory[idx];
   if (!m || !m.action || m.actionState !== 'pending') return;
-  if (assistantProactivePending) {
-    assistantSendFeedback(assistantProactivePending.category, true);
-    assistantProactivePending = null;
-  }
+  assistantClearPending(true);
   m.actionState = 'resolving';
   assistantRenderMessages();
   try {
@@ -4708,16 +4704,27 @@ async function assistantResolveAction(idx, confirmed) {
 
 const ASSISTANT_PROACTIVE_THROTTLE_MS = 6 * 60 * 60 * 1000;
 let assistantProactivePending = null;
-async function assistantSendFeedback(category, engaged) {
+async function assistantSendFeedback(category, engaged, topicKey, strong) {
   if (!category) return;
   try {
     await api('/api/assistant/feedback', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ category: category, engaged: engaged }),
+      body: JSON.stringify({ category: category, engaged: engaged, topicKey: topicKey || null, strong: !!strong }),
     });
   } catch (e) { /* mag falen, alleen advies-signaal */ }
 }
+function assistantClearPending(engaged) {
+  if (!assistantProactivePending) return;
+  assistantSendFeedback(assistantProactivePending.category, engaged, assistantProactivePending.topicKey, false);
+  assistantProactivePending = null;
+}
+window.assistantMarkNotRelevant = function () {
+  if (!assistantProactivePending) return;
+  assistantSendFeedback(assistantProactivePending.category, false, assistantProactivePending.topicKey, true);
+  assistantProactivePending = null;
+  assistantRenderMessages();
+};
 async function assistantProactiveCheck() {
   try {
     if ($('assistantPanel').classList.contains('open')) return;
@@ -4735,7 +4742,7 @@ async function assistantProactiveCheck() {
     assistantHistoryLoaded = false;
     await assistantLoadHistory();
     assistantOpen();
-    assistantProactivePending = d.category ? { category: d.category } : null;
+    assistantProactivePending = d.category ? { category: d.category, topicKey: d.topicKey || null } : null;
     assistantTypewriter(assistantHistory.length - 1);
   } catch (e) { /* stil negeren, proactieve check mag falen */ }
 }
