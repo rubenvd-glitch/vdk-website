@@ -4714,6 +4714,34 @@ document.addEventListener('keydown', function (e) {
   });
 })();
 
+(function assistantSetupBgTripleTap() {
+  let tapCount = 0;
+  let tapTimer = null;
+  function isBgTarget(el) {
+    return !!el && (el === document.body || el.tagName === 'MAIN' || el.id === 'view-home');
+  }
+  document.addEventListener('click', function (e) {
+    if (window.innerWidth > 640) return;
+    const panel = $('assistantPanel');
+    if (panel && panel.classList.contains('open')) return;
+    const homeView = $('view-home');
+    if (!homeView || homeView.style.display === 'none') return;
+    if (!isBgTarget(e.target)) {
+      tapCount = 0;
+      clearTimeout(tapTimer);
+      return;
+    }
+    tapCount++;
+    clearTimeout(tapTimer);
+    tapTimer = setTimeout(() => { tapCount = 0; }, 600);
+    if (tapCount >= 3) {
+      tapCount = 0;
+      clearTimeout(tapTimer);
+      assistantOpen();
+    }
+  });
+})();
+
 async function assistantClear() {
   if (!confirm(t('assistant.clearConfirm'))) return;
   try { await api('/api/assistant/clear', { method: 'POST' }); } catch (e) { /* negeren */ }
