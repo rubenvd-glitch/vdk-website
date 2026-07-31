@@ -658,6 +658,25 @@ header { padding: 10px 16px; }
   .assistant-panel { top: auto; bottom: 16px; right: 16px; }
   .assistant-panel.expanded { width: calc(100vw - 32px); max-width: 360px; }
 }
+/* ---------- Tijdlijn 2.0 (Structured-stijl) ---------- */
+.tl2-axis { position: relative; margin-top: 6px; }
+.tl2-line { position: absolute; left: 56px; top: 0; bottom: 0; width: 2px; background: #1c2433; border-radius: 1px; }
+.tl2-hour { position: absolute; left: 0; right: 0; height: 1px; background: #171d27; }
+.tl2-hour span { position: absolute; left: 0; top: -7px; font-size: 10.5px; color: #566070; }
+.tl2-blocks { position: absolute; left: 74px; right: 4px; top: 0; bottom: 0; }
+.tl2-block { position: absolute; border-radius: 10px; padding: 5px 10px 4px; overflow: hidden; cursor: pointer; border-left: 3px solid; box-sizing: border-box; }
+.tl2-block.tl2-ev { cursor: default; }
+.tl2-bt { font-size: 13px; font-weight: 600; color: #e8ecf1; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tl2-bs { font-size: 10.5px; color: #8b94a1; }
+.tl2-dot { position: absolute; left: 45px; width: 24px; height: 24px; border-radius: 50%; background: #11151c; border: 2px solid; display: flex; align-items: center; justify-content: center; z-index: 3; }
+.tl2-dot svg { width: 12px; height: 12px; }
+.tl2-check { position: absolute; top: 6px; right: 8px; width: 16px; height: 16px; border-radius: 50%; border: 1.6px solid #8b94a1; z-index: 2; cursor: pointer; }
+.tl2-check:hover { border-color: #7fd68f; background: rgba(127,214,143,.2); }
+.tl2-now { position: absolute; left: 48px; right: 0; height: 2px; background: #e05252; z-index: 4; border-radius: 1px; }
+.tl2-now span { position: absolute; left: -5px; top: -3px; width: 8px; height: 8px; border-radius: 50%; background: #e05252; display: block; }
+.tl2-gapchip { position: absolute; left: 74px; font-size: 10.5px; color: #566070; border: 1px dashed #242d3b; padding: 2px 8px; border-radius: 999px; z-index: 1; }
+.tl2-past { opacity: .45; }
+.tl2-cur { box-shadow: 0 0 0 1.5px rgba(122,162,247,.35); }
 </style>
 </head>
 <body>
@@ -1994,32 +2013,123 @@ return (LANG === 'nl') ? `${parts.join(' ')} vrij` : `${parts.join(' ')} free`;
 
 window.tlToggleDone = async (id) => { await toggleDone(id, true); loadTimeline(); };
 
+let tlNowTimer = null;
+const TL2_PRIO = { 1: '#f28b8b', 2: '#f0b45c', 3: '#e8e05c', 4: '#7fd68f' };
+const TL2_EV = '#7aa2f7';
+
+function tl2UpdateNow() {
+const el = document.getElementById('tl2Now');
+const cfg = window.__tl2;
+if (!el || !cfg) return;
+const today = iso(new Date());
+const now = new Date();
+const nowMin = now.getHours() * 60 + now.getMinutes();
+if (tlDate !== today || nowMin < cfg.rangeStart || nowMin > cfg.rangeEnd) { el.style.display = 'none'; return; }
+el.style.display = 'block';
+el.style.top = ((nowMin - cfg.rangeStart) * cfg.ppm) + 'px';
+}
+
+window.tlAxisClick = (e) => {
+if (e.target.closest('.tl2-block,.tl2-dot,.tl2-check,.tl2-gapchip')) return;
+const cfg = window.__tl2;
+const axis = document.querySelector('.tl2-axis');
+if (!cfg || !axis) return;
+const rect = axis.getBoundingClientRect();
+const y = e.clientY - rect.top;
+let m = cfg.rangeStart + y / cfg.ppm;
+m = Math.round(m / 15) * 15;
+m = Math.max(0, Math.min(1425, m));
+const hh = String(Math.floor(m / 60)).padStart(2, '0');
+const mm = String(m % 60).padStart(2, '0');
+openModal(null, { due: tlDate, time: hh + ':' + mm });
+};
+
 function renderTlList(blocks) {
 const list = $('tlList');
-if (!blocks.length) { list.innerHTML = `<div class="tl-empty">${t('tl.emptyDay')}</div>`; return; }
-blocks.sort((a, b) => tlMinutesFromMidnight(a.time) - tlMinutesFromMidnight(b.time));
-let html = '';
-blocks.forEach((b, i) => {
-if (i > 0) {
-const prev = blocks[i - 1];
-const prevEnd = tlMinutesFromMidnight(prev.time) + (prev.endTime ? tlMinutesFromMidnight(prev.endTime) - tlMinutesFromMidnight(prev.time) : 60);
-const gap = tlMinutesFromMidnight(b.time) - prevEnd;
-if (gap > 15) html += `<div class="tl-gap"><div class="tl-gap-line"></div><span class="tl-gap-text">${tlFmtGap(gap)}</span></div>`;
+if (tlNowTimer) { clearInterval(tlNowTimer); tlNowTimer = null; }
+if (!blocks.length) { window.__tl2 = null; list.innerHTML = '<div class="tl-empty">' + t('tl.emptyDay') + '</div>'; return; }
+const M = tlMinutesFromMidnight;
+const items = blocks.map((b) => {
+const start = M(b.time);
+let end = b.endTime ? M(b.endTime) : start + 60;
+if (end <= start) end = start + 30;
+return { b, start, end, lane: 0, laneCount: 1 };
+}).sort((x, y) => x.start - y.start || y.end - x.end);
+// Lanes (max 3): eerste vrije laan op startvolgorde
+const laneEnds = [];
+items.forEach((it) => {
+let lane = -1;
+for (let i = 0; i < laneEnds.length; i++) { if (laneEnds[i] <= it.start) { lane = i; break; } }
+if (lane === -1) {
+if (laneEnds.length < 3) { lane = laneEnds.length; laneEnds.push(0); }
+else { let best = 0; for (let i = 1; i < 3; i++) { if (laneEnds[i] < laneEnds[best]) best = i; } lane = best; }
 }
-const cls = b.kind === 'apple' ? 'apple' : `p${b.prio}`;
-const custom = tlSafeColor(b.color);
-const sub = b.endTime ? `${b.time}–${b.endTime}` : b.time;
-html += `<div class="tl-row">
-<div class="tl-row-time">${b.time}</div>
-<div class="tl-avatar ${cls}"${custom ? ` style="background:${custom}22;color:${custom};border-color:${custom};"` : ''}>${tlIcon(b.icon)}</div>
-<div class="tl-row-body"${b.kind === 'reminder' ? ` onclick="openModal('${b.id}')" style="cursor:pointer;"` : ''}>
-<div class="tl-row-title">${esc(b.title)}</div>
-<div class="tl-row-sub">${sub}</div>
-</div>
-${b.kind === 'reminder' ? `<div class="tl-row-check" onclick="tlToggleDone('${b.id}')" title="${t('ttl.done')}"></div>` : ''}
-</div>`;
+laneEnds[lane] = it.end;
+it.lane = lane;
 });
+items.forEach((it) => {
+let cnt = it.lane + 1;
+items.forEach((o) => { if (o !== it && o.start < it.end && o.end > it.start) cnt = Math.max(cnt, o.lane + 1); });
+it.laneCount = cnt;
+});
+let minStart = 1440, maxEnd = 0;
+items.forEach((it) => { if (it.start < minStart) minStart = it.start; if (it.end > maxEnd) maxEnd = it.end; });
+const todayIso = iso(new Date());
+const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
+if (tlDate === todayIso) { if (nowMin < minStart) minStart = nowMin; if (nowMin > maxEnd) maxEnd = nowMin; }
+const rangeStart = Math.max(0, Math.floor((minStart - 30) / 60) * 60);
+const rangeEnd = Math.min(1440, Math.ceil((maxEnd + 30) / 60) * 60);
+const PPM = 1.1;
+window.__tl2 = { rangeStart, rangeEnd, ppm: PPM };
+const H = (rangeEnd - rangeStart) * PPM;
+const px = (m) => ((m - rangeStart) * PPM);
+let html = '<div class="tl2-axis" style="height:' + H + 'px;" onclick="tlAxisClick(event)">';
+html += '<div class="tl2-line"></div>';
+for (let h = Math.ceil(rangeStart / 60); h <= Math.floor(rangeEnd / 60); h++) {
+html += '<div class="tl2-hour" style="top:' + px(h * 60) + 'px;"><span>' + String(h).padStart(2, '0') + ':00</span></div>';
+}
+// Vrije-tijd chips in gaten > 30 min (op samengevoegde bezette intervallen)
+const busy = [];
+items.slice().sort((a2, b2) => a2.start - b2.start).forEach((it) => {
+if (busy.length && it.start <= busy[busy.length - 1][1]) { busy[busy.length - 1][1] = Math.max(busy[busy.length - 1][1], it.end); }
+else busy.push([it.start, it.end]);
+});
+for (let i = 1; i < busy.length; i++) {
+const gap = busy[i][0] - busy[i - 1][1];
+if (gap > 30) {
+const mid = (busy[i - 1][1] + busy[i][0]) / 2;
+html += '<div class="tl2-gapchip" style="top:' + (px(mid) - 10) + 'px;">' + tlFmtGap(gap) + '</div>';
+}
+}
+html += '<div class="tl2-blocks">';
+items.forEach((it) => {
+const b = it.b;
+const custom = tlSafeColor(b.color);
+const col = b.kind === 'apple' ? TL2_EV : (custom || TL2_PRIO[b.prio] || TL2_PRIO[4]);
+const isPast = (tlDate < todayIso) || (tlDate === todayIso && it.end <= nowMin);
+const isCur = tlDate === todayIso && it.start <= nowMin && nowMin < it.end;
+const wPct = 100 / it.laneCount;
+const style = 'top:' + px(it.start) + 'px;height:' + Math.max(30, (it.end - it.start) * PPM - 3) + 'px;left:' + (it.lane * wPct) + '%;width:calc(' + wPct + '% - 6px);background:' + col + '22;border-left-color:' + col + ';';
+const cls = 'tl2-block' + (b.kind === 'apple' ? ' tl2-ev' : '') + (isPast ? ' tl2-past' : '') + (isCur ? ' tl2-cur' : '');
+const click = b.kind === 'reminder' ? ' onclick="event.stopPropagation();openModal(\'' + b.id + '\')"' : ' onclick="event.stopPropagation()"';
+const sub = b.time + (b.endTime ? ' - ' + b.endTime : '');
+const check = b.kind === 'reminder' ? '<span class="tl2-check" title="' + t('ttl.done') + '" onclick="event.stopPropagation();tlToggleDone(\'' + b.id + '\')"></span>' : '';
+html += '<div class="' + cls + '" style="' + style + '"' + click + '>' + check + '<div class="tl2-bt">' + esc(b.title) + '</div><div class="tl2-bs">' + sub + '</div></div>';
+});
+html += '</div>';
+// Icoon-bollen op de aslijn
+items.forEach((it) => {
+const b = it.b;
+const custom = tlSafeColor(b.color);
+const col = b.kind === 'apple' ? TL2_EV : (custom || TL2_PRIO[b.prio] || TL2_PRIO[4]);
+const isPast = (tlDate < todayIso) || (tlDate === todayIso && it.end <= nowMin);
+html += '<div class="tl2-dot' + (isPast ? ' tl2-past' : '') + '" style="top:' + (px(it.start) + 2) + 'px;border-color:' + col + ';color:' + col + ';">' + tlIcon(b.kind === 'apple' ? 'calendar' : b.icon) + '</div>';
+});
+html += '<div class="tl2-now" id="tl2Now" style="display:none;"><span></span></div>';
+html += '</div>';
 list.innerHTML = html;
+tl2UpdateNow();
+tlNowTimer = setInterval(tl2UpdateNow, 30000);
 }
 
 async function loadTimeline() {
