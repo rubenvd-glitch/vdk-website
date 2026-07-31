@@ -1955,6 +1955,10 @@ await kvSetJson(key, list);
 return list;
 }
 
+function gymValidCreatedAt(v) {
+const t = Number(v);
+return Number.isFinite(t) && t > 1577836800000 && t <= Date.now() + 5 * 60 * 1000 ? t : null;
+}
 async function applyGymLogAction(email, body) {
 const key = gymLogKey(email);
 let list = (await kvGetJson(key)) || [];
@@ -1973,7 +1977,7 @@ muscle: MUSCLE_GROUPS.includes(body.muscle) ? body.muscle : 'Other',
 rpe: body.rpe !== undefined && body.rpe !== '' ? Math.min(10, Math.max(1, Number(body.rpe) || 0)) : null,
 restSeconds: body.restSeconds !== undefined && body.restSeconds !== null && body.restSeconds !== '' ? Math.max(0, Math.min(3600, Math.round(Number(body.restSeconds) || 0))) : null,
 note: String(body.note || '').trim().slice(0, 500),
-createdAt: Date.now(),
+createdAt: gymValidCreatedAt(body.createdAt) || Date.now(),
 });
 } else if (body.action === 'update') {
 const it = list.find((x) => x.id === body.id);
@@ -1986,6 +1990,7 @@ if (body.muscle !== undefined) it.muscle = MUSCLE_GROUPS.includes(body.muscle) ?
 if (body.rpe !== undefined) it.rpe = body.rpe === '' ? null : Math.min(10, Math.max(1, Number(body.rpe) || 0));
 if (body.restSeconds !== undefined) it.restSeconds = (body.restSeconds === '' || body.restSeconds === null) ? null : Math.max(0, Math.min(3600, Math.round(Number(body.restSeconds) || 0)));
 if (body.note !== undefined) it.note = String(body.note).trim().slice(0, 500);
+if (body.createdAt !== undefined) { const ca = gymValidCreatedAt(body.createdAt); if (ca) it.createdAt = ca; }
 } else if (body.action === 'delete') {
 list = list.filter((x) => x.id !== body.id);
 } else {
