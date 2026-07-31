@@ -2747,6 +2747,19 @@ for (const [k, v] of sessionStores[realm]) if (now > v.expires) sessionStores[re
 for (const [k, v] of codes) if (now > v.expires) codes.delete(k);
 }, 60 * 60 * 1000).unref();
 
+// Ingebouwde push-check: elke 5 minuten kijken of er een reminder met tijd
+// zojuist is verstreken (pushDueReminderCheck dedupliceert zelf via de
+// pushsent-sleutels). Zolang de server draait is er zo geen externe
+// cron-dienst nodig; /api/cron/push blijft bestaan als handmatige of externe
+// trigger. Direct na het opstarten draait ook een inhaalcheck (vangnet van
+// 45 min), zodat een net-wakkere instance gemiste meldingen alsnog stuurt.
+setInterval(() => {
+pushDueReminderCheck().catch((e) => console.error('push interval error:', e.message));
+}, 5 * 60 * 1000).unref();
+setTimeout(() => {
+pushDueReminderCheck().catch((e) => console.error('push boot-check error:', e.message));
+}, 20 * 1000).unref();
+
 server.listen(PORT, () => {
 console.log(`VDK Business Services running on http://localhost:${PORT}`);
 if (!smtpConfigured()) console.log('Note: SMTP not configured — 2FA codes are printed to this console (dev mode).');
