@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>VDK CRM</title>
 <style>
+  /* Voorkom per ongeluk selecteren van tekst/vakken */
+  * { -webkit-user-select: none; user-select: none; }
+  input, textarea, select, [contenteditable="true"], [contenteditable=""] { -webkit-user-select: text; user-select: text; }
 @keyframes bootPulse { 0%, 100% { opacity: .55; transform: scale(1); } 50% { opacity: 1; transform: scale(1.04); } }
 @keyframes bootFadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 .boot-screen { position: fixed; inset: 0; z-index: 9999; display: flex; align-items: center; justify-content: center; flex-direction: column; background: #0e1116; transition: opacity .15s ease, visibility .15s ease; }
