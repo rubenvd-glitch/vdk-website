@@ -933,26 +933,33 @@ const pad2 = (n) => String(n).padStart(2, '0');
 const todayISO = t.y + '-' + pad2(t.m) + '-' + pad2(t.d);
 const midnightMs = zonedMidnightUTC(t, TZ).getTime();
 const now = Date.now();
+const fmtHM = (ms) => { const mtot = Math.round((ms - midnightMs) / 60000); return pad2(Math.floor((((mtot % 1440) + 1440) % 1440) / 60)) + ':' + pad2(((mtot % 60) + 60) % 60); };
+// Meldingsschema zoals Structured: per item met tijd standaard drie alerts
+// (5 min voor start, bij start, bij einde), per item uitzetbaar via r.alerts.
 const due = reminders.filter((r) => !r.done && r.due === todayISO && /^\d{2}:\d{2}$/.test(r.time || ''));
 let sent = 0;
 const results = [];
 for (const r of due) {
 const hm = r.time.split(':');
-const dueMs = midnightMs + (Number(hm[0]) * 60 + Number(hm[1])) * 60000;
-if (now < dueMs || now - dueMs > 45 * 60000) continue;
-const sentKey = 'pushsent:' + r.id + ':' + r.due;
+const startMs = midnightMs + (Number(hm[0]) * 60 + Number(hm[1])) * 60000;
+const endMs = startMs + (r.duration && r.duration > 0 ? r.duration : 60) * 60000;
+const al = r.alerts || { pre: true, start: true, end: true };
+const endHM = fmtHM(endMs);
+const alerts = [];
+if (al.pre !== false) alerts.push({ kind: 'pre', at: startMs - 5 * 60000, title: '\u23F0 Over 5 min: ' + r.title, body: 'Start om ' + r.time });
+if (al.start !== false) alerts.push({ kind: 'start', at: startMs, title: '\u25B6\uFE0F Nu: ' + r.title, body: r.time + ' tot ' + endHM });
+if (al.end !== false) alerts.push({ kind: 'end', at: endMs, title: '\u2705 Klaar: ' + r.title + '?', body: 'Liep tot ' + endHM + '. Vink af in Base.' });
+for (const a of alerts) {
+if (now < a.at || now - a.at > 45 * 60000) continue;
+const sentKey = 'pushsent:' + r.id + ':' + r.due + ':' + a.kind;
 let already = null;
 try { already = await kvCmd('GET', sentKey); } catch (e) {}
 if (already) continue;
 try { await kvCmd('SET', sentKey, '1'); await kvCmd('EXPIRE', sentKey, '259200'); } catch (e) {}
-const out = await pushToAll(ADMIN_EMAIL, {
-title: '⏰ ' + r.title,
-body: 'Gepland om ' + r.time + (r.note ? ' | ' + String(r.note).slice(0, 120) : ''),
-url: '/base#tijdlijn?d=' + r.due,
-tag: 'rem-' + r.id,
-});
+const out = await pushToAll(ADMIN_EMAIL, { title: a.title, body: a.body, url: '/base#tijdlijn?d=' + r.due, tag: 'rem-' + r.id + '-' + a.kind });
 sent++;
-results.push({ id: r.id, title: r.title, delivered: out.delivered });
+results.push({ id: r.id, kind: a.kind, delivered: out.delivered });
+}
 }
 return { ok: true, candidates: due.length, sent, results };
 }
@@ -1826,6 +1833,8 @@ prio: Math.min(4, Math.max(1, Number(body.prio) || 4)),
 icon: REMINDER_ICONS.includes(body.icon) ? body.icon : '',
 color: isHexColor(body.color) ? String(body.color).toLowerCase() : '',
 duration: Math.min(480, Math.max(0, Number(body.duration) || 0)), // minutes; 0 = unspecified (timeline defaults to 1h)
+tl: body.tl === true,
+alerts: (body.alerts && typeof body.alerts === 'object') ? { pre: body.alerts.pre !== false, start: body.alerts.start !== false, end: body.alerts.end !== false } : { pre: true, start: true, end: true },
 done: false,
 createdAt: Date.now(),
 });
@@ -1841,6 +1850,8 @@ if (body.prio !== undefined) r.prio = Math.min(4, Math.max(1, Number(body.prio) 
 if (body.icon !== undefined) r.icon = REMINDER_ICONS.includes(body.icon) ? body.icon : '';
 if (body.color !== undefined) r.color = isHexColor(body.color) ? String(body.color).toLowerCase() : '';
 if (body.duration !== undefined) r.duration = Math.min(480, Math.max(0, Number(body.duration) || 0));
+if (body.tl !== undefined) r.tl = body.tl === true;
+if (body.alerts && typeof body.alerts === 'object') r.alerts = { pre: body.alerts.pre !== false, start: body.alerts.start !== false, end: body.alerts.end !== false };
 if (body.done !== undefined) {
 if (body.done && !r.done) bump('rd');
 r.done = !!body.done;
