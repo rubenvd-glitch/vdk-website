@@ -721,6 +721,11 @@ header { padding: 10px 16px; }
 .tls-err { color: #f28b8b; font-size: 12.5px; margin: 6px 16px 0; min-height: 14px; }
 @keyframes tlsShake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
 .tls-shake { animation: tlsShake .3s ease 0s 1; }
+.tls-iconpick { position: absolute; top: 92px; left: 14px; right: 14px; background: #1c2433; border: 1px solid #2a3547; border-radius: 14px; padding: 10px; z-index: 5; display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.tls-iconpick button { background: #232c3a; border: 1px solid transparent; border-radius: 10px; padding: 9px 0; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.tls-iconpick button:hover { background: #2a3547; }
+.tls-iconpick button.sel { border-color: #7aa2f7; }
+.tls-iconpick button svg { width: 17px; height: 17px; }
 </style>
 </head>
 <body>
@@ -1249,6 +1254,7 @@ header { padding: 10px 16px; }
 </div>
 <button type="button" class="tls-menu-btn" id="tlsMenuBtn" style="display:none;">&#8943;</button>
 </div>
+<div class="tls-iconpick" id="tlsIconPick" style="display:none;"></div>
 <div class="tls-menu" id="tlsMenu" style="display:none;">
 <button type="button" id="tlsDupBtn" data-i18n="tls.dup">Dupliceer</button>
 <button type="button" id="tlsDelBtn" class="tls-danger" data-i18n="tls.del">Verwijder</button>
@@ -2193,7 +2199,7 @@ html += '<div class="tl2-blocks">';
 items.forEach((it) => {
 const b = it.b;
 const custom = tlSafeColor(b.color);
-const col = b.kind === 'apple' ? TL2_EV : (custom || TL2_PRIO[b.prio] || TL2_PRIO[4]);
+const col = b.kind === 'apple' ? TL2_EV : (custom || TLS_ICON_COLORS[b.icon] || '#7d8798');
 const isPast = (tlDate < todayIso) || (tlDate === todayIso && it.end <= nowMin);
 const isCur = tlDate === todayIso && it.start <= nowMin && nowMin < it.end;
 const wPct = 100 / it.laneCount;
@@ -2209,7 +2215,7 @@ html += '</div>';
 items.forEach((it) => {
 const b = it.b;
 const custom = tlSafeColor(b.color);
-const col = b.kind === 'apple' ? TL2_EV : (custom || TL2_PRIO[b.prio] || TL2_PRIO[4]);
+const col = b.kind === 'apple' ? TL2_EV : (custom || TLS_ICON_COLORS[b.icon] || '#7d8798');
 const isPast = (tlDate < todayIso) || (tlDate === todayIso && it.end <= nowMin);
 html += '<div class="tl2-dot' + (isPast ? ' tl2-past' : '') + '" style="top:' + (px(it.start) + 2) + 'px;border-color:' + col + ';color:' + col + ';">' + tlIcon(b.kind === 'apple' ? 'calendar' : b.icon) + '</div>';
 });
@@ -5001,7 +5007,8 @@ flashSetMsg(out.delivered ? t('set.pushTestSent') : t('set.pushTestNone'));
 let tlsState = null;
 let tlsWheelTimer = null;
 const TLS_DURS = [15, 30, 45, 60, 90, 120];
-const TLS_ICON_WORDS = [['gym', 'dumbbell'], ['sport', 'dumbbell'], ['train', 'dumbbell'], ['lunch', 'utensils'], ['ontbijt', 'utensils'], ['diner', 'utensils'], ['eten', 'utensils'], ['slapen', 'bed'], ['bed', 'bed'], ['werk', 'briefcase'], ['meeting', 'briefcase'], ['bellen', 'phone'], ['call', 'phone'], ['koffie', 'coffee'], ['boodschap', 'cart'], ['lezen', 'book'], ['boek', 'book'], ['auto', 'car'], ['rijden', 'car'], ['muziek', 'music'], ['vlucht', 'plane'], ['pil', 'pill'], ['medic', 'pill'], ['klus', 'wrench'], ['mail', 'mail'], ['cadeau', 'gift'], ['huis', 'home'], ['wekker', 'alarm'], ['alarm', 'alarm']];
+const TLS_ICON_WORDS = [['gym', 'dumbbell'], ['sport', 'dumbbell'], ['train', 'dumbbell'], ['hardloop', 'heart'], ['wandel', 'heart'], ['fiets', 'heart'], ['zwem', 'heart'], ['yoga', 'heart'], ['lunch', 'utensils'], ['ontbijt', 'utensils'], ['diner', 'utensils'], ['eten', 'utensils'], ['koken', 'utensils'], ['slapen', 'bed'], ['bed', 'bed'], ['nap', 'bed'], ['werk', 'briefcase'], ['meeting', 'briefcase'], ['overleg', 'briefcase'], ['bellen', 'phone'], ['call', 'phone'], ['koffie', 'coffee'], ['thee', 'coffee'], ['boodschap', 'cart'], ['winkel', 'cart'], ['lezen', 'book'], ['boek', 'book'], ['studie', 'book'], ['leren', 'book'], ['school', 'book'], ['auto', 'car'], ['rijden', 'car'], ['garage', 'car'], ['muziek', 'music'], ['vlucht', 'plane'], ['reis', 'plane'], ['pil', 'pill'], ['medic', 'pill'], ['dokter', 'pill'], ['tandarts', 'pill'], ['klus', 'wrench'], ['repar', 'wrench'], ['mail', 'mail'], ['cadeau', 'gift'], ['huis', 'home'], ['schoonmaak', 'home'], ['papier', 'home'], ['afval', 'home'], ['wekker', 'alarm'], ['alarm', 'alarm'], ['afspraak', 'calendar']];
+const TLS_ICON_COLORS = { alarm: '#8b94a1', bed: '#8b94a1', dumbbell: '#4a6fd8', coffee: '#c98d5c', briefcase: '#8b94a1', book: '#4ab8a1', heart: '#e8628c', car: '#5cb8e8', home: '#f0b45c', bell: '#7d8798', phone: '#7fd68f', mail: '#7aa2f7', calendar: '#7aa2f7', cart: '#7fd68f', gift: '#e05252', music: '#c67ae8', plane: '#5cb8e8', utensils: '#f0b45c', pill: '#e05252', wrench: '#8b94a1' };
 const tlsPad = (n) => String(n).padStart(2, '0');
 const tlsMinOf = (t2) => { const p = String(t2 || '').split(':'); return Number(p[0]) * 60 + Number(p[1] || 0); };
 const tlsFmt = (m) => { m = ((m % 1440) + 1440) % 1440; return tlsPad(Math.floor(m / 60)) + ':' + tlsPad(m % 60); };
@@ -5071,7 +5078,7 @@ top.forEach((s) => {
 const dur = s.dur || 60;
 const row = document.createElement('div');
 row.className = 'tls-sugg-row';
-const ico = document.createElement('div'); ico.className = 'tls-sugg-ico'; ico.innerHTML = tlIcon(s.icon || tlsGuessIcon(s.title));
+const ico = document.createElement('div'); ico.className = 'tls-sugg-ico'; const sic = s.icon || tlsGuessIcon(s.title); ico.innerHTML = tlIcon(sic); ico.style.color = TLS_ICON_COLORS[sic] || '#7aa2f7';
 const body = document.createElement('div'); body.style.minWidth = '0';
 const l1 = document.createElement('div'); l1.className = 'tls-sugg-sub';
 l1.textContent = s.time ? (s.time + ' - ' + tlsFmt(tlsMinOf(s.time) + dur) + ' (' + dur + ' min)') : '';
@@ -5121,6 +5128,7 @@ due: (r && r.due) || data.due || iso(new Date()),
 time: (r && r.time) || data.time || nextQ,
 dur: (r && r.duration) || 60,
 alerts: (r && r.alerts) ? { pre: r.alerts.pre !== false, start: r.alerts.start !== false, end: r.alerts.end !== false } : { pre: true, start: true, end: true },
+iconManual: !!(r && r.icon),
 step: 1,
 };
 $('tlsTitle').value = tlsState.title;
@@ -5130,6 +5138,7 @@ $('tlsErr').textContent = '';
 $('tlsMenuBtn').style.display = mode === 'edit' ? 'flex' : 'none';
 $('tlsMenu').style.display = 'none';
 $('tlsConfirm').style.display = 'none';
+$('tlsIconPick').style.display = 'none';
 tlsUpdateHead(); tlsRenderDur(); tlsRenderSugg();
 $('tlsSteps').style.transition = 'none';
 tlsStepTo(mode === 'edit' ? 3 : 1);
@@ -5180,6 +5189,23 @@ if (tlsState.mode === 'new' && (!tlsState.icon || tlsState.icon === 'bell')) tls
 tlsSubmit(tlsState.mode === 'edit' ? 'update' : 'create', tlsPayload());
 }
 };
+$('tlsIco').style.cursor = 'pointer';
+$('tlsIco').onclick = () => {
+if (!tlsState) return;
+const el = $('tlsIconPick');
+if (el.style.display !== 'none') { el.style.display = 'none'; return; }
+el.innerHTML = '';
+Object.keys(TL_ICONS).forEach((name) => {
+const b = document.createElement('button');
+b.type = 'button';
+b.innerHTML = tlIcon(name);
+b.style.color = TLS_ICON_COLORS[name] || '#e8ecf1';
+if (tlsState.icon === name) b.classList.add('sel');
+b.onclick = (ev) => { ev.stopPropagation(); if (tlsState) { tlsState.icon = name; tlsState.iconManual = true; tlsUpdateHead(); } el.style.display = 'none'; };
+el.appendChild(b);
+});
+el.style.display = 'grid';
+};
 $('tlsClose').onclick = tlSheetClose;
 $('tlsOverlay').onclick = (e) => { if (e.target === $('tlsOverlay')) tlSheetClose(); };
 $('tlsMenuBtn').onclick = () => { $('tlsMenu').style.display = $('tlsMenu').style.display === 'none' ? 'flex' : 'none'; };
@@ -5187,7 +5213,7 @@ $('tlsDelBtn').onclick = () => { $('tlsMenu').style.display = 'none'; $('tlsConf
 $('tlsDelNo').onclick = () => { $('tlsConfirm').style.display = 'none'; };
 $('tlsDelYes').onclick = () => { tlsSubmit('delete', { id: tlsState.id }); };
 $('tlsDupBtn').onclick = () => { $('tlsMenu').style.display = 'none'; const p = tlsPayload(); delete p.id; tlsSubmit('create', p); };
-$('tlsTitle').addEventListener('input', () => { if (tlsState && tlsState.mode === 'new') { tlsState.icon = tlsGuessIcon($('tlsTitle').value); tlsUpdateHead(); } });
+$('tlsTitle').addEventListener('input', () => { if (tlsState && tlsState.mode === 'new' && !tlsState.iconManual) { tlsState.icon = tlsGuessIcon($('tlsTitle').value); tlsUpdateHead(); } });
 $('tlsSumDate').onclick = () => tlsStepTo(2);
 $('tlsSumTime').onclick = () => tlsStepTo(2);
 $('tlsDate').addEventListener('change', () => { if (tlsState) tlsState.due = $('tlsDate').value; });
