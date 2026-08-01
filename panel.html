@@ -1122,10 +1122,14 @@ header { padding: 10px 16px; }
 <button class="cp4" data-p="4" data-i18n="p.4">P4</button>
 </div>
 
-<label style="display:flex; align-items:center; gap:8px; margin-top:12px; cursor:pointer;" id="calOnlyRow">
-<input type="checkbox" id="fCalOnly" style="width:auto; margin:0;">
-<span data-i18n="rem.calOnly" style="font-weight:400;">Alleen naar agenda sturen (niet bewaren als to-do)</span>
-</label>
+<div id="alertsRow" style="display:none; margin-top:12px;">
+<label data-i18n="l.alerts">Meldingen</label>
+<div class="chips" id="alertChips">
+<button type="button" id="alertPre" class="sel" onclick="this.classList.toggle('sel')" data-i18n="al.pre">5 min ervoor</button>
+<button type="button" id="alertStart" class="sel" onclick="this.classList.toggle('sel')" data-i18n="al.start">Bij start</button>
+<button type="button" id="alertEnd" class="sel" onclick="this.classList.toggle('sel')" data-i18n="al.end">Bij einde</button>
+</div>
+</div>
 
 <div class="err" id="modalErr"></div>
 <div class="modal-actions">
@@ -1186,19 +1190,6 @@ header { padding: 10px 16px; }
 <div class="modal-actions">
 <button class="btn-ghost" id="sugCancelBtn" data-i18n="cancel">Annuleren</button>
 <button class="btn-primary" id="sugSaveBtn" data-i18n="save">Opslaan</button>
-</div>
-</div>
-</div>
-
-<div class="overlay" id="calPushOverlay">
-<div class="modal" style="width:min(420px,100%);">
-<h3 data-i18n="cal.pushTitle">Push naar je agenda?</h3>
-<div class="sub" id="calPushSub"></div>
-<div id="calPushChoices" style="display:flex; flex-direction:column; gap:10px; margin-bottom:6px;"></div>
-<div class="err" id="calPushErr"></div>
-<div class="modal-actions">
-<button class="btn-ghost" id="calPushSkipBtn" data-i18n="cal.pushSkip">Nee, bedankt</button>
-<button class="btn-primary" id="calPushYesBtn" data-i18n="cal.pushYes">Ja, push</button>
 </div>
 </div>
 </div>
@@ -1383,7 +1374,7 @@ en: {
 'nav.home':'Dashboard','nav.rem':'Reminders','nav.timeline':'Timeline','nav.sug':'Suggestions','nav.gym':'Gym','nav.idea':'Idea box','nav.log':'Log',
 'save':'Save','cancel':'Cancel',
 'tl.title':'Timeline','tl.add':'+ New item','tl.today':'Today','tl.emptyDay':'Nothing planned for this day.',
-'tl.sub':'A visual day overview of your reminders and calendar, with the option to push new items straight to Apple Calendar.',
+'tl.sub':'A visual day overview of your actions, reminders and calendar.',
 'name.ask':'What should I call you?',
 'home.week':'This coming week','home.weekSub':'Your reminders for the next 7 days.',
 'home.weekEmpty':'Nothing planned for the coming week.',
@@ -1438,6 +1429,7 @@ en: {
 'set.tgHelp':'One-time setup: create a bot via @BotFather in Telegram, put the token in Render as TELEGRAM_BOT_TOKEN, send your bot a message and click Link here.',
 'set.status':'Status','set.link':'Link','set.test':'Test message','set.soon':'Coming soon',
 'set.cal':'Connect calendar','set.calSub':'Import your calendar and push reminders to it (always with a confirmation first).',
+'l.alerts':'Notifications','al.pre':'5 min before','al.start':'At start','al.end':'At end',
 'set.push':'Push notifications','set.pushSub':'Get Base notifications on this device, for example when a timed reminder is due.','set.pushEnable':'Enable on this device','set.pushDisable':'Disable','set.pushTest':'Send test','set.pushOn':'Push notifications are enabled on this device.','set.pushOff':'Not enabled on this device yet.','set.pushDenied':'Notifications are blocked for Base in your browser or system settings.','set.pushUnsupported':'This browser does not support push here. On iPhone: add Base to your home screen first (Share, Add to Home Screen) and open it from there.','set.pushOnMsg':'Push notifications enabled.','set.pushTestSent':'Test notification sent.','set.pushTestNone':'No devices are registered yet.','set.pushIosHelp':'iPhone/iPad: first add Base to your home screen (Share, Add to Home Screen) and open the app from there; then you can enable notifications.',
 
 'set.connect':'Connect','set.disconnect':'Disconnect',
@@ -1464,7 +1456,7 @@ nl: {
 'nav.home':'Dashboard','nav.rem':'Herinneringen','nav.timeline':'Tijdlijn','nav.sug':'Suggesties','nav.gym':'Gym','nav.idea':'Ideeënbox','nav.log':'Logboek',
 'save':'Opslaan','cancel':'Annuleren',
 'tl.title':'Tijdlijn','tl.add':'+ Nieuw item','tl.today':'Vandaag','tl.emptyDay':'Niets gepland op deze dag.',
-'tl.sub':'Een visueel dagoverzicht van je herinneringen en agenda, met de optie om nieuwe items direct naar je Apple Calendar te pushen.',
+'tl.sub':'Een visueel dagoverzicht van je acties, herinneringen en agenda.',
 'name.ask':'Hoe mag ik je noemen?',
 'home.week':'Komende week','home.weekSub':'Je herinneringen voor de komende 7 dagen.',
 'home.weekEmpty':'Niets gepland voor de komende week.',
@@ -1519,6 +1511,7 @@ nl: {
 'set.tgHelp':'Eenmalig instellen: maak een bot via @BotFather in Telegram, zet het token in Render als TELEGRAM_BOT_TOKEN, stuur je bot een berichtje en klik hier op Koppelen.',
 'set.status':'Status','set.link':'Koppelen','set.test':'Testbericht','set.soon':'Binnenkort beschikbaar',
 'set.cal':'Agenda koppelen','set.calSub':'Importeer je agenda en push herinneringen ernaartoe (altijd eerst met bevestiging).',
+'l.alerts':'Meldingen','al.pre':'5 min ervoor','al.start':'Bij start','al.end':'Bij einde',
 'set.push':'Pushmeldingen','set.pushSub':'Krijg meldingen van Base op dit apparaat, bijvoorbeeld wanneer een reminder met tijd verloopt.','set.pushEnable':'Zet aan op dit apparaat','set.pushDisable':'Uitzetten','set.pushTest':'Testmelding','set.pushOn':'Pushmeldingen staan aan op dit apparaat.','set.pushOff':'Nog niet aan op dit apparaat.','set.pushDenied':'Meldingen zijn voor Base geblokkeerd in je browser- of systeeminstellingen.','set.pushUnsupported':'Deze browser ondersteunt hier geen push. Op iPhone: zet Base eerst op je beginscherm (Deel, Zet op beginscherm) en open hem vanaf daar.','set.pushOnMsg':'Pushmeldingen aangezet.','set.pushTestSent':'Testmelding verstuurd.','set.pushTestNone':'Er zijn nog geen apparaten aangemeld.','set.pushIosHelp':'iPhone/iPad: zet Base eerst op je beginscherm (Deel-knop, Zet op beginscherm) en open de app vanaf daar; daarna kun je meldingen aanzetten.',
 
 'set.connect':'Koppelen','set.disconnect':'Ontkoppelen',
@@ -1621,6 +1614,7 @@ const todayISO = iso(new Date());
 const plusDays = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return iso(d); };
 const filter = $('filterSel').value;
 const shown = reminders
+.filter((r) => !r.tl)
 .filter((r) => (view === 'active' ? !r.done : r.done))
 .filter((r) => {
 if (view !== 'active' || filter === 'all') return true;
@@ -1633,8 +1627,8 @@ if (filter === 'late') return r.due < todayISO;
 return true;
 })
 .sort((a, b) => a.prio - b.prio || (a.due || '9999').localeCompare(b.due || '9999'));
-$('tabActive').textContent = `${t('tab.active')} (${reminders.filter((r) => !r.done).length})`;
-$('tabDone').textContent = `${t('tab.done')} (${reminders.filter((r) => r.done).length})`;
+$('tabActive').textContent = `${t('tab.active')} (${reminders.filter((r) => !r.tl && !r.done).length})`;
+$('tabDone').textContent = `${t('tab.done')} (${reminders.filter((r) => !r.tl && r.done).length})`;
 if (!shown.length) {
 $('list').innerHTML = `<div class="empty">${view === 'active' ? t('empty.active') : t('empty.done')}</div>`;
 return;
@@ -2041,7 +2035,7 @@ m = Math.round(m / 15) * 15;
 m = Math.max(0, Math.min(1425, m));
 const hh = String(Math.floor(m / 60)).padStart(2, '0');
 const mm = String(m % 60).padStart(2, '0');
-openModal(null, { due: tlDate, time: hh + ':' + mm });
+openModal(null, { due: tlDate, time: hh + ':' + mm, tl: true });
 };
 
 function renderTlList(blocks) {
@@ -2169,37 +2163,7 @@ const h = Math.floor((total % 1440) / 60), m = total % 60;
 return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
-$('tlAddBtn').onclick = () => openModal(null, { due: tlDate });
-
-function maybeOfferPush(rem) {
-if (!rem.due) return;
-if (!calStatus.apple) return;
-pendingPushReminder = rem;
-$('calPushSub').textContent = t('cal.pushSub', { title: rem.title });
-const choices = [];
-if (calStatus.apple) choices.push(`<label style="display:flex;align-items:center;gap:8px;font-size:14px;"><input type="checkbox" id="pushApple" checked> Apple Calendar</label>`);
-$('calPushChoices').innerHTML = choices.join('');
-$('calPushErr').textContent = '';
-$('calPushOverlay').classList.add('open');
-}
-$('calPushSkipBtn').onclick = () => { pendingPushReminder = null; $('calPushOverlay').classList.remove('open'); };
-$('calPushOverlay').onclick = (e) => { if (e.target === $('calPushOverlay')) { pendingPushReminder = null; $('calPushOverlay').classList.remove('open'); } };
-$('calPushYesBtn').onclick = async () => {
-if (!pendingPushReminder) return;
-const calendars = [];
-if ($('pushApple') && $('pushApple').checked) calendars.push('apple');
-if (!calendars.length) { $('calPushErr').textContent = t('cal.errConnect'); return; }
-try {
-await api('/api/calendar/push', {
-method: 'POST', headers: { 'Content-Type': 'application/json' },
-body: JSON.stringify({ title: pendingPushReminder.title, note: pendingPushReminder.note, due: pendingPushReminder.due, time: pendingPushReminder.time, calendars }),
-});
-pendingPushReminder = null;
-$('calPushOverlay').classList.remove('open');
-flashSetMsg(t('cal.pushDone'));
-loadCalToday();
-} catch (e) { $('calPushErr').textContent = e.message || t('cal.pushErr'); }
-};
+$('tlAddBtn').onclick = () => openModal(null, { due: tlDate, tl: true });
 
 window.convertSug = (id) => {
 const r = suggestions.find((x) => x.id === id);
@@ -2454,7 +2418,7 @@ $('backdrop').onclick = closeDrawer;
 function renderHome() {
 const plus7 = (() => { const d = new Date(); d.setDate(d.getDate() + 7); return iso(d); })();
 const items = reminders
-.filter((r) => !r.done && r.due && r.due <= plus7)
+.filter((r) => !r.tl && !r.done && r.due && r.due <= plus7)
 .sort((a, b) => a.prio - b.prio || a.due.localeCompare(b.due));
 $('weekList').innerHTML = items.length
 ? items.map((r) => {
@@ -2589,6 +2553,7 @@ body: JSON.stringify({ lockedCrmToAdmin: $('lockCrmToggle').checked }),
 updateLockCrmTxt();
 };
 
+let modalTl = false;
 window.openModal = (id, prefill) => {
 editing = id || null;
 const r = id ? reminders.find((x) => x.id === id) : null;
@@ -2612,8 +2577,14 @@ $('fTime').value = r && r.time ? r.time : (!r && prefill && prefill.time ? prefi
 // End time is derived from the stored duration (in minutes) so editing an
 // existing reminder shows its actual end time, not a re-guessed default.
 $('fEndTime').value = (r && r.time && r.duration) ? tlAddMinutes(r.time, r.duration) : '';
+modalTl = r ? !!r.tl : !!(prefill && prefill.tl);
+const al = (r && r.alerts) ? r.alerts : { pre: true, start: true, end: true };
+if ($('alertPre')) {
+$('alertPre').classList.toggle('sel', al.pre !== false);
+$('alertStart').classList.toggle('sel', al.start !== false);
+$('alertEnd').classList.toggle('sel', al.end !== false);
+}
 $('modalErr').textContent = '';
-$('fCalOnly').checked = false;
 paintChips();
 $('overlay').classList.add('open');
 $('fTitle').focus();
@@ -2641,12 +2612,7 @@ $('durationRow').style.display = tv ? 'block' : 'none';
 $('datePreview').textContent = d
 ? `${t('prev.on')} ${fmt(new Date(d + 'T00:00:00'))}${tv ? ` ${t('prev.at')} ${tv}` : ''}`
 : t('prev.none');
-// The "calendar-only" checkbox only makes sense with a due date and an
-// actually connected calendar — hide it (and force it unchecked)
-// otherwise so it can't silently do nothing.
-const calOnlyEligible = !!d && calStatus.apple;
-$('calOnlyRow').style.display = calOnlyEligible ? 'flex' : 'none';
-if (!calOnlyEligible) $('fCalOnly').checked = false;
+if ($('alertsRow')) $('alertsRow').style.display = tv ? 'block' : 'none';
 }
 
 function targetDate() {
@@ -2701,23 +2667,10 @@ prio: selPrio,
 icon: selIcon,
 color: selColor,
 duration: computeDurationMinutes(),
+tl: modalTl,
+alerts: { pre: $('alertPre').classList.contains('sel'), start: $('alertStart').classList.contains('sel'), end: $('alertEnd').classList.contains('sel') },
 };
 if (!payload.title.trim()) { $('modalErr').textContent = t('err.title'); return; }
-// "Only send to calendar" — checking this box IS the confirmation the
-// push flow normally asks for separately, so skip creating a to-do
-// entirely and push straight to Apple Calendar instead.
-if ($('fCalOnly').checked && payload.due && !editing) {
-try {
-await api('/api/calendar/push', {
-method: 'POST', headers: { 'Content-Type': 'application/json' },
-body: JSON.stringify({ title: payload.title, note: payload.note, due: payload.due, time: payload.time, duration: payload.duration, calendars: ['apple'] }),
-});
-$('overlay').classList.remove('open');
-flashSetMsg(t('cal.pushDone'));
-loadCalToday();
-} catch (e) { $('modalErr').textContent = e.message || t('cal.pushErr'); }
-return;
-}
 try {
 const d = await api('/api/reminders', {
 method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -2734,7 +2687,6 @@ if (pendingIdeaConvert) {
 const iid = pendingIdeaConvert; pendingIdeaConvert = null;
 await ideaAct(iid, 'archive');
 }
-if (payload.due) maybeOfferPush({ title: payload.title, note: payload.note, due: payload.due, time: payload.time });
 } catch (e) { $('modalErr').textContent = e.message; }
 };
 
@@ -4968,7 +4920,7 @@ if (d && /^\d{4}-\d{2}-\d{2}$/.test(d)) tlDate = d;
 showView('timeline');
 Promise.resolve(loadDone).then(() => {
 showView('timeline');
-if (q.get('add') === '1') setTimeout(() => openModal(null, { due: tlDate }), 300);
+if (q.get('add') === '1') setTimeout(() => openModal(null, { due: tlDate, tl: true }), 300);
 });
 })();
 pushInit();
