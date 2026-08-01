@@ -733,6 +733,9 @@ header { padding: 10px 16px; }
 .tls-color { width: 26px; height: 26px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; flex-shrink: 0; }
 .tls-color.sel { border-color: #7aa2f7; }
 .tls-iconpick button.tls-sug { background: #2a3547; }
+.tls-durinput { width: 64px; background: #232c3a; border: 1px solid #2a3547; border-radius: 999px; color: #e8ecf1; padding: 6px 10px; font-size: 12.5px; outline: none; }
+.tls-more { width: 26px; height: 26px; border-radius: 50%; border: none; background: #232c3a; color: #8b94a1; cursor: pointer; font-size: 14px; line-height: 1; }
+.tls-more:hover { color: #e8ecf1; }
 </style>
 </head>
 <body>
@@ -1278,7 +1281,8 @@ header { padding: 10px 16px; }
 </div>
 <div class="tls-step" id="tlsStep2">
 <div class="tls-row"><span data-i18n="tls.date">Datum</span><input type="date" id="tlsDate"></div>
-<div class="tls-label" data-i18n="l.time">Tijd</div>
+<div class="tls-label" style="display:flex; align-items:center; justify-content:space-between;"><span data-i18n="l.time">Tijd</span><button type="button" id="tlsTimeMore" class="tls-more">&#8943;</button></div>
+<input type="time" id="tlsTimeCustom" style="display:none; width:100%; background:#1c2433; border:1px solid #2a3547; border-radius:10px; color:#e8ecf1; padding:9px 12px; font-size:14px; outline:none; box-sizing:border-box; margin-bottom:8px; color-scheme:dark;">
 <div class="tls-wheelwrap">
 <div class="tls-pill" id="tlsPill"></div>
 <div class="tls-wheel" id="tlsWheel"></div>
@@ -1289,6 +1293,10 @@ header { padding: 10px 16px; }
 <div class="tls-step" id="tlsStep3">
 <div class="tls-row" id="tlsSumDate"><span data-i18n="tls.date">Datum</span><span class="tls-val" id="tlsSumDateV"></span></div>
 <div class="tls-row" id="tlsSumTime"><span data-i18n="l.time">Tijd</span><span class="tls-val" id="tlsSumTimeV"></span></div>
+<div class="tls-row" id="tlsSumDur"><span data-i18n="tls.dur">Duur</span><span class="tls-val" id="tlsSumDurV"></span></div>
+<div class="chips" id="tlsDur3" style="display:none; margin:2px 0 8px;"></div>
+<div class="tls-row" id="tlsRepeatRow"><span data-i18n="tls.rep">Herhalen</span><span class="tls-val" id="tlsRepeatV"></span></div>
+<div class="chips" id="tlsRepeat" style="display:none; margin:2px 0 8px;"></div>
 <div class="tls-row" id="tlsAlertsRow"><span data-i18n="l.alerts">Meldingen</span><span class="tls-val" id="tlsAlertsCount"></span></div>
 <div class="tls-alerts" id="tlsAlerts" style="display:none;"></div>
 <textarea id="tlsNote" data-i18n-ph="tls.note" placeholder="Notitie toevoegen..." rows="2"></textarea>
@@ -1534,7 +1542,7 @@ en: {
 'set.tgHelp':'One-time setup: create a bot via @BotFather in Telegram, put the token in Render as TELEGRAM_BOT_TOKEN, send your bot a message and click Link here.',
 'set.status':'Status','set.link':'Link','set.test':'Test message','set.soon':'Coming soon',
 'set.cal':'Connect calendar','set.calSub':'Import your calendar and push reminders to it (always with a confirmation first).',
-'tls.title':'What are you working on?','tls.sugg':'Suggestions','tls.noSugg':'No suggestions yet','tls.date':'Date','tls.dur':'Duration','tls.note':'Add notes...','tls.continue':'Continue','tls.create':'Create action','tls.dup':'Duplicate','tls.del':'Delete','tls.delSure':'Delete this action?','al.count':'alerts',
+'tls.title':'What are you working on?','tls.sugg':'Suggestions','tls.noSugg':'No suggestions yet','tls.date':'Date','tls.dur':'Duration','tls.note':'Add notes...','tls.continue':'Continue','tls.create':'Create action','tls.dup':'Duplicate','tls.del':'Delete','tls.delSure':'Delete this action?','al.count':'alerts','tls.rep':'Repeat','tls.repNone':'None','tls.repDaily':'Daily','tls.repWeekly':'Weekly','tls.repMonthly':'Monthly',
 'l.alerts':'Notifications','al.pre':'5 min before','al.start':'At start','al.end':'At end',
 'set.push':'Push notifications','set.pushSub':'Get Base notifications on this device, for example when a timed reminder is due.','set.pushEnable':'Enable on this device','set.pushDisable':'Disable','set.pushTest':'Send test','set.pushOn':'Push notifications are enabled on this device.','set.pushOff':'Not enabled on this device yet.','set.pushDenied':'Notifications are blocked for Base in your browser or system settings.','set.pushUnsupported':'This browser does not support push here. On iPhone: add Base to your home screen first (Share, Add to Home Screen) and open it from there.','set.pushOnMsg':'Push notifications enabled.','set.pushTestSent':'Test notification sent.','set.pushTestNone':'No devices are registered yet.','set.pushIosHelp':'iPhone/iPad: first add Base to your home screen (Share, Add to Home Screen) and open the app from there; then you can enable notifications.',
 
@@ -1617,7 +1625,7 @@ nl: {
 'set.tgHelp':'Eenmalig instellen: maak een bot via @BotFather in Telegram, zet het token in Render als TELEGRAM_BOT_TOKEN, stuur je bot een berichtje en klik hier op Koppelen.',
 'set.status':'Status','set.link':'Koppelen','set.test':'Testbericht','set.soon':'Binnenkort beschikbaar',
 'set.cal':'Agenda koppelen','set.calSub':'Importeer je agenda en push herinneringen ernaartoe (altijd eerst met bevestiging).',
-'tls.title':'Waar ga je aan werken?','tls.sugg':'Suggesties','tls.noSugg':'Nog geen suggesties','tls.date':'Datum','tls.dur':'Duur','tls.note':'Notitie toevoegen...','tls.continue':'Ga verder','tls.create':'Maak actie','tls.dup':'Dupliceer','tls.del':'Verwijder','tls.delSure':'Actie verwijderen?','al.count':'meldingen',
+'tls.title':'Waar ga je aan werken?','tls.sugg':'Suggesties','tls.noSugg':'Nog geen suggesties','tls.date':'Datum','tls.dur':'Duur','tls.note':'Notitie toevoegen...','tls.continue':'Ga verder','tls.create':'Maak actie','tls.dup':'Dupliceer','tls.del':'Verwijder','tls.delSure':'Actie verwijderen?','al.count':'meldingen','tls.rep':'Herhalen','tls.repNone':'Geen','tls.repDaily':'Dagelijks','tls.repWeekly':'Wekelijks','tls.repMonthly':'Maandelijks',
 'l.alerts':'Meldingen','al.pre':'5 min ervoor','al.start':'Bij start','al.end':'Bij einde',
 'set.push':'Pushmeldingen','set.pushSub':'Krijg meldingen van Base op dit apparaat, bijvoorbeeld wanneer een reminder met tijd verloopt.','set.pushEnable':'Zet aan op dit apparaat','set.pushDisable':'Uitzetten','set.pushTest':'Testmelding','set.pushOn':'Pushmeldingen staan aan op dit apparaat.','set.pushOff':'Nog niet aan op dit apparaat.','set.pushDenied':'Meldingen zijn voor Base geblokkeerd in je browser- of systeeminstellingen.','set.pushUnsupported':'Deze browser ondersteunt hier geen push. Op iPhone: zet Base eerst op je beginscherm (Deel, Zet op beginscherm) en open hem vanaf daar.','set.pushOnMsg':'Pushmeldingen aangezet.','set.pushTestSent':'Testmelding verstuurd.','set.pushTestNone':'Er zijn nog geen apparaten aangemeld.','set.pushIosHelp':'iPhone/iPad: zet Base eerst op je beginscherm (Deel-knop, Zet op beginscherm) en open de app vanaf daar; daarna kun je meldingen aanzetten.',
 
@@ -2112,7 +2120,17 @@ if (m || !h) parts.push(`${m}m`);
 return (LANG === 'nl') ? `${parts.join(' ')} vrij` : `${parts.join(' ')} free`;
 }
 
-window.tlToggleDone = async (id) => { await toggleDone(id, true); loadTimeline(); };
+window.tlToggleDone = async (id) => {
+const r = reminders.find((x) => x.id === id);
+if (r && r.repeat && r.repeat.type) {
+const d = await api('/api/reminders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'doneDate', id, date: tlDate }) });
+reminders = d.reminders;
+loadTimeline();
+return;
+}
+await toggleDone(id, true);
+loadTimeline();
+};
 
 let tlNowTimer = null;
 const TL2_PRIO = { 1: '#f28b8b', 2: '#f0b45c', 3: '#e8e05c', 4: '#7fd68f' };
@@ -2152,7 +2170,7 @@ if (!blocks.length) { window.__tl2 = null; list.innerHTML = '<div class="tl-empt
 const M = tlMinutesFromMidnight;
 const items = blocks.map((b) => {
 const start = M(b.time);
-let end = b.endTime ? M(b.endTime) : start + 60;
+let end = b.endTime ? M(b.endTime) : start + 30;
 if (end <= start) end = start + 30;
 return { b, start, end, lane: 0, laneCount: 1 };
 }).sort((x, y) => x.start - y.start || y.end - x.end);
@@ -2233,10 +2251,23 @@ tl2UpdateNow();
 tlNowTimer = setInterval(tl2UpdateNow, 30000);
 }
 
+function tlOccursOn(r, dateISO) {
+if (r.due === dateISO) return true;
+if (!r.repeat || !r.repeat.type || !r.due || dateISO < r.due) return false;
+if (r.repeat.type === 'daily') return true;
+const a = new Date(r.due + 'T00:00:00');
+const d = new Date(dateISO + 'T00:00:00');
+if (r.repeat.type === 'weekly') return a.getDay() === d.getDay();
+if (r.repeat.type === 'monthly') return a.getDate() === d.getDate();
+return false;
+}
+function tlIsDoneOn(r, dateISO) {
+return (r.repeat && r.repeat.type) ? (Array.isArray(r.doneDates) && r.doneDates.includes(dateISO)) : r.done;
+}
 async function loadTimeline() {
 tlRenderWeek();
 const allDayItems = [], timedBlocks = [];
-reminders.filter((r) => !r.done && r.due === tlDate).forEach((r) => {
+reminders.filter((r) => !tlIsDoneOn(r, tlDate) && tlOccursOn(r, tlDate)).forEach((r) => {
 if (r.time) timedBlocks.push({ kind: 'reminder', id: r.id, title: r.title, time: r.time, prio: r.prio, icon: r.icon, color: r.color, endTime: r.duration ? tlAddMinutes(r.time, r.duration) : null });
 else allDayItems.push({ kind: 'reminder', id: r.id, title: r.title, prio: r.prio, icon: r.icon, color: r.color });
 });
@@ -5013,7 +5044,7 @@ flashSetMsg(out.delivered ? t('set.pushTestSent') : t('set.pushTestNone'));
 // ---------- Structured-stijl actie-sheet (getrapte create-flow) ----------
 let tlsState = null;
 let tlsWheelTimer = null;
-const TLS_DURS = [15, 30, 45, 60, 90, 120];
+const TLS_DURS = [0, 15, 30, 45, 60, 90, 120];
 const TLS_ICON_WORDS = [['gym', 'dumbbell'], ['sport', 'dumbbell'], ['train', 'dumbbell'], ['hardlo', 'heart'], ['renn', 'heart'], ['wandel', 'heart'], ['fiets', 'heart'], ['zwem', 'heart'], ['yoga', 'heart'], ['lunch', 'utensils'], ['ontbijt', 'utensils'], ['diner', 'utensils'], ['eten', 'utensils'], ['koken', 'utensils'], ['slapen', 'bed'], ['bed', 'bed'], ['nap', 'bed'], ['werk', 'briefcase'], ['meeting', 'briefcase'], ['overleg', 'briefcase'], ['bellen', 'phone'], ['call', 'phone'], ['koffie', 'coffee'], ['thee', 'coffee'], ['boodschap', 'cart'], ['winkel', 'cart'], ['lezen', 'book'], ['boek', 'book'], ['studie', 'book'], ['leren', 'book'], ['school', 'book'], ['auto', 'car'], ['rijden', 'car'], ['garage', 'car'], ['muziek', 'music'], ['vlucht', 'plane'], ['reis', 'plane'], ['pil', 'pill'], ['medic', 'pill'], ['dokter', 'pill'], ['tandarts', 'pill'], ['klus', 'wrench'], ['repar', 'wrench'], ['mail', 'mail'], ['cadeau', 'gift'], ['huis', 'home'], ['schoonmaak', 'home'], ['papier', 'home'], ['afval', 'home'], ['wekker', 'alarm'], ['alarm', 'alarm'], ['afspraak', 'calendar']];
 const TLS_ICON_COLORS = { alarm: '#8b94a1', bed: '#8b94a1', dumbbell: '#4a6fd8', coffee: '#c98d5c', briefcase: '#8b94a1', book: '#4ab8a1', heart: '#e8628c', car: '#5cb8e8', home: '#f0b45c', bell: '#7d8798', phone: '#7fd68f', mail: '#7aa2f7', calendar: '#7aa2f7', cart: '#7fd68f', gift: '#e05252', music: '#c67ae8', plane: '#5cb8e8', utensils: '#f0b45c', pill: '#e05252', wrench: '#8b94a1' };
 const tlsPad = (n) => String(n).padStart(2, '0');
@@ -5029,9 +5060,9 @@ const st = tlsState; if (!st) return;
 $('tlsIco').innerHTML = tlIcon(st.icon || 'bell');
 const headEl = document.querySelector('.tls-head');
 if (headEl) headEl.style.background = tlSafeColor(st.color) || '#e8ecf1';
-const range = st.time ? (st.time + ' - ' + tlsFmt(tlsMinOf(st.time) + st.dur) + ' (' + st.dur + ' min)') : '';
+const range = st.time ? (st.dur > 0 ? (st.time + ' - ' + tlsFmt(tlsMinOf(st.time) + st.dur) + ' (' + st.dur + ' min)') : st.time) : '';
 $('tlsRange').textContent = range;
-$('tlsPill').textContent = st.time ? (st.time + ' - ' + tlsFmt(tlsMinOf(st.time) + st.dur)) : '';
+$('tlsPill').textContent = st.time ? (st.dur > 0 ? (st.time + ' - ' + tlsFmt(tlsMinOf(st.time) + st.dur)) : st.time) : '';
 }
 function tlsRenderWheel() {
 const el = $('tlsWheel');
@@ -5045,15 +5076,32 @@ el.appendChild(d);
 el.scrollTop = Math.round(tlsMinOf(tlsState.time) / 5) * 32;
 }
 function tlsRenderDur() {
-const el = $('tlsDur');
+[$('tlsDur'), $('tlsDur3')].forEach((el) => {
+if (!el) return;
 el.innerHTML = '';
 TLS_DURS.forEach((m) => {
 const b = document.createElement('button');
 b.type = 'button';
 b.textContent = m < 60 ? (m + 'm') : (String(m / 60).replace('.', ',') + 'u');
 b.classList.toggle('sel', tlsState.dur === m);
-b.onclick = () => { tlsState.dur = m; tlsRenderDur(); tlsUpdateHead(); };
+b.onclick = () => { tlsState.dur = m; tlsRenderDur(); tlsUpdateHead(); tlsUpdateSums(); };
 el.appendChild(b);
+});
+const inp = document.createElement('input');
+inp.type = 'number';
+inp.min = '0';
+inp.max = '480';
+inp.className = 'tls-durinput';
+inp.placeholder = 'min';
+inp.value = TLS_DURS.includes(tlsState.dur) ? '' : tlsState.dur;
+inp.addEventListener('click', (ev) => ev.stopPropagation());
+inp.addEventListener('input', () => {
+if (inp.value === '') return;
+tlsState.dur = Math.max(0, Math.min(480, Number(inp.value) || 0));
+[$('tlsDur'), $('tlsDur3')].forEach((el3) => { if (el3) el3.querySelectorAll('button').forEach((bb) => bb.classList.remove('sel')); });
+tlsUpdateHead(); tlsUpdateSums();
+});
+el.appendChild(inp);
 });
 }
 function tlsRenderAlerts() {
@@ -5109,14 +5157,37 @@ el.appendChild(row);
 });
 if (!top.length) { const d2 = document.createElement('div'); d2.className = 'tls-sugg-sub'; d2.style.padding = '8px 2px'; d2.textContent = t('tls.noSugg'); el.appendChild(d2); }
 }
+function tlsUpdateSums() {
+if (!tlsState) return;
+if ($('tlsSumDateV')) $('tlsSumDateV').textContent = $('tlsDate').value || tlsState.due;
+if ($('tlsSumTimeV')) $('tlsSumTimeV').textContent = tlsState.dur > 0 ? (tlsState.time + ' - ' + tlsFmt(tlsMinOf(tlsState.time) + tlsState.dur) + ' (' + tlsState.dur + ' min)') : tlsState.time;
+if ($('tlsSumDurV')) $('tlsSumDurV').textContent = tlsState.dur + ' min';
+if ($('tlsRepeatV')) $('tlsRepeatV').textContent = tlsState.repeat ? ({ daily: t('tls.repDaily'), weekly: t('tls.repWeekly'), monthly: t('tls.repMonthly') })[tlsState.repeat.type] : t('tls.repNone');
+}
+function tlsRenderRepeat() {
+const el = $('tlsRepeat');
+if (!el || !tlsState) return;
+el.innerHTML = '';
+[['', t('tls.repNone')], ['daily', t('tls.repDaily')], ['weekly', t('tls.repWeekly')], ['monthly', t('tls.repMonthly')]].forEach((def) => {
+const b = document.createElement('button');
+b.type = 'button';
+b.textContent = def[1];
+const cur = tlsState.repeat && tlsState.repeat.type ? tlsState.repeat.type : '';
+b.classList.toggle('sel', cur === def[0]);
+b.onclick = () => { tlsState.repeat = def[0] ? { type: def[0] } : null; tlsRenderRepeat(); tlsUpdateSums(); };
+el.appendChild(b);
+});
+}
 function tlsStepTo(n) {
 tlsState.step = n;
 $('tlsSteps').style.transform = 'translateX(-' + ((n - 1) * 100 / 3) + '%)';
 if (n === 3) {
-$('tlsSumDateV').textContent = $('tlsDate').value || tlsState.due;
-$('tlsSumTimeV').textContent = tlsState.time + ' - ' + tlsFmt(tlsMinOf(tlsState.time) + tlsState.dur) + ' (' + tlsState.dur + ' min)';
+tlsUpdateSums();
 $('tlsAlerts').style.display = 'none';
+if ($('tlsDur3')) $('tlsDur3').style.display = 'none';
+if ($('tlsRepeat')) $('tlsRepeat').style.display = 'none';
 tlsRenderAlerts();
+tlsRenderRepeat();
 }
 $('tlsCta').textContent = n < 3 ? t('tls.continue') : (tlsState.mode === 'edit' ? t('save') : t('tls.create'));
 }
@@ -5138,8 +5209,9 @@ color: r ? (r.color || '') : '',
 prio: r ? r.prio : 4,
 due: (r && r.due) || data.due || iso(new Date()),
 time: (r && r.time) || data.time || nextQ,
-dur: (r && r.duration) || 60,
+dur: r ? (r.duration || 0) : 60,
 alerts: (r && r.alerts) ? { pre: r.alerts.pre !== false, start: r.alerts.start !== false, end: r.alerts.end !== false } : { pre: true, start: true, end: true },
+repeat: (r && r.repeat && r.repeat.type) ? { type: r.repeat.type } : null,
 iconManual: !!(r && r.icon),
 step: 1,
 };
@@ -5151,6 +5223,7 @@ $('tlsMenuBtn').style.display = mode === 'edit' ? 'flex' : 'none';
 $('tlsMenu').style.display = 'none';
 $('tlsConfirm').style.display = 'none';
 $('tlsIconPick').style.display = 'none';
+if ($('tlsTimeCustom')) { $('tlsTimeCustom').style.display = 'none'; const ww = document.querySelector('.tls-wheelwrap'); if (ww) ww.style.display = 'block'; }
 tlsUpdateHead(); tlsRenderDur(); tlsRenderSugg();
 $('tlsSteps').style.transition = 'none';
 tlsStepTo(mode === 'edit' ? 3 : 1);
@@ -5184,6 +5257,7 @@ color: st.color,
 duration: st.dur,
 tl: st.tl,
 alerts: st.alerts,
+repeat: st.repeat,
 };
 }
 $('tlsCta').onclick = () => {
@@ -5275,8 +5349,25 @@ $('tlsDelYes').onclick = () => { tlsSubmit('delete', { id: tlsState.id }); };
 $('tlsDupBtn').onclick = () => { $('tlsMenu').style.display = 'none'; const p = tlsPayload(); delete p.id; tlsSubmit('create', p); };
 $('tlsTitle').addEventListener('input', () => { if (tlsState && tlsState.mode === 'new' && !tlsState.iconManual) { tlsState.icon = tlsGuessIcon($('tlsTitle').value); tlsUpdateHead(); } });
 $('tlsAlertsRow').onclick = () => { const el = $('tlsAlerts'); el.style.display = el.style.display === 'none' ? 'block' : 'none'; };
+$('tlsTimeMore').onclick = (ev) => {
+ev.stopPropagation();
+const ci = $('tlsTimeCustom');
+const wrap = document.querySelector('.tls-wheelwrap');
+const showCustom = ci.style.display === 'none';
+ci.style.display = showCustom ? 'block' : 'none';
+wrap.style.display = showCustom ? 'none' : 'block';
+if (showCustom) { ci.value = tlsState ? tlsState.time : ''; ci.focus(); }
+else { tlsRenderWheel(); }
+};
+$('tlsTimeCustom').addEventListener('input', () => {
+if (!tlsState) return;
+const v = $('tlsTimeCustom').value;
+if (/^\d{2}:\d{2}$/.test(v)) { tlsState.time = v; tlsUpdateHead(); tlsUpdateSums(); }
+});
 $('tlsSumDate').onclick = () => tlsStepTo(2);
 $('tlsSumTime').onclick = () => tlsStepTo(2);
+$('tlsSumDur').onclick = () => { const el2 = $('tlsDur3'); el2.style.display = el2.style.display === 'none' ? 'flex' : 'none'; tlsRenderDur(); };
+$('tlsRepeatRow').onclick = () => { const el2 = $('tlsRepeat'); el2.style.display = el2.style.display === 'none' ? 'flex' : 'none'; tlsRenderRepeat(); };
 $('tlsDate').addEventListener('change', () => { if (tlsState) tlsState.due = $('tlsDate').value; });
 $('tlsWheel').addEventListener('scroll', () => {
 if (!tlsState) return;
