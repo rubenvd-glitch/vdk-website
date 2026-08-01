@@ -327,23 +327,34 @@ sessionStores[realm].delete(id);
 if (KV_URL) { try { await kvCmd('DEL', `sess:${realm}:${id}`); } catch (e) { /* ignore */ } }
 }
 
+// Een misvormd cookie-paar wordt overgeslagen in plaats van verkeerd geparsed.
+function parseCookies(header) {
+const out = {};
+for (const part of String(header || '').split(';')) {
+const i = part.indexOf('=');
+if (i === -1) continue;
+const k = part.slice(0, i).trim();
+if (k) out[k] = part.slice(i + 1).trim();
+}
+return out;
+}
+
 async function getSession(req, realm) {
 const cookieName = REALM_COOKIE[realm];
-const cookies = Object.fromEntries(
-(req.headers.cookie || '').split(';').map((c) => {
-const i = c.indexOf('=');
-return [c.slice(0, i).trim(), c.slice(i + 1).trim()];
-})
-);
-const raw = cookies[cookieName];
+if (!cookieName) return null;
+const raw = parseCookies(req.headers.cookie)[cookieName];
 if (!raw) return null;
 const dot = raw.lastIndexOf('.');
-if (dot === -1) return null;
+if (dot <= 0) return null;
 const id = raw.slice(0, dot);
 const sig = raw.slice(dot + 1);
-const expected = sign(id);
-if (sig.length !== expected.length ||
-!crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return null;
+// C-01: vergelijk BYTE-lengtes, nooit string-lengtes. Bij een multi-byte teken
+// lopen die twee uiteen, en dan gooit timingSafeEqual een RangeError die het
+// hele proces meenam.
+const sigBuf = Buffer.from(sig, 'utf8');
+const expBuf = Buffer.from(sign(id), 'utf8');
+if (sigBuf.length !== expBuf.length) return null;
+if (!crypto.timingSafeEqual(sigBuf, expBuf)) return null;
 const store = sessionStores[realm];
 let s = store.get(id);
 if (!s && KV_URL) {
@@ -408,9 +419,29 @@ return ++e.count <= 10;
 }
 
 // ---------- HTTP helpers ----------
+// Beveiligingsheaders op elk antwoord. De CSP volgt in een latere commit,
+// samen met het omzetten van de inline handlers: een nonce-CSP blokkeert die
+// en zonder die omzetting zijn de panelen onbruikbaar.
+function securityHeaders() {
+const h = {
+'X-Content-Type-Options': 'nosniff',
+'X-Frame-Options': 'DENY',
+'Referrer-Policy': 'no-referrer',
+'Permissions-Policy': 'geolocation=(), microphone=(), camera=(), payment=()',
+'Cross-Origin-Opener-Policy': 'same-origin',
+};
+if (IS_PROD) h['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains';
+return h;
+}
+
 function json(res, status, obj, headers = {}) {
 const body = JSON.stringify(obj);
-res.writeHead(status, { 'Content-Type': 'application/json', ...headers });
+res.writeHead(status, {
+'Content-Type': 'application/json',
+'Cache-Control': 'no-store, max-age=0',
+...securityHeaders(),
+...headers,
+});
 res.end(body);
 }
 
@@ -418,17 +449,50 @@ function serveFile(res, filePath, status = 200) {
 const types = { '.html': 'text/html; charset=utf-8', '.png': 'image/png', '.svg': 'image/svg+xml',
 '.css': 'text/css', '.js': 'text/javascript', '.ico': 'image/x-icon', '.jpg': 'image/jpeg' };
 fs.readFile(filePath, (err, data) => {
-if (err) { res.writeHead(404, { 'Content-Type': 'text/plain' }); return res.end('Not found'); }
-res.writeHead(status, { 'Content-Type': types[path.extname(filePath)] || 'application/octet-stream' });
+if (err) { res.writeHead(404, { 'Content-Type': 'text/plain', ...securityHeaders() }); return res.end('Not found'); }
+const ext = path.extname(filePath);
+// Ingelogde HTML mag nergens blijven staan (terugknop na uitloggen); alleen
+// statische afbeeldingen mogen gecachet worden.
+const cache = ext === '.html' ? 'no-store, max-age=0' : 'public, max-age=86400';
+res.writeHead(status, {
+'Content-Type': types[ext] || 'application/octet-stream',
+'Cache-Control': cache,
+...securityHeaders(),
+});
 res.end(data);
 });
 }
 
-function readBody(req) {
+// M-06: req.destroy() liet 'end' nooit vuren, dus de promise werd nooit
+// afgerond en de handler bleef eeuwig hangen. Nu: 413 terug, null resolven,
+// en tellen in bytes in plaats van gedecodeerde tekens.
+function readBody(req, res, limit = 10000) {
 return new Promise((resolve) => {
-let data = '';
-req.on('data', (c) => { data += c; if (data.length > 10000) req.destroy(); });
-req.on('end', () => { try { resolve(JSON.parse(data || '{}')); } catch { resolve({}); } });
+const chunks = [];
+let len = 0, settled = false;
+const finish = (v) => { if (!settled) { settled = true; resolve(v); } };
+req.on('data', (c) => {
+len += c.length;
+if (len > limit) {
+req.removeAllListeners('data');
+if (res && !res.headersSent) {
+// Connection: close, anders probeert de client de socket die we hierna
+// vernielen te hergebruiken en krijgt hij een ECONNRESET op het volgende
+// verzoek in plaats van dit nette 413-antwoord.
+res.writeHead(413, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', Connection: 'close' });
+res.end(JSON.stringify({ error: 'Verzoek te groot.' }));
+}
+req.destroy();
+return finish(null);
+}
+chunks.push(c);
+});
+req.on('end', () => {
+try { finish(JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}')); }
+catch { finish({}); }
+});
+req.on('error', () => finish(null));
+req.on('aborted', () => finish(null));
 });
 }
 
@@ -1051,7 +1115,8 @@ apple: !!a, appleId: a && a.appleId ? a.appleId : null,
 async function handleAppleConnect(req, res, realm) {
 const s = await getSession(req, realm);
 if (!s) return json(res, 401, { error: 'Not logged in' });
-const body = await readBody(req);
+const body = await readBody(req, res);
+if (!body) return;
 const appleId = String(body.appleId || '').trim();
 const appPassword = String(body.appPassword || '').trim().replace(/\s+/g, '');
 if (!appleId || !appPassword) return json(res, 400, { error: 'Vul je iCloud e-mailadres en app-specifiek wachtwoord in.' });
@@ -1119,7 +1184,8 @@ return json(res, 200, { events, debug });
 async function handleCalendarPush(req, res, realm) {
 const s = await getSession(req, realm);
 if (!s) return json(res, 401, { error: 'Not logged in' });
-const body = await readBody(req);
+const body = await readBody(req, res);
+if (!body) return;
 const title = String(body.title || '').trim().slice(0, 200);
 const note = String(body.note || '').trim().slice(0, 2000);
 const due = String(body.due || '').slice(0, 10);
@@ -1145,7 +1211,8 @@ return json(res, 200, { ok: true, results });
 // CRM never share a login state.
 async function handleRequestCode(req, res, realm) {
 if (!allowRate(req.socket.remoteAddress)) return json(res, 429, { error: 'Too many attempts. Try again later.' });
-const body = await readBody(req);
+const body = await readBody(req, res);
+if (!body) return;
 const email = String(body.email || '').trim().toLowerCase();
 const generic = { ok: true, message: 'If this email is authorized, a code has been sent.' };
 let allowed = email === ADMIN_EMAIL && email.includes('@');
@@ -1192,7 +1259,8 @@ return json(res, 200, generic);
 
 async function handleVerify(req, res, realm) {
 if (!allowRate(req.socket.remoteAddress)) return json(res, 429, { error: 'Too many attempts. Try again later.' });
-const body = await readBody(req);
+const body = await readBody(req, res);
+if (!body) return;
 const email = String(body.email || '').trim().toLowerCase();
 const code = String(body.code || '').trim();
 const entry = await getLoginCode(realm, email);
@@ -1462,7 +1530,8 @@ async function handleAssistantChat(req, res) {
   const apiKey = (process.env.GROQ_API_KEY || '').trim();
   if (!apiKey) return json(res, 503, { error: 'De assistent is nog niet ingesteld (GROQ_API_KEY ontbreekt in Render — gratis te maken op console.groq.com).' });
   try {
-    const body = await readBody(req);
+    const body = await readBody(req, res);
+    if (!body) return;
     const message = String(body.message || '').trim().slice(0, 4000);
     if (!message) return json(res, 400, { error: 'Typ eerst een vraag.' });
     const page = String(body.page || '').slice(0, 40);
@@ -1608,7 +1677,8 @@ async function handleAssistantProactive(req, res) {
   const apiKey = (process.env.GROQ_API_KEY || '').trim();
   if (!apiKey) return json(res, 200, { ok: true, reply: null });
   try {
-    const body = await readBody(req);
+    const body = await readBody(req, res);
+    if (!body) return;
     const page = String(body.page || '').slice(0, 40);
     const lang = body.lang === 'nl' ? 'nl' : 'en';
 
@@ -1725,7 +1795,8 @@ async function handleAssistantFeedback(req, res) {
   const s = await getSession(req, 'admin');
   if (!s) return json(res, 401, { error: 'Not logged in' });
   try {
-    const body = await readBody(req);
+    const body = await readBody(req, res);
+    if (!body) return;
     const category = ASSISTANT_PROACTIVE_CATEGORIES.includes(body.category) ? body.category : 'other';
     const engaged = !!body.engaged;
     const strong = !!body.strong;
@@ -1767,7 +1838,8 @@ async function handleAssistantAction(req, res) {
   const s = await getSession(req, 'admin');
   if (!s) return json(res, 401, { error: 'Not logged in' });
   try {
-    const body = await readBody(req);
+    const body = await readBody(req, res);
+    if (!body) return;
     const lang = body.lang === 'nl' ? 'nl' : 'en';
     const context = await buildAssistantContext(s.email);
     const action = validateAssistantAction({ type: body.type, params: body.params }, context);
@@ -1809,7 +1881,8 @@ const key = gymExKey(s.email);
 try {
 if (req.method === 'GET') return json(res, 200, (await kvGetJson(key)) || []);
 if (req.method === 'POST') {
-const body = await readBody(req);
+const body = await readBody(req, res);
+if (!body) return;
 let list = (await kvGetJson(key)) || [];
 if (body.action === 'create') {
 const name = String(body.name || '').trim().slice(0, 100);
@@ -2049,7 +2122,8 @@ const key = gymLogKey(s.email);
 try {
 if (req.method === 'GET') return json(res, 200, (await kvGetJson(key)) || []);
 if (req.method === 'POST') {
-const body = await readBody(req);
+const body = await readBody(req, res);
+if (!body) return;
 const list = await applyGymLogAction(s.email, body);
 return json(res, 200, { ok: true, log: list });
 }
@@ -2067,7 +2141,8 @@ const key = gymBcKey(s.email);
 try {
 if (req.method === 'GET') return json(res, 200, (await kvGetJson(key)) || []);
 if (req.method === 'POST') {
-const body = await readBody(req);
+const body = await readBody(req, res);
+if (!body) return;
 let list = (await kvGetJson(key)) || [];
 if (body.action === 'create') {
 const date = /^\d{4}-\d{2}-\d{2}$/.test(String(body.date || '')) ? String(body.date) : new Date().toISOString().slice(0, 10);
@@ -2115,7 +2190,8 @@ const key = gymGoalKey(s.email);
 try {
 if (req.method === 'GET') return json(res, 200, (await kvGetJson(key)) || []);
 if (req.method === 'POST') {
-const body = await readBody(req);
+const body = await readBody(req, res);
+if (!body) return;
 let list = (await kvGetJson(key)) || [];
 if (body.action === 'create') {
 const kind = body.kind === 'general' ? 'general' : 'exercise';
@@ -2228,7 +2304,8 @@ const key = gymSessionKey(s.email);
 try {
 if (req.method === 'GET') return json(res, 200, (await kvGetJson(key)) || []);
 if (req.method === 'POST') {
-const body = await readBody(req);
+const body = await readBody(req, res);
+if (!body) return;
 let list = (await kvGetJson(key)) || [];
 if (body.action === 'create') {
 const name = String(body.name || '').trim().slice(0, 100);
@@ -2265,7 +2342,8 @@ const key = gymSplitKey(s.email);
 try {
 if (req.method === 'GET') return json(res, 200, (await kvGetJson(key)) || { order: [], currentIndex: 0 });
 if (req.method === 'POST') {
-const body = await readBody(req);
+const body = await readBody(req, res);
+if (!body) return;
 let sched = (await kvGetJson(key)) || { order: [], currentIndex: 0 };
 if (body.action === 'setOrder') {
 const order = Array.isArray(body.order) ? body.order.map((x) => String(x).slice(0, 100)).slice(0, 20) : [];
@@ -2288,7 +2366,7 @@ return json(res, 500, { error: 'Opslag niet bereikbaar. Is Upstash gekoppeld?' }
 
 // ---------- Server ----------
 
-const server = http.createServer(async (req, res) => {
+async function handleRequest(req, res) {
 const url = new URL(req.url, 'http://localhost');
 const p = url.pathname;
 const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress;
@@ -2324,7 +2402,8 @@ if (p === '/api/push/subscribe' && req.method === 'POST') {
 const s = await getSession(req, 'admin');
 if (!s) return json(res, 401, { error: 'Not logged in' });
 try {
-const body = await readBody(req);
+const body = await readBody(req, res);
+if (!body) return;
 const sub = body.subscription;
 if (!sub || !sub.endpoint || !sub.keys || !sub.keys.p256dh || !sub.keys.auth) return json(res, 400, { error: 'Ongeldige subscription.' });
 const key = pushSubsKey(s.email);
@@ -2341,7 +2420,8 @@ if (p === '/api/push/unsubscribe' && req.method === 'POST') {
 const s = await getSession(req, 'admin');
 if (!s) return json(res, 401, { error: 'Not logged in' });
 try {
-const body = await readBody(req);
+const body = await readBody(req, res);
+if (!body) return;
 const key = pushSubsKey(s.email);
 let subs = null;
 try { subs = await kvGetJson(key); } catch (e) {}
@@ -2431,7 +2511,8 @@ const key = `crmco:${s.email}`;
 try {
 if (req.method === 'GET') return json(res, 200, (await kvGetJson(key)) || []);
 if (req.method === 'POST') {
-const body = await readBody(req);
+const body = await readBody(req, res);
+if (!body) return;
 let list = (await kvGetJson(key)) || [];
 if (body.action === 'create') {
 const name = String(body.name || '').trim().slice(0, 200);
@@ -2516,7 +2597,8 @@ const key = `crmidea:${s.email}`;
 try {
 if (req.method === 'GET') return json(res, 200, (await kvGetJson(key)) || []);
 if (req.method === 'POST') {
-const body = await readBody(req);
+const body = await readBody(req, res);
+if (!body) return;
 let list = (await kvGetJson(key)) || [];
 const todayISO = new Date().toISOString().slice(0, 10);
 const plus = (n) => {
@@ -2573,7 +2655,8 @@ const key = `crmact:${s.email}`;
 try {
 if (req.method === 'GET') return json(res, 200, (await kvGetJson(key)) || []);
 if (req.method === 'POST') {
-const body = await readBody(req);
+const body = await readBody(req, res);
+if (!body) return;
 let list = (await kvGetJson(key)) || [];
 if (body.action === 'create') {
 const companyId = String(body.companyId || '').trim();
@@ -2623,7 +2706,8 @@ if (!s) return json(res, 401, { error: 'Not logged in' });
 try {
 if (req.method === 'GET') return json(res, 200, (await kvGetJson(`rem:${s.email}`)) || []);
 if (req.method === 'POST') {
-const body = await readBody(req);
+const body = await readBody(req, res);
+if (!body) return;
 const list = await applyReminderAction(s.email, body);
 return json(res, 200, { ok: true, reminders: list });
 }
@@ -2640,7 +2724,8 @@ if (!s) return json(res, 401, { error: 'Not logged in' });
 try {
 if (req.method === 'GET') return json(res, 200, (await kvGetJson(`sug:${s.email}`)) || []);
 if (req.method === 'POST') {
-const body = await readBody(req);
+const body = await readBody(req, res);
+if (!body) return;
 const list = await applySuggestionAction(s.email, body);
 return json(res, 200, { ok: true, suggestions: list });
 }
@@ -2657,7 +2742,8 @@ if (!s) return json(res, 401, { error: 'Not logged in' });
 try {
 if (req.method === 'GET') return json(res, 200, (await kvGetJson(`idea:${s.email}`)) || []);
 if (req.method === 'POST') {
-const body = await readBody(req);
+const body = await readBody(req, res);
+if (!body) return;
 const list = await applyIdeaAction(s.email, body);
 return json(res, 200, { ok: true, ideas: list });
 }
@@ -2679,7 +2765,8 @@ const pr = (await kvGetJson(key)) || {};
 return json(res, 200, { ...defaults, ...pr });
 }
 if (req.method === 'POST') {
-const body = await readBody(req);
+const body = await readBody(req, res);
+if (!body) return;
 const pr = { ...defaults, ...((await kvGetJson(key)) || {}) };
 if (body.name !== undefined) pr.name = String(body.name).trim().slice(0, 60);
 if (body.lang !== undefined) pr.lang = ['en', 'nl'].includes(body.lang) ? body.lang : 'en';
@@ -2708,7 +2795,8 @@ const pr = (await kvGetJson(key)) || {};
 return json(res, 200, { ...defaults, ...pr });
 }
 if (req.method === 'POST') {
-const body = await readBody(req);
+const body = await readBody(req, res);
+if (!body) return;
 const pr = { ...defaults, ...((await kvGetJson(key)) || {}) };
 if (body.name !== undefined) pr.name = String(body.name).trim().slice(0, 60);
 if (body.lang !== undefined) pr.lang = ['en', 'nl'].includes(body.lang) ? body.lang : 'en';
@@ -2734,7 +2822,8 @@ const pr = (await kvGetJson(key)) || {};
 return json(res, 200, { ...defaults, ...pr });
 }
 if (req.method === 'POST') {
-const body = await readBody(req);
+const body = await readBody(req, res);
+if (!body) return;
 const pr = { ...defaults, ...((await kvGetJson(key)) || {}) };
 if (body.unit !== undefined) pr.unit = ['kg', 'lb'].includes(body.unit) ? body.unit : 'kg';
 if (body.restDays !== undefined) pr.restDays = Math.min(7, Math.max(1, Number(body.restDays) || 2));
@@ -2778,7 +2867,8 @@ const chat = KV_URL ? await kvCmd('GET', 'tg:chat').catch(() => null) : null;
 return json(res, 200, { configured: !!token, linked: !!chat });
 }
 if (req.method === 'POST') {
-const body = await readBody(req);
+const body = await readBody(req, res);
+if (!body) return;
 if (!token) return json(res, 400, { error: 'Zet eerst TELEGRAM_BOT_TOKEN in Render.' });
 if (body.action === 'link') {
 const r = await fetch(`https://api.telegram.org/bot${token}/getUpdates`);
@@ -2827,7 +2917,8 @@ if (s.email !== ADMIN_EMAIL) return json(res, 403, { error: 'Geen toegang' });
 try {
 if (req.method === 'GET') return json(res, 200, (await kvGetJson('settings')) || { lockedToAdmin: true, lockedCrmToAdmin: true });
 if (req.method === 'POST') {
-const body = await readBody(req);
+const body = await readBody(req, res);
+if (!body) return;
 const prev = (await kvGetJson('settings')) || {};
 const st = {
 lockedToAdmin: body.lockedToAdmin !== undefined ? body.lockedToAdmin !== false : (prev.lockedToAdmin !== false),
@@ -2880,8 +2971,28 @@ bumpUniq(ip);
 return serveFile(res, path.join(__dirname, 'index.html'));
 }
 if (p === '/logo.png') return serveFile(res, path.join(__dirname, 'logo.png'));
-res.writeHead(404, { 'Content-Type': 'text/plain' });
+res.writeHead(404, { 'Content-Type': 'text/plain', ...securityHeaders() });
 res.end('Not found');
+}
+
+// C-02: de router was één async callback zonder catch, dus elke throw was een
+// volledige storing in plaats van een 500.
+const server = http.createServer((req, res) => {
+handleRequest(req, res).catch((err) => {
+console.error('unhandled request error:', (err && (err.stack || err.message)) || String(err));
+if (res.writableEnded) return;
+if (!res.headersSent) res.writeHead(500, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+res.end(JSON.stringify({ error: 'Interne fout.' }));
+});
+});
+
+// Laatste vangnet: een losse rejection elders logt voortaan in plaats van het
+// proces te beeindigen.
+process.on('unhandledRejection', (reason) => {
+console.error('unhandledRejection:', (reason && (reason.stack || reason.message)) || String(reason));
+});
+process.on('uncaughtException', (err) => {
+console.error('uncaughtException:', (err && (err.stack || err.message)) || String(err));
 });
 
 // Cleanup expired sessions/codes hourly
