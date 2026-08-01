@@ -726,6 +726,10 @@ header { padding: 10px 16px; }
 .tls-iconpick button:hover { background: #2a3547; }
 .tls-iconpick button.sel { border-color: #7aa2f7; }
 .tls-iconpick button svg { width: 17px; height: 17px; }
+.tls-colorrow { grid-column: 1 / -1; display: flex; gap: 6px; justify-content: space-between; margin-bottom: 4px; }
+.tls-color { width: 26px; height: 26px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; flex-shrink: 0; }
+.tls-color.sel { border-color: #7aa2f7; }
+.tls-iconpick button.tls-sug { background: #2a3547; }
 </style>
 </head>
 <body>
@@ -5020,6 +5024,8 @@ return 'bell';
 function tlsUpdateHead() {
 const st = tlsState; if (!st) return;
 $('tlsIco').innerHTML = tlIcon(st.icon || 'bell');
+const headEl = document.querySelector('.tls-head');
+if (headEl) headEl.style.background = tlSafeColor(st.color) || '#e8ecf1';
 const range = st.time ? (st.time + ' - ' + tlsFmt(tlsMinOf(st.time) + st.dur) + ' (' + st.dur + ' min)') : '';
 $('tlsRange').textContent = range;
 $('tlsPill').textContent = st.time ? (st.time + ' - ' + tlsFmt(tlsMinOf(st.time) + st.dur)) : '';
@@ -5198,12 +5204,28 @@ if (!tlsState) return;
 const el = $('tlsIconPick');
 if (el.style.display !== 'none') { el.style.display = 'none'; return; }
 el.innerHTML = '';
-Object.keys(TL_ICONS).forEach((name) => {
+const crow = document.createElement('div');
+crow.className = 'tls-colorrow';
+['', '#e08a7e', '#e6b54a', '#8fbf5f', '#b5764a', '#4a6fd8', '#3f7d5c', '#5b8fd6', '#d67ec4'].forEach((col) => {
+const cb = document.createElement('button');
+cb.type = 'button';
+cb.className = 'tls-color' + ((tlsState.color || '') === col ? ' sel' : '');
+cb.style.background = col || '#e8ecf1';
+cb.onclick = (ev) => { ev.stopPropagation(); if (tlsState) { tlsState.color = col; tlsUpdateHead(); } el.style.display = 'none'; };
+crow.appendChild(cb);
+});
+el.appendChild(crow);
+const sugIcons = [];
+const titleNow = String($('tlsTitle').value || '').toLowerCase();
+TLS_ICON_WORDS.forEach((pair) => { if (titleNow && titleNow.includes(pair[0]) && !sugIcons.includes(pair[1])) sugIcons.push(pair[1]); });
+const ordered = sugIcons.concat(Object.keys(TL_ICONS).filter((n2) => !sugIcons.includes(n2)));
+ordered.forEach((name) => {
 const b = document.createElement('button');
 b.type = 'button';
 b.innerHTML = tlIcon(name);
 b.style.color = TLS_ICON_COLORS[name] || '#e8ecf1';
 if (tlsState.icon === name) b.classList.add('sel');
+if (sugIcons.includes(name)) b.classList.add('tls-sug');
 b.onclick = (ev) => { ev.stopPropagation(); if (tlsState) { tlsState.icon = name; tlsState.iconManual = true; tlsUpdateHead(); } el.style.display = 'none'; };
 el.appendChild(b);
 });
