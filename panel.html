@@ -736,6 +736,9 @@ header { padding: 10px 16px; }
 .tls-durinput { width: 64px; background: #232c3a; border: 1px solid #2a3547; border-radius: 999px; color: #e8ecf1; padding: 6px 10px; font-size: 12.5px; outline: none; }
 .tls-more { width: 26px; height: 26px; border-radius: 50%; border: none; background: #232c3a; color: #8b94a1; cursor: pointer; font-size: 14px; line-height: 1; }
 .tls-more:hover { color: #e8ecf1; }
+.tl-datewrap { position: relative; display: flex; justify-content: center; margin: 4px 0 10px; }
+.tl-datehead { background: none; border: none; color: #e8ecf1; font-size: 21px; font-weight: 700; cursor: pointer; font-family: inherit; letter-spacing: .2px; }
+.tl-jumpinput { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: 0; color-scheme: dark; }
 </style>
 </head>
 <body>
@@ -838,6 +841,7 @@ header { padding: 10px 16px; }
 <h2 data-i18n="tl.title">Tijdlijn</h2>
 </div>
 <div class="section-sub" data-i18n="tl.sub">Een visueel dagoverzicht van je herinneringen en agenda, met de optie om nieuwe items direct naar je Apple Calendar te pushen.</div>
+<div class="tl-datewrap"><button type="button" class="tl-datehead" id="tlDateHead"></button><input type="date" id="tlJumpDate" class="tl-jumpinput"></div>
 <div class="tl-week" id="tlWeek"></div>
 <div class="tl-allday" id="tlAllDay"></div>
 <div class="tl-list" id="tlList"></div>
@@ -2198,7 +2202,9 @@ const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
 if (tlDate === todayIso) { if (nowMin < minStart) minStart = nowMin; if (nowMin > maxEnd) maxEnd = nowMin; }
 const rangeStart = Math.max(0, Math.floor((minStart - 30) / 60) * 60);
 const rangeEnd = Math.min(1440, Math.ceil((maxEnd + 30) / 60) * 60);
-const PPM = 1.1;
+const rectTop = $('tlList').getBoundingClientRect().top;
+const availH = Math.max(320, window.innerHeight - Math.max(0, rectTop) - 28);
+const PPM = Math.max(0.35, Math.min(2.2, availH / (rangeEnd - rangeStart)));
 window.__tl2 = { rangeStart, rangeEnd, ppm: PPM };
 const H = (rangeEnd - rangeStart) * PPM;
 const px = (m) => ((m - rangeStart) * PPM);
@@ -2266,6 +2272,7 @@ return (r.repeat && r.repeat.type) ? (Array.isArray(r.doneDates) && r.doneDates.
 }
 async function loadTimeline() {
 tlRenderWeek();
+tlRenderDateHead();
 const allDayItems = [], timedBlocks = [];
 reminders.filter((r) => !tlIsDoneOn(r, tlDate) && tlOccursOn(r, tlDate)).forEach((r) => {
 if (r.time) timedBlocks.push({ kind: 'reminder', id: r.id, title: r.title, time: r.time, prio: r.prio, icon: r.icon, color: r.color, endTime: r.duration ? tlAddMinutes(r.time, r.duration) : null });
@@ -2301,6 +2308,64 @@ const h = Math.floor((total % 1440) / 60), m = total % 60;
 return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
+const TL_MONTHS_NL = ['januari', 'februari', 'maart', 'april', 'mei', 'juni', 'juli', 'augustus', 'september', 'oktober', 'november', 'december'];
+const TL_MONTHS_EN = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+function tlRenderDateHead() {
+const el = $('tlDateHead');
+if (!el) return;
+const d = new Date(tlDate + 'T00:00:00');
+const months = LANG === 'nl' ? TL_MONTHS_NL : TL_MONTHS_EN;
+el.innerHTML = d.getDate() + ' ' + months[d.getMonth()] + ' ' + d.getFullYear() + ' \u203A';
+if ($('tlJumpDate')) $('tlJumpDate').value = tlDate;
+}
+function tlWeekShift(days) {
+const el = $('tlWeek');
+el.style.transition = 'transform .15s ease, opacity .15s ease';
+el.style.transform = 'translateX(' + (days > 0 ? '-18px' : '18px') + ')';
+el.style.opacity = '0.35';
+setTimeout(() => {
+const d = new Date(tlDate + 'T00:00:00');
+d.setDate(d.getDate() + days);
+tlDate = iso(d);
+loadTimeline();
+el.style.transition = 'none';
+el.style.transform = 'translateX(' + (days > 0 ? '18px' : '-18px') + ')';
+requestAnimationFrame(() => {
+el.style.transition = 'transform .15s ease, opacity .15s ease';
+el.style.transform = 'none';
+el.style.opacity = '1';
+});
+}, 150);
+}
+let tlSwipeX = null, tlSwipeY = null;
+$('tlWeek').addEventListener('touchstart', (e) => { tlSwipeX = e.touches[0].clientX; tlSwipeY = e.touches[0].clientY; }, { passive: true });
+$('tlWeek').addEventListener('touchend', (e) => {
+if (tlSwipeX === null) return;
+const dx = e.changedTouches[0].clientX - tlSwipeX;
+const dy = e.changedTouches[0].clientY - tlSwipeY;
+tlSwipeX = null;
+if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.5) tlWeekShift(dx < 0 ? 7 : -7);
+}, { passive: true });
+let tlMouseX = null;
+$('tlWeek').addEventListener('mousedown', (e) => { tlMouseX = e.clientX; });
+$('tlWeek').addEventListener('mouseup', (e) => {
+if (tlMouseX === null) return;
+const dx = e.clientX - tlMouseX;
+tlMouseX = null;
+if (Math.abs(dx) > 60) tlWeekShift(dx < 0 ? 7 : -7);
+});
+$('tlJumpDate').addEventListener('change', () => {
+const v = $('tlJumpDate').value;
+if (/^\d{4}-\d{2}-\d{2}$/.test(v)) { tlDate = v; loadTimeline(); }
+});
+let tlResizeTimer = null;
+window.addEventListener('resize', () => {
+clearTimeout(tlResizeTimer);
+tlResizeTimer = setTimeout(() => {
+const v = document.getElementById('view-timeline');
+if (v && v.style.display !== 'none') loadTimeline();
+}, 200);
+});
 $('tlAddBtn').onclick = () => tlSheetOpen('new', { due: tlDate });
 
 window.convertSug = (id) => {
