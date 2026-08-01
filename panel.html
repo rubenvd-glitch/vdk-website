@@ -746,6 +746,21 @@ header { padding: 10px 16px; }
 .tl2-slim .tl2-bt { font-size: 11.5px; line-height: 1.25; }
 .tl2-slim .tl2-bs { display: none; }
 .tl2-slim .tl2-check { top: 2px; width: 12px; height: 12px; }
+.tl3 { position: relative; padding: 2px 0 6px; }
+.tl3::before { content: ''; position: absolute; left: 68px; top: 8px; bottom: 8px; width: 2px; background: #1c2433; border-radius: 1px; }
+.tl3-row { position: relative; display: flex; align-items: center; gap: 10px; padding: 5px 4px 5px 0; cursor: pointer; }
+.tl3-time { width: 44px; text-align: right; font-size: 11.5px; color: #8b94a1; font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.tl3-dot { width: 30px; height: 30px; border-radius: 50%; background: #11151c; border: 2px solid; display: flex; align-items: center; justify-content: center; flex-shrink: 0; position: relative; z-index: 1; }
+.tl3-dot svg { width: 14px; height: 14px; }
+.tl3-body { flex: 1; min-width: 0; background: #161b24; border: 1px solid #232c3a; border-radius: 12px; padding: 7px 12px; }
+.tl3-cur .tl3-body { border-color: rgba(122,162,247,.55); box-shadow: 0 0 0 1px rgba(122,162,247,.25); }
+.tl3-title { font-size: 13.5px; font-weight: 600; color: #e8ecf1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tl3-sub { font-size: 11px; color: #8b94a1; }
+.tl3-gap { position: relative; display: flex; justify-content: center; padding: 5px 0; cursor: pointer; }
+.tl3-gap span { font-size: 11px; color: #566070; border: 1px dashed #242d3b; border-radius: 999px; padding: 2px 10px; background: #11151c; position: relative; z-index: 1; }
+.tl3-now { position: relative; height: 2px; background: #e05252; margin: 4px 0 4px 56px; border-radius: 1px; }
+.tl3-now span { position: absolute; left: -5px; top: -3px; width: 8px; height: 8px; border-radius: 50%; background: #e05252; }
+.tl3-check { position: static !important; flex-shrink: 0; margin-right: 4px; }
 </style>
 </head>
 <body>
@@ -2144,128 +2159,60 @@ loadTimeline();
 };
 
 let tlNowTimer = null;
-const TL2_PRIO = { 1: '#f28b8b', 2: '#f0b45c', 3: '#e8e05c', 4: '#7fd68f' };
 const TL2_EV = '#7aa2f7';
-
-function tl2UpdateNow() {
-const el = document.getElementById('tl2Now');
-const cfg = window.__tl2;
-if (!el || !cfg) return;
-const today = iso(new Date());
-const now = new Date();
-const nowMin = now.getHours() * 60 + now.getMinutes();
-if (tlDate !== today || nowMin < cfg.rangeStart || nowMin > cfg.rangeEnd) { el.style.display = 'none'; return; }
-el.style.display = 'block';
-el.style.top = ((nowMin - cfg.rangeStart) * cfg.ppm) + 'px';
-}
-
-window.tlAxisClick = (e) => {
-if (e.target.closest('.tl2-block,.tl2-dot,.tl2-check,.tl2-gapchip')) return;
-const cfg = window.__tl2;
-const axis = document.querySelector('.tl2-axis');
-if (!cfg || !axis) return;
-const rect = axis.getBoundingClientRect();
-const y = e.clientY - rect.top;
-let m = cfg.rangeStart + y / cfg.ppm;
-m = Math.round(m / 15) * 15;
-m = Math.max(0, Math.min(1425, m));
-const hh = String(Math.floor(m / 60)).padStart(2, '0');
-const mm = String(m % 60).padStart(2, '0');
-tlSheetOpen('new', { due: tlDate, time: hh + ':' + mm });
+const TL3_NOW = '<div class="tl3-now"><span></span></div>';
+window.tlGapClick = (m) => {
+const mm = Math.min(1425, Math.ceil(m / 15) * 15);
+const hh = String(Math.floor(mm / 60)).padStart(2, '0') + ':' + String(mm % 60).padStart(2, '0');
+tlSheetOpen('new', { due: tlDate, time: hh });
 };
-
 function renderTlList(blocks) {
 const list = $('tlList');
 if (tlNowTimer) { clearInterval(tlNowTimer); tlNowTimer = null; }
-if (!blocks.length) { window.__tl2 = null; list.innerHTML = '<div class="tl-empty">' + t('tl.emptyDay') + '</div>'; return; }
+window.__tlBlocks = blocks;
+if (!blocks.length) { list.innerHTML = '<div class="tl-empty">' + t('tl.emptyDay') + '</div>'; return; }
 const M = tlMinutesFromMidnight;
 const items = blocks.map((b) => {
 const start = M(b.time);
-let end = b.endTime ? M(b.endTime) : start + 30;
-if (end <= start) end = start + 30;
-return { b, start, end, lane: 0, laneCount: 1 };
-}).sort((x, y) => x.start - y.start || y.end - x.end);
-// Lanes (max 3): eerste vrije laan op startvolgorde
-const laneEnds = [];
-items.forEach((it) => {
-let lane = -1;
-for (let i = 0; i < laneEnds.length; i++) { if (laneEnds[i] <= it.start) { lane = i; break; } }
-if (lane === -1) {
-if (laneEnds.length < 3) { lane = laneEnds.length; laneEnds.push(0); }
-else { let best = 0; for (let i = 1; i < 3; i++) { if (laneEnds[i] < laneEnds[best]) best = i; } lane = best; }
-}
-laneEnds[lane] = it.end;
-it.lane = lane;
-});
-items.forEach((it) => {
-let cnt = it.lane + 1;
-items.forEach((o) => { if (o !== it && o.start < it.end && o.end > it.start) cnt = Math.max(cnt, o.lane + 1); });
-it.laneCount = cnt;
-});
-let minStart = 1440, maxEnd = 0;
-items.forEach((it) => { if (it.start < minStart) minStart = it.start; if (it.end > maxEnd) maxEnd = it.end; });
+let end = b.endTime ? M(b.endTime) : start;
+if (end < start) end = start;
+return { b, start, end };
+}).sort((x, y) => x.start - y.start || x.end - y.end);
 const todayIso = iso(new Date());
-const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
-if (tlDate === todayIso) { if (nowMin < minStart) minStart = nowMin; if (nowMin > maxEnd) maxEnd = nowMin; }
-const rangeStart = Math.max(0, Math.floor((minStart - 30) / 60) * 60);
-const rangeEnd = Math.min(1440, Math.ceil((maxEnd + 30) / 60) * 60);
-const rectTop = $('tlList').getBoundingClientRect().top;
-const availH = Math.max(320, window.innerHeight - Math.max(0, rectTop) - 28);
-let minSpan = 1440;
-items.forEach((it2) => { minSpan = Math.min(minSpan, it2.end - it2.start); });
-const densityPPM = 18 / Math.max(10, minSpan);
-const PPM = Math.max(0.35, Math.min(2.2, Math.max(availH / (rangeEnd - rangeStart), densityPPM)));
-window.__tl2 = { rangeStart, rangeEnd, ppm: PPM };
-const H = (rangeEnd - rangeStart) * PPM;
-const px = (m) => ((m - rangeStart) * PPM);
-let html = '<div class="tl2-axis" style="height:' + H + 'px;" onclick="tlAxisClick(event)">';
-html += '<div class="tl2-line"></div>';
-for (let h = Math.ceil(rangeStart / 60); h <= Math.floor(rangeEnd / 60); h++) {
-html += '<div class="tl2-hour" style="top:' + px(h * 60) + 'px;"><span>' + String(h).padStart(2, '0') + ':00</span></div>';
-}
-// Vrije-tijd chips in gaten > 30 min (op samengevoegde bezette intervallen)
-const busy = [];
-items.slice().sort((a2, b2) => a2.start - b2.start).forEach((it) => {
-if (busy.length && it.start <= busy[busy.length - 1][1]) { busy[busy.length - 1][1] = Math.max(busy[busy.length - 1][1], it.end); }
-else busy.push([it.start, it.end]);
-});
-for (let i = 1; i < busy.length; i++) {
-const gap = busy[i][0] - busy[i - 1][1];
-if (gap > 30) {
-const mid = (busy[i - 1][1] + busy[i][0]) / 2;
-html += '<div class="tl2-gapchip" style="top:' + (px(mid) - 10) + 'px;">' + tlFmtGap(gap) + '</div>';
+const now = new Date();
+const nowMin = now.getHours() * 60 + now.getMinutes();
+const isToday = tlDate === todayIso;
+let html = '<div class="tl3">';
+let nowDrawn = !isToday;
+items.forEach((it, i) => {
+if (i > 0) {
+const prev = items[i - 1];
+const prevEnd = Math.max(prev.end, prev.start);
+const gap = it.start - prevEnd;
+if (gap > 15) {
+if (!nowDrawn && nowMin > prevEnd && nowMin < it.start) { html += TL3_NOW; nowDrawn = true; }
+html += '<div class="tl3-gap" onclick="tlGapClick(' + prevEnd + ')"><span>' + tlFmtGap(gap) + '</span></div>';
 }
 }
-html += '<div class="tl2-blocks">';
-items.forEach((it) => {
+if (!nowDrawn && it.start > nowMin) { html += TL3_NOW; nowDrawn = true; }
 const b = it.b;
 const custom = tlSafeColor(b.color);
 const col = b.kind === 'apple' ? TL2_EV : (custom || TLS_ICON_COLORS[b.icon] || '#7d8798');
-const isPast = (tlDate < todayIso) || (tlDate === todayIso && it.end <= nowMin);
-const isCur = tlDate === todayIso && it.start <= nowMin && nowMin < it.end;
-const wPct = 100 / it.laneCount;
-const bh = Math.max(18, (it.end - it.start) * PPM - 3);
-const style = 'top:' + px(it.start) + 'px;height:' + bh + 'px;left:' + (it.lane * wPct) + '%;width:calc(' + wPct + '% - 6px);background:' + col + '22;border-left-color:' + col + ';';
-const cls = 'tl2-block' + (bh < 30 ? ' tl2-slim' : '') + (b.kind === 'apple' ? ' tl2-ev' : '') + (isPast ? ' tl2-past' : '') + (isCur ? ' tl2-cur' : '');
-const click = b.kind === 'reminder' ? ' onclick="event.stopPropagation();tlSheetOpen(\'' + b.id + '\')"' : ' onclick="event.stopPropagation()"';
-const sub = b.time + (b.endTime ? ' - ' + b.endTime : '');
-const check = b.kind === 'reminder' ? '<span class="tl2-check" title="' + t('ttl.done') + '" onclick="event.stopPropagation();tlToggleDone(\'' + b.id + '\')"></span>' : '';
-html += '<div class="' + cls + '" style="' + style + '"' + click + '>' + check + '<div class="tl2-bt">' + esc(b.title) + '</div><div class="tl2-bs">' + sub + '</div></div>';
+const effEnd = Math.max(it.end, it.start + 1);
+const isPast = (tlDate < todayIso) || (isToday && effEnd <= nowMin);
+const isCur = isToday && it.start <= nowMin && nowMin < effEnd;
+const range = b.endTime ? (b.time + ' - ' + b.endTime + ' (' + (it.end - it.start) + ' min)') : b.time;
+html += '<div class="tl3-row' + (isPast ? ' tl2-past' : '') + (isCur ? ' tl3-cur' : '') + '"' + (b.kind === 'reminder' ? ' onclick="tlSheetOpen(\'' + b.id + '\')"' : '') + '>'
++ '<div class="tl3-time">' + b.time + '</div>'
++ '<div class="tl3-dot" style="border-color:' + col + ';color:' + col + ';">' + tlIcon(b.kind === 'apple' ? 'calendar' : b.icon) + '</div>'
++ '<div class="tl3-body"><div class="tl3-title">' + esc(b.title) + '</div><div class="tl3-sub">' + range + '</div></div>'
++ (b.kind === 'reminder' ? '<div class="tl2-check tl3-check" onclick="event.stopPropagation();tlToggleDone(\'' + b.id + '\')"></div>' : '')
++ '</div>';
 });
-html += '</div>';
-// Icoon-bollen op de aslijn
-items.forEach((it) => {
-const b = it.b;
-const custom = tlSafeColor(b.color);
-const col = b.kind === 'apple' ? TL2_EV : (custom || TLS_ICON_COLORS[b.icon] || '#7d8798');
-const isPast = (tlDate < todayIso) || (tlDate === todayIso && it.end <= nowMin);
-html += '<div class="tl2-dot' + (isPast ? ' tl2-past' : '') + '" style="top:' + (px(it.start) + 2) + 'px;border-color:' + col + ';color:' + col + ';">' + tlIcon(b.kind === 'apple' ? 'calendar' : b.icon) + '</div>';
-});
-html += '<div class="tl2-now" id="tl2Now" style="display:none;"><span></span></div>';
+if (!nowDrawn) html += TL3_NOW;
 html += '</div>';
 list.innerHTML = html;
-tl2UpdateNow();
-tlNowTimer = setInterval(tl2UpdateNow, 30000);
+tlNowTimer = setInterval(() => { if (window.__tlBlocks) renderTlList(window.__tlBlocks); }, 60000);
 }
 
 function tlOccursOn(r, dateISO) {
