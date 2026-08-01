@@ -677,6 +677,50 @@ header { padding: 10px 16px; }
 .tl2-gapchip { position: absolute; left: 74px; font-size: 10.5px; color: #566070; border: 1px dashed #242d3b; padding: 2px 8px; border-radius: 999px; z-index: 1; }
 .tl2-past { opacity: .45; }
 .tl2-cur { box-shadow: 0 0 0 1.5px rgba(122,162,247,.35); }
+/* ---------- Structured-stijl actie-sheet ---------- */
+.tls-sheet { position: fixed; right: 18px; bottom: 18px; width: min(420px, calc(100vw - 24px)); background: #161b24; border: 1px solid #232c3a; border-radius: 22px; padding: 0 0 14px; z-index: 60; transform: translateY(28px); opacity: 0; transition: transform .32s cubic-bezier(.2,.9,.3,1), opacity .28s ease; box-shadow: 0 18px 60px rgba(0,0,0,.55); display: flex; flex-direction: column; max-height: min(660px, calc(100vh - 40px)); }
+#tlsOverlay.open .tls-sheet { transform: none; opacity: 1; }
+.tls-head { position: relative; display: flex; gap: 12px; align-items: center; background: #e8ecf1; border-radius: 21px 21px 18px 18px; padding: 18px 16px; }
+.tls-head input { background: transparent; border: none; border-bottom: 2px solid #11151c; color: #11151c; font-size: 17px; font-weight: 700; width: 100%; outline: none; padding: 2px 0; }
+.tls-ico { width: 46px; height: 46px; border-radius: 50%; background: #11151c; color: #e8ecf1; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.tls-ico svg { width: 20px; height: 20px; }
+.tls-range { font-size: 11px; color: #444d5a; min-height: 13px; }
+.tls-x { position: absolute; top: -9px; left: -9px; width: 30px; height: 30px; border-radius: 50%; background: #232c3a; color: #e8ecf1; border: 1px solid #2a3547; font-size: 15px; cursor: pointer; z-index: 3; }
+.tls-menu-btn { width: 34px; height: 34px; border-radius: 50%; border: none; background: rgba(17,21,28,.08); color: #11151c; font-size: 18px; cursor: pointer; align-items: center; justify-content: center; flex-shrink: 0; }
+.tls-menu { position: absolute; top: 58px; right: 14px; background: #1c2433; border: 1px solid #2a3547; border-radius: 12px; padding: 6px; z-index: 4; flex-direction: column; gap: 2px; display: flex; }
+.tls-menu button { background: none; border: none; color: #e8ecf1; padding: 8px 14px; text-align: left; border-radius: 8px; cursor: pointer; font-size: 13.5px; }
+.tls-menu button:hover { background: #232c3a; }
+.tls-danger { color: #f28b8b !important; }
+.tls-confirm { position: absolute; top: 58px; right: 14px; background: #1c2433; border: 1px solid #2a3547; border-radius: 12px; padding: 12px 14px; z-index: 4; gap: 10px; align-items: center; font-size: 13px; display: flex; }
+.tls-confirm button { border: none; border-radius: 8px; padding: 6px 12px; cursor: pointer; background: #232c3a; color: #e8ecf1; font-size: 12.5px; }
+.tls-stepswrap { overflow: hidden; flex: 1; }
+.tls-steps { display: flex; width: 300%; transition: transform .3s cubic-bezier(.2,.8,.25,1); }
+.tls-step { width: 33.3333%; padding: 14px 16px 4px; box-sizing: border-box; }
+.tls-label { font-size: 11.5px; text-transform: uppercase; letter-spacing: .4px; color: #8b94a1; margin: 10px 0 6px; }
+.tls-sugg { display: flex; flex-direction: column; max-height: 300px; overflow-y: auto; }
+.tls-sugg-row { display: flex; gap: 10px; align-items: center; padding: 8px 6px; border-radius: 10px; cursor: pointer; }
+.tls-sugg-row:hover { background: #1c2433; }
+.tls-sugg-ico { width: 30px; height: 30px; border-radius: 50%; background: #232c3a; color: #7aa2f7; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.tls-sugg-ico svg { width: 14px; height: 14px; }
+.tls-sugg-sub { font-size: 11px; color: #8b94a1; }
+.tls-sugg-title { font-size: 13.5px; font-weight: 600; color: #e8ecf1; }
+.tls-row { display: flex; justify-content: space-between; align-items: center; background: #1c2433; border-radius: 12px; padding: 11px 14px; margin: 8px 0; font-size: 13.5px; cursor: pointer; }
+.tls-row input[type="date"] { background: transparent; border: none; color: #e8ecf1; outline: none; color-scheme: dark; }
+.tls-val { color: #8b94a1; }
+.tls-wheelwrap { position: relative; }
+.tls-wheel { height: 160px; overflow-y: auto; scroll-snap-type: y mandatory; padding: 64px 0; text-align: center; -webkit-mask-image: linear-gradient(transparent, #000 30%, #000 70%, transparent); mask-image: linear-gradient(transparent, #000 30%, #000 70%, transparent); }
+.tls-wheel::-webkit-scrollbar { display: none; }
+.tls-wopt { height: 32px; line-height: 32px; scroll-snap-align: center; color: #8b94a1; font-size: 14px; }
+.tls-pill { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); background: #e8ecf1; color: #11151c; font-weight: 700; font-size: 14px; border-radius: 999px; padding: 6px 22px; pointer-events: none; z-index: 2; min-width: 110px; text-align: center; }
+.tls-alert { display: flex; justify-content: space-between; align-items: center; background: #1c2433; border-radius: 10px; padding: 9px 13px; margin: 6px 0; font-size: 13px; color: #8b94a1; cursor: pointer; }
+.tls-alert.on { color: #e8ecf1; }
+.tls-alert-mark { color: #566070; font-weight: 700; }
+.tls-alert.on .tls-alert-mark { color: #7fd68f; }
+#tlsNote { width: 100%; background: #1c2433; border: 1px solid #232c3a; border-radius: 10px; color: #e8ecf1; padding: 9px 12px; font-size: 13px; resize: none; box-sizing: border-box; margin-top: 8px; outline: none; font-family: inherit; }
+.tls-cta { margin: 10px 16px 2px; padding: 12px; border-radius: 999px; font-size: 15px; cursor: pointer; }
+.tls-err { color: #f28b8b; font-size: 12.5px; margin: 6px 16px 0; min-height: 14px; }
+@keyframes tlsShake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+.tls-shake { animation: tlsShake .3s ease 0s 1; }
 </style>
 </head>
 <body>
@@ -1194,6 +1238,54 @@ header { padding: 10px 16px; }
 </div>
 </div>
 
+<div class="overlay" id="tlsOverlay">
+<div class="tls-sheet">
+<button type="button" class="tls-x" id="tlsClose">&#10005;</button>
+<div class="tls-head">
+<div class="tls-ico" id="tlsIco"></div>
+<div style="flex:1; min-width:0;">
+<div class="tls-range" id="tlsRange"></div>
+<input type="text" id="tlsTitle" data-i18n-ph="tls.title" placeholder="Waar ga je aan werken?" autocomplete="off">
+</div>
+<button type="button" class="tls-menu-btn" id="tlsMenuBtn" style="display:none;">&#8943;</button>
+</div>
+<div class="tls-menu" id="tlsMenu" style="display:none;">
+<button type="button" id="tlsDupBtn" data-i18n="tls.dup">Dupliceer</button>
+<button type="button" id="tlsDelBtn" class="tls-danger" data-i18n="tls.del">Verwijder</button>
+</div>
+<div class="tls-confirm" id="tlsConfirm" style="display:none;">
+<span data-i18n="tls.delSure">Actie verwijderen?</span>
+<button type="button" id="tlsDelNo" data-i18n="cancel">Annuleer</button>
+<button type="button" id="tlsDelYes" class="tls-danger" data-i18n="tls.del">Verwijder</button>
+</div>
+<div class="tls-stepswrap"><div class="tls-steps" id="tlsSteps">
+<div class="tls-step" id="tlsStep1">
+<div class="tls-label" data-i18n="tls.sugg">Suggesties</div>
+<div class="tls-sugg" id="tlsSugg"></div>
+</div>
+<div class="tls-step" id="tlsStep2">
+<div class="tls-row"><span data-i18n="tls.date">Datum</span><input type="date" id="tlsDate"></div>
+<div class="tls-label" data-i18n="l.time">Tijd</div>
+<div class="tls-wheelwrap">
+<div class="tls-pill" id="tlsPill"></div>
+<div class="tls-wheel" id="tlsWheel"></div>
+</div>
+<div class="tls-label" data-i18n="tls.dur">Duur</div>
+<div class="chips" id="tlsDur"></div>
+</div>
+<div class="tls-step" id="tlsStep3">
+<div class="tls-row" id="tlsSumDate"><span data-i18n="tls.date">Datum</span><span class="tls-val" id="tlsSumDateV"></span></div>
+<div class="tls-row" id="tlsSumTime"><span data-i18n="l.time">Tijd</span><span class="tls-val" id="tlsSumTimeV"></span></div>
+<div class="tls-label" data-i18n="l.alerts">Meldingen</div>
+<div class="tls-alerts" id="tlsAlerts"></div>
+<textarea id="tlsNote" data-i18n-ph="tls.note" placeholder="Notitie toevoegen..." rows="2"></textarea>
+</div>
+</div></div>
+<div class="tls-err" id="tlsErr"></div>
+<button type="button" class="btn-primary tls-cta" id="tlsCta">Ga verder</button>
+</div>
+</div>
+
 <div class="overlay" id="gymLogOverlay">
 <div class="modal">
 <h3 id="gymLogModalTitle">Nieuwe set</h3>
@@ -1429,6 +1521,7 @@ en: {
 'set.tgHelp':'One-time setup: create a bot via @BotFather in Telegram, put the token in Render as TELEGRAM_BOT_TOKEN, send your bot a message and click Link here.',
 'set.status':'Status','set.link':'Link','set.test':'Test message','set.soon':'Coming soon',
 'set.cal':'Connect calendar','set.calSub':'Import your calendar and push reminders to it (always with a confirmation first).',
+'tls.title':'What are you working on?','tls.sugg':'Suggestions','tls.noSugg':'No suggestions yet','tls.date':'Date','tls.dur':'Duration','tls.note':'Add notes...','tls.continue':'Continue','tls.create':'Create action','tls.dup':'Duplicate','tls.del':'Delete','tls.delSure':'Delete this action?',
 'l.alerts':'Notifications','al.pre':'5 min before','al.start':'At start','al.end':'At end',
 'set.push':'Push notifications','set.pushSub':'Get Base notifications on this device, for example when a timed reminder is due.','set.pushEnable':'Enable on this device','set.pushDisable':'Disable','set.pushTest':'Send test','set.pushOn':'Push notifications are enabled on this device.','set.pushOff':'Not enabled on this device yet.','set.pushDenied':'Notifications are blocked for Base in your browser or system settings.','set.pushUnsupported':'This browser does not support push here. On iPhone: add Base to your home screen first (Share, Add to Home Screen) and open it from there.','set.pushOnMsg':'Push notifications enabled.','set.pushTestSent':'Test notification sent.','set.pushTestNone':'No devices are registered yet.','set.pushIosHelp':'iPhone/iPad: first add Base to your home screen (Share, Add to Home Screen) and open the app from there; then you can enable notifications.',
 
@@ -1511,6 +1604,7 @@ nl: {
 'set.tgHelp':'Eenmalig instellen: maak een bot via @BotFather in Telegram, zet het token in Render als TELEGRAM_BOT_TOKEN, stuur je bot een berichtje en klik hier op Koppelen.',
 'set.status':'Status','set.link':'Koppelen','set.test':'Testbericht','set.soon':'Binnenkort beschikbaar',
 'set.cal':'Agenda koppelen','set.calSub':'Importeer je agenda en push herinneringen ernaartoe (altijd eerst met bevestiging).',
+'tls.title':'Waar ga je aan werken?','tls.sugg':'Suggesties','tls.noSugg':'Nog geen suggesties','tls.date':'Datum','tls.dur':'Duur','tls.note':'Notitie toevoegen...','tls.continue':'Ga verder','tls.create':'Maak actie','tls.dup':'Dupliceer','tls.del':'Verwijder','tls.delSure':'Actie verwijderen?',
 'l.alerts':'Meldingen','al.pre':'5 min ervoor','al.start':'Bij start','al.end':'Bij einde',
 'set.push':'Pushmeldingen','set.pushSub':'Krijg meldingen van Base op dit apparaat, bijvoorbeeld wanneer een reminder met tijd verloopt.','set.pushEnable':'Zet aan op dit apparaat','set.pushDisable':'Uitzetten','set.pushTest':'Testmelding','set.pushOn':'Pushmeldingen staan aan op dit apparaat.','set.pushOff':'Nog niet aan op dit apparaat.','set.pushDenied':'Meldingen zijn voor Base geblokkeerd in je browser- of systeeminstellingen.','set.pushUnsupported':'Deze browser ondersteunt hier geen push. Op iPhone: zet Base eerst op je beginscherm (Deel, Zet op beginscherm) en open hem vanaf daar.','set.pushOnMsg':'Pushmeldingen aangezet.','set.pushTestSent':'Testmelding verstuurd.','set.pushTestNone':'Er zijn nog geen apparaten aangemeld.','set.pushIosHelp':'iPhone/iPad: zet Base eerst op je beginscherm (Deel-knop, Zet op beginscherm) en open de app vanaf daar; daarna kun je meldingen aanzetten.',
 
@@ -2035,7 +2129,7 @@ m = Math.round(m / 15) * 15;
 m = Math.max(0, Math.min(1425, m));
 const hh = String(Math.floor(m / 60)).padStart(2, '0');
 const mm = String(m % 60).padStart(2, '0');
-openModal(null, { due: tlDate, time: hh + ':' + mm, tl: true });
+tlSheetOpen('new', { due: tlDate, time: hh + ':' + mm });
 };
 
 function renderTlList(blocks) {
@@ -2105,7 +2199,7 @@ const isCur = tlDate === todayIso && it.start <= nowMin && nowMin < it.end;
 const wPct = 100 / it.laneCount;
 const style = 'top:' + px(it.start) + 'px;height:' + Math.max(30, (it.end - it.start) * PPM - 3) + 'px;left:' + (it.lane * wPct) + '%;width:calc(' + wPct + '% - 6px);background:' + col + '22;border-left-color:' + col + ';';
 const cls = 'tl2-block' + (b.kind === 'apple' ? ' tl2-ev' : '') + (isPast ? ' tl2-past' : '') + (isCur ? ' tl2-cur' : '');
-const click = b.kind === 'reminder' ? ' onclick="event.stopPropagation();openModal(\'' + b.id + '\')"' : ' onclick="event.stopPropagation()"';
+const click = b.kind === 'reminder' ? ' onclick="event.stopPropagation();tlSheetOpen(\'' + b.id + '\')"' : ' onclick="event.stopPropagation()"';
 const sub = b.time + (b.endTime ? ' - ' + b.endTime : '');
 const check = b.kind === 'reminder' ? '<span class="tl2-check" title="' + t('ttl.done') + '" onclick="event.stopPropagation();tlToggleDone(\'' + b.id + '\')"></span>' : '';
 html += '<div class="' + cls + '" style="' + style + '"' + click + '>' + check + '<div class="tl2-bt">' + esc(b.title) + '</div><div class="tl2-bs">' + sub + '</div></div>';
@@ -2163,7 +2257,7 @@ const h = Math.floor((total % 1440) / 60), m = total % 60;
 return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
-$('tlAddBtn').onclick = () => openModal(null, { due: tlDate, tl: true });
+$('tlAddBtn').onclick = () => tlSheetOpen('new', { due: tlDate });
 
 window.convertSug = (id) => {
 const r = suggestions.find((x) => x.id === id);
@@ -4903,6 +4997,210 @@ flashSetMsg(out.delivered ? t('set.pushTestSent') : t('set.pushTestNone'));
 };
 }
 
+// ---------- Structured-stijl actie-sheet (getrapte create-flow) ----------
+let tlsState = null;
+let tlsWheelTimer = null;
+const TLS_DURS = [15, 30, 45, 60, 90, 120];
+const TLS_ICON_WORDS = [['gym', 'dumbbell'], ['sport', 'dumbbell'], ['train', 'dumbbell'], ['lunch', 'utensils'], ['ontbijt', 'utensils'], ['diner', 'utensils'], ['eten', 'utensils'], ['slapen', 'bed'], ['bed', 'bed'], ['werk', 'briefcase'], ['meeting', 'briefcase'], ['bellen', 'phone'], ['call', 'phone'], ['koffie', 'coffee'], ['boodschap', 'cart'], ['lezen', 'book'], ['boek', 'book'], ['auto', 'car'], ['rijden', 'car'], ['muziek', 'music'], ['vlucht', 'plane'], ['pil', 'pill'], ['medic', 'pill'], ['klus', 'wrench'], ['mail', 'mail'], ['cadeau', 'gift'], ['huis', 'home'], ['wekker', 'alarm'], ['alarm', 'alarm']];
+const tlsPad = (n) => String(n).padStart(2, '0');
+const tlsMinOf = (t2) => { const p = String(t2 || '').split(':'); return Number(p[0]) * 60 + Number(p[1] || 0); };
+const tlsFmt = (m) => { m = ((m % 1440) + 1440) % 1440; return tlsPad(Math.floor(m / 60)) + ':' + tlsPad(m % 60); };
+function tlsGuessIcon(title) {
+const s = String(title || '').toLowerCase();
+for (const pair of TLS_ICON_WORDS) { if (s.includes(pair[0])) return pair[1]; }
+return 'bell';
+}
+function tlsUpdateHead() {
+const st = tlsState; if (!st) return;
+$('tlsIco').innerHTML = tlIcon(st.icon || 'bell');
+const range = st.time ? (st.time + ' - ' + tlsFmt(tlsMinOf(st.time) + st.dur) + ' (' + st.dur + ' min)') : '';
+$('tlsRange').textContent = range;
+$('tlsPill').textContent = st.time ? (st.time + ' - ' + tlsFmt(tlsMinOf(st.time) + st.dur)) : '';
+}
+function tlsRenderWheel() {
+const el = $('tlsWheel');
+el.innerHTML = '';
+for (let i = 0; i < 96; i++) {
+const d = document.createElement('div');
+d.className = 'tls-wopt';
+d.textContent = tlsFmt(i * 15);
+el.appendChild(d);
+}
+el.scrollTop = Math.round(tlsMinOf(tlsState.time) / 15) * 32;
+}
+function tlsRenderDur() {
+const el = $('tlsDur');
+el.innerHTML = '';
+TLS_DURS.forEach((m) => {
+const b = document.createElement('button');
+b.type = 'button';
+b.textContent = m < 60 ? (m + 'm') : (String(m / 60).replace('.', ',') + 'u');
+b.classList.toggle('sel', tlsState.dur === m);
+b.onclick = () => { tlsState.dur = m; tlsRenderDur(); tlsUpdateHead(); };
+el.appendChild(b);
+});
+}
+function tlsRenderAlerts() {
+const el = $('tlsAlerts');
+el.innerHTML = '';
+[['pre', t('al.pre')], ['start', t('al.start')], ['end', t('al.end')]].forEach((def) => {
+const row = document.createElement('div');
+row.className = 'tls-alert' + (tlsState.alerts[def[0]] ? ' on' : '');
+const s1 = document.createElement('span'); s1.textContent = def[1];
+const s2 = document.createElement('span'); s2.className = 'tls-alert-mark'; s2.textContent = tlsState.alerts[def[0]] ? '\u2713' : '+';
+row.appendChild(s1); row.appendChild(s2);
+row.onclick = () => { tlsState.alerts[def[0]] = !tlsState.alerts[def[0]]; tlsRenderAlerts(); };
+el.appendChild(row);
+});
+}
+function tlsRenderSugg() {
+const el = $('tlsSugg');
+el.innerHTML = '';
+const counts = {};
+(reminders || []).forEach((r) => {
+if (!r.title) return;
+const k = r.title.trim().toLowerCase();
+if (!counts[k]) counts[k] = { n: 0, title: r.title.trim(), time: '', dur: 0, icon: '' };
+counts[k].n++;
+if (r.time) counts[k].time = r.time;
+if (r.duration) counts[k].dur = r.duration;
+if (r.icon) counts[k].icon = r.icon;
+});
+const top = Object.values(counts).sort((a, b) => b.n - a.n).slice(0, 8);
+top.forEach((s) => {
+const dur = s.dur || 60;
+const row = document.createElement('div');
+row.className = 'tls-sugg-row';
+const ico = document.createElement('div'); ico.className = 'tls-sugg-ico'; ico.innerHTML = tlIcon(s.icon || tlsGuessIcon(s.title));
+const body = document.createElement('div'); body.style.minWidth = '0';
+const l1 = document.createElement('div'); l1.className = 'tls-sugg-sub';
+l1.textContent = s.time ? (s.time + ' - ' + tlsFmt(tlsMinOf(s.time) + dur) + ' (' + dur + ' min)') : '';
+const l2 = document.createElement('div'); l2.className = 'tls-sugg-title'; l2.textContent = s.title;
+body.appendChild(l1); body.appendChild(l2);
+row.appendChild(ico); row.appendChild(body);
+row.onclick = () => {
+tlsState.title = s.title;
+tlsState.icon = s.icon || tlsGuessIcon(s.title);
+if (s.time) tlsState.time = s.time;
+tlsState.dur = dur;
+$('tlsTitle').value = s.title;
+tlsUpdateHead(); tlsRenderWheel(); tlsRenderDur();
+tlsStepTo(2);
+};
+el.appendChild(row);
+});
+if (!top.length) { const d2 = document.createElement('div'); d2.className = 'tls-sugg-sub'; d2.style.padding = '8px 2px'; d2.textContent = t('tls.noSugg'); el.appendChild(d2); }
+}
+function tlsStepTo(n) {
+tlsState.step = n;
+$('tlsSteps').style.transform = 'translateX(-' + ((n - 1) * 100 / 3) + '%)';
+if (n === 3) {
+$('tlsSumDateV').textContent = $('tlsDate').value || tlsState.due;
+$('tlsSumTimeV').textContent = tlsState.time + ' - ' + tlsFmt(tlsMinOf(tlsState.time) + tlsState.dur) + ' (' + tlsState.dur + ' min)';
+tlsRenderAlerts();
+}
+$('tlsCta').textContent = n < 3 ? t('tls.continue') : (tlsState.mode === 'edit' ? t('save') : t('tls.create'));
+}
+function tlSheetOpen(a, b) {
+let mode = 'new', id = null, data = {};
+if (a === 'new') { data = b || {}; }
+else if (a === 'edit') { mode = 'edit'; id = b; }
+else { mode = 'edit'; id = a; }
+const r = id ? reminders.find((x) => x.id === id) : null;
+if (id && !r) return;
+const now = new Date();
+const nextQ = tlsFmt(Math.min(1425, Math.ceil((now.getHours() * 60 + now.getMinutes()) / 15) * 15));
+tlsState = {
+mode, id,
+tl: r ? !!r.tl : true,
+title: r ? r.title : '',
+icon: r ? (r.icon || '') : '',
+color: r ? (r.color || '') : '',
+prio: r ? r.prio : 4,
+due: (r && r.due) || data.due || iso(new Date()),
+time: (r && r.time) || data.time || nextQ,
+dur: (r && r.duration) || 60,
+alerts: (r && r.alerts) ? { pre: r.alerts.pre !== false, start: r.alerts.start !== false, end: r.alerts.end !== false } : { pre: true, start: true, end: true },
+step: 1,
+};
+$('tlsTitle').value = tlsState.title;
+$('tlsNote').value = r ? (r.note || '') : '';
+$('tlsDate').value = tlsState.due;
+$('tlsErr').textContent = '';
+$('tlsMenuBtn').style.display = mode === 'edit' ? 'flex' : 'none';
+$('tlsMenu').style.display = 'none';
+$('tlsConfirm').style.display = 'none';
+tlsUpdateHead(); tlsRenderDur(); tlsRenderSugg();
+$('tlsSteps').style.transition = 'none';
+tlsStepTo(mode === 'edit' ? 3 : 1);
+void $('tlsSteps').offsetWidth;
+$('tlsSteps').style.transition = '';
+$('tlsOverlay').classList.add('open');
+setTimeout(tlsRenderWheel, 60);
+if (mode === 'new') setTimeout(() => $('tlsTitle').focus(), 280);
+}
+window.tlSheetOpen = tlSheetOpen;
+function tlSheetClose() { $('tlsOverlay').classList.remove('open'); tlsState = null; }
+async function tlsSubmit(action, extra) {
+try {
+const d = await api('/api/reminders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({ action }, extra)) });
+reminders = d.reminders;
+tlSheetClose();
+render(); loadTimeline();
+} catch (e) { $('tlsErr').textContent = e.message || 'Error'; }
+}
+function tlsPayload() {
+const st = tlsState;
+return {
+id: st.id || undefined,
+title: $('tlsTitle').value.trim(),
+note: $('tlsNote').value,
+due: $('tlsDate').value || st.due,
+time: st.time,
+prio: st.prio,
+icon: st.icon,
+color: st.color,
+duration: st.dur,
+tl: st.tl,
+alerts: st.alerts,
+};
+}
+$('tlsCta').onclick = () => {
+if (!tlsState) return;
+if (tlsState.step === 1) {
+const v = $('tlsTitle').value.trim();
+if (!v) { $('tlsTitle').focus(); $('tlsTitle').classList.add('tls-shake'); setTimeout(() => $('tlsTitle').classList.remove('tls-shake'), 400); return; }
+tlsState.title = v;
+tlsUpdateHead();
+tlsStepTo(2);
+} else if (tlsState.step === 2) { tlsStepTo(3); }
+else {
+if (!$('tlsTitle').value.trim()) { $('tlsTitle').focus(); return; }
+if (tlsState.mode === 'new' && (!tlsState.icon || tlsState.icon === 'bell')) tlsState.icon = tlsGuessIcon($('tlsTitle').value);
+tlsSubmit(tlsState.mode === 'edit' ? 'update' : 'create', tlsPayload());
+}
+};
+$('tlsClose').onclick = tlSheetClose;
+$('tlsOverlay').onclick = (e) => { if (e.target === $('tlsOverlay')) tlSheetClose(); };
+$('tlsMenuBtn').onclick = () => { $('tlsMenu').style.display = $('tlsMenu').style.display === 'none' ? 'flex' : 'none'; };
+$('tlsDelBtn').onclick = () => { $('tlsMenu').style.display = 'none'; $('tlsConfirm').style.display = 'flex'; };
+$('tlsDelNo').onclick = () => { $('tlsConfirm').style.display = 'none'; };
+$('tlsDelYes').onclick = () => { tlsSubmit('delete', { id: tlsState.id }); };
+$('tlsDupBtn').onclick = () => { $('tlsMenu').style.display = 'none'; const p = tlsPayload(); delete p.id; tlsSubmit('create', p); };
+$('tlsTitle').addEventListener('input', () => { if (tlsState && tlsState.mode === 'new') { tlsState.icon = tlsGuessIcon($('tlsTitle').value); tlsUpdateHead(); } });
+$('tlsSumDate').onclick = () => tlsStepTo(2);
+$('tlsSumTime').onclick = () => tlsStepTo(2);
+$('tlsDate').addEventListener('change', () => { if (tlsState) tlsState.due = $('tlsDate').value; });
+$('tlsWheel').addEventListener('scroll', () => {
+if (!tlsState) return;
+clearTimeout(tlsWheelTimer);
+tlsWheelTimer = setTimeout(() => {
+const idx = Math.max(0, Math.min(95, Math.round($('tlsWheel').scrollTop / 32)));
+tlsState.time = tlsFmt(idx * 15);
+tlsUpdateHead();
+}, 90);
+});
+
 applyLang();
 $('assistantInput').placeholder = t('assistant.placeholder');
 bootGreet();
@@ -4920,7 +5218,7 @@ if (d && /^\d{4}-\d{2}-\d{2}$/.test(d)) tlDate = d;
 showView('timeline');
 Promise.resolve(loadDone).then(() => {
 showView('timeline');
-if (q.get('add') === '1') setTimeout(() => openModal(null, { due: tlDate, tl: true }), 300);
+if (q.get('add') === '1') setTimeout(() => tlSheetOpen('new', { due: tlDate }), 300);
 });
 })();
 pushInit();
