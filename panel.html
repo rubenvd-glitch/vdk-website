@@ -1282,8 +1282,8 @@ header { padding: 10px 16px; }
 <div class="tls-step" id="tlsStep3">
 <div class="tls-row" id="tlsSumDate"><span data-i18n="tls.date">Datum</span><span class="tls-val" id="tlsSumDateV"></span></div>
 <div class="tls-row" id="tlsSumTime"><span data-i18n="l.time">Tijd</span><span class="tls-val" id="tlsSumTimeV"></span></div>
-<div class="tls-label" data-i18n="l.alerts">Meldingen</div>
-<div class="tls-alerts" id="tlsAlerts"></div>
+<div class="tls-row" id="tlsAlertsRow"><span data-i18n="l.alerts">Meldingen</span><span class="tls-val" id="tlsAlertsCount"></span></div>
+<div class="tls-alerts" id="tlsAlerts" style="display:none;"></div>
 <textarea id="tlsNote" data-i18n-ph="tls.note" placeholder="Notitie toevoegen..." rows="2"></textarea>
 </div>
 </div></div>
@@ -1527,7 +1527,7 @@ en: {
 'set.tgHelp':'One-time setup: create a bot via @BotFather in Telegram, put the token in Render as TELEGRAM_BOT_TOKEN, send your bot a message and click Link here.',
 'set.status':'Status','set.link':'Link','set.test':'Test message','set.soon':'Coming soon',
 'set.cal':'Connect calendar','set.calSub':'Import your calendar and push reminders to it (always with a confirmation first).',
-'tls.title':'What are you working on?','tls.sugg':'Suggestions','tls.noSugg':'No suggestions yet','tls.date':'Date','tls.dur':'Duration','tls.note':'Add notes...','tls.continue':'Continue','tls.create':'Create action','tls.dup':'Duplicate','tls.del':'Delete','tls.delSure':'Delete this action?',
+'tls.title':'What are you working on?','tls.sugg':'Suggestions','tls.noSugg':'No suggestions yet','tls.date':'Date','tls.dur':'Duration','tls.note':'Add notes...','tls.continue':'Continue','tls.create':'Create action','tls.dup':'Duplicate','tls.del':'Delete','tls.delSure':'Delete this action?','al.count':'alerts',
 'l.alerts':'Notifications','al.pre':'5 min before','al.start':'At start','al.end':'At end',
 'set.push':'Push notifications','set.pushSub':'Get Base notifications on this device, for example when a timed reminder is due.','set.pushEnable':'Enable on this device','set.pushDisable':'Disable','set.pushTest':'Send test','set.pushOn':'Push notifications are enabled on this device.','set.pushOff':'Not enabled on this device yet.','set.pushDenied':'Notifications are blocked for Base in your browser or system settings.','set.pushUnsupported':'This browser does not support push here. On iPhone: add Base to your home screen first (Share, Add to Home Screen) and open it from there.','set.pushOnMsg':'Push notifications enabled.','set.pushTestSent':'Test notification sent.','set.pushTestNone':'No devices are registered yet.','set.pushIosHelp':'iPhone/iPad: first add Base to your home screen (Share, Add to Home Screen) and open the app from there; then you can enable notifications.',
 
@@ -1610,7 +1610,7 @@ nl: {
 'set.tgHelp':'Eenmalig instellen: maak een bot via @BotFather in Telegram, zet het token in Render als TELEGRAM_BOT_TOKEN, stuur je bot een berichtje en klik hier op Koppelen.',
 'set.status':'Status','set.link':'Koppelen','set.test':'Testbericht','set.soon':'Binnenkort beschikbaar',
 'set.cal':'Agenda koppelen','set.calSub':'Importeer je agenda en push herinneringen ernaartoe (altijd eerst met bevestiging).',
-'tls.title':'Waar ga je aan werken?','tls.sugg':'Suggesties','tls.noSugg':'Nog geen suggesties','tls.date':'Datum','tls.dur':'Duur','tls.note':'Notitie toevoegen...','tls.continue':'Ga verder','tls.create':'Maak actie','tls.dup':'Dupliceer','tls.del':'Verwijder','tls.delSure':'Actie verwijderen?',
+'tls.title':'Waar ga je aan werken?','tls.sugg':'Suggesties','tls.noSugg':'Nog geen suggesties','tls.date':'Datum','tls.dur':'Duur','tls.note':'Notitie toevoegen...','tls.continue':'Ga verder','tls.create':'Maak actie','tls.dup':'Dupliceer','tls.del':'Verwijder','tls.delSure':'Actie verwijderen?','al.count':'meldingen',
 'l.alerts':'Meldingen','al.pre':'5 min ervoor','al.start':'Bij start','al.end':'Bij einde',
 'set.push':'Pushmeldingen','set.pushSub':'Krijg meldingen van Base op dit apparaat, bijvoorbeeld wanneer een reminder met tijd verloopt.','set.pushEnable':'Zet aan op dit apparaat','set.pushDisable':'Uitzetten','set.pushTest':'Testmelding','set.pushOn':'Pushmeldingen staan aan op dit apparaat.','set.pushOff':'Nog niet aan op dit apparaat.','set.pushDenied':'Meldingen zijn voor Base geblokkeerd in je browser- of systeeminstellingen.','set.pushUnsupported':'Deze browser ondersteunt hier geen push. Op iPhone: zet Base eerst op je beginscherm (Deel, Zet op beginscherm) en open hem vanaf daar.','set.pushOnMsg':'Pushmeldingen aangezet.','set.pushTestSent':'Testmelding verstuurd.','set.pushTestNone':'Er zijn nog geen apparaten aangemeld.','set.pushIosHelp':'iPhone/iPad: zet Base eerst op je beginscherm (Deel-knop, Zet op beginscherm) en open de app vanaf daar; daarna kun je meldingen aanzetten.',
 
@@ -5048,6 +5048,8 @@ el.appendChild(b);
 });
 }
 function tlsRenderAlerts() {
+const cnt = ['pre', 'start', 'end'].filter((k) => tlsState.alerts[k]).length;
+$('tlsAlertsCount').textContent = cnt + ' ' + t('al.count');
 const el = $('tlsAlerts');
 el.innerHTML = '';
 [['pre', t('al.pre')], ['start', t('al.start')], ['end', t('al.end')]].forEach((def) => {
@@ -5104,6 +5106,7 @@ $('tlsSteps').style.transform = 'translateX(-' + ((n - 1) * 100 / 3) + '%)';
 if (n === 3) {
 $('tlsSumDateV').textContent = $('tlsDate').value || tlsState.due;
 $('tlsSumTimeV').textContent = tlsState.time + ' - ' + tlsFmt(tlsMinOf(tlsState.time) + tlsState.dur) + ' (' + tlsState.dur + ' min)';
+$('tlsAlerts').style.display = 'none';
 tlsRenderAlerts();
 }
 $('tlsCta').textContent = n < 3 ? t('tls.continue') : (tlsState.mode === 'edit' ? t('save') : t('tls.create'));
@@ -5214,6 +5217,7 @@ $('tlsDelNo').onclick = () => { $('tlsConfirm').style.display = 'none'; };
 $('tlsDelYes').onclick = () => { tlsSubmit('delete', { id: tlsState.id }); };
 $('tlsDupBtn').onclick = () => { $('tlsMenu').style.display = 'none'; const p = tlsPayload(); delete p.id; tlsSubmit('create', p); };
 $('tlsTitle').addEventListener('input', () => { if (tlsState && tlsState.mode === 'new' && !tlsState.iconManual) { tlsState.icon = tlsGuessIcon($('tlsTitle').value); tlsUpdateHead(); } });
+$('tlsAlertsRow').onclick = () => { const el = $('tlsAlerts'); el.style.display = el.style.display === 'none' ? 'block' : 'none'; };
 $('tlsSumDate').onclick = () => tlsStepTo(2);
 $('tlsSumTime').onclick = () => tlsStepTo(2);
 $('tlsDate').addEventListener('change', () => { if (tlsState) tlsState.due = $('tlsDate').value; });
