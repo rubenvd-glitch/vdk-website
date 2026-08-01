@@ -936,7 +936,18 @@ const now = Date.now();
 const fmtHM = (ms) => { const mtot = Math.round((ms - midnightMs) / 60000); return pad2(Math.floor((((mtot % 1440) + 1440) % 1440) / 60)) + ':' + pad2(((mtot % 60) + 60) % 60); };
 // Meldingsschema zoals Structured: per item met tijd standaard drie alerts
 // (5 min voor start, bij start, bij einde), per item uitzetbaar via r.alerts.
-const due = reminders.filter((r) => !r.done && r.due === todayISO && /^\d{2}:\d{2}$/.test(r.time || ''));
+const occursToday = (r) => {
+if (r.due === todayISO) return true;
+if (!r.repeat || !r.repeat.type || !r.due || todayISO < r.due) return false;
+if (r.repeat.type === 'daily') return true;
+const a = new Date(r.due + 'T00:00:00Z');
+const d = new Date(todayISO + 'T00:00:00Z');
+if (r.repeat.type === 'weekly') return a.getUTCDay() === d.getUTCDay();
+if (r.repeat.type === 'monthly') return a.getUTCDate() === d.getUTCDate();
+return false;
+};
+const isDoneToday = (r) => (r.repeat && r.repeat.type) ? (Array.isArray(r.doneDates) && r.doneDates.includes(todayISO)) : r.done;
+const due = reminders.filter((r) => !isDoneToday(r) && occursToday(r) && /^\d{2}:\d{2}$/.test(r.time || ''));
 let sent = 0;
 const results = [];
 for (const r of due) {
@@ -948,7 +959,7 @@ const endHM = fmtHM(endMs);
 const alerts = [];
 if (al.pre !== false) alerts.push({ kind: 'pre', at: startMs - 5 * 60000, title: '\u23F0 Over 5 min: ' + r.title, body: 'Start om ' + r.time });
 if (al.start !== false) alerts.push({ kind: 'start', at: startMs, title: '\u25B6\uFE0F Nu: ' + r.title, body: r.time + ' tot ' + endHM });
-if (al.end !== false) alerts.push({ kind: 'end', at: endMs, title: '\u2705 Klaar: ' + r.title + '?', body: 'Liep tot ' + endHM + '. Vink af in Base.' });
+if (al.end !== false && r.duration && r.duration > 0) alerts.push({ kind: 'end', at: endMs, title: '\u2705 Klaar: ' + r.title + '?', body: 'Liep tot ' + endHM + '. Vink af in Base.' });
 for (const a of alerts) {
 if (now < a.at || now - a.at > 45 * 60000) continue;
 const sentKey = 'pushsent:' + r.id + ':' + r.due + ':' + a.kind;
@@ -985,8 +996,18 @@ const tomorrowISO = isoOf(addDaysToYMD(t, 1));
 let reminders = null;
 try { reminders = await kvGetJson('rem:' + ADMIN_EMAIL); } catch (e) {}
 reminders = reminders || [];
+const occursOnW = (r, d) => {
+if (r.due === d) return true;
+if (!r.repeat || !r.repeat.type || !r.due || d < r.due) return false;
+if (r.repeat.type === 'daily') return true;
+const a = new Date(r.due + 'T00:00:00Z');
+const dd = new Date(d + 'T00:00:00Z');
+if (r.repeat.type === 'weekly') return a.getUTCDay() === dd.getUTCDay();
+if (r.repeat.type === 'monthly') return a.getUTCDate() === dd.getUTCDate();
+return false;
+};
 const remFor = (d) => reminders
-.filter((r) => !r.done && r.due === d)
+.filter((r) => ((r.repeat && r.repeat.type) ? !(Array.isArray(r.doneDates) && r.doneDates.includes(d)) : !r.done) && occursOnW(r, d))
 .map((r) => ({ title: r.title, time: r.time || null, prio: r.prio, icon: r.icon || null, color: r.color || null, duration: r.duration || 0 }))
 .sort((a, b) => String(a.time || '99').localeCompare(String(b.time || '99')));
 let events = [];
@@ -1835,6 +1856,7 @@ color: isHexColor(body.color) ? String(body.color).toLowerCase() : '',
 duration: Math.min(480, Math.max(0, Number(body.duration) || 0)), // minutes; 0 = unspecified (timeline defaults to 1h)
 tl: body.tl === true,
 alerts: (body.alerts && typeof body.alerts === 'object') ? { pre: body.alerts.pre !== false, start: body.alerts.start !== false, end: body.alerts.end !== false } : { pre: true, start: true, end: true },
+repeat: (body.repeat && typeof body.repeat === 'object' && ['daily', 'weekly', 'monthly'].includes(body.repeat.type)) ? { type: body.repeat.type } : null,
 done: false,
 createdAt: Date.now(),
 });
@@ -1852,10 +1874,19 @@ if (body.color !== undefined) r.color = isHexColor(body.color) ? String(body.col
 if (body.duration !== undefined) r.duration = Math.min(480, Math.max(0, Number(body.duration) || 0));
 if (body.tl !== undefined) r.tl = body.tl === true;
 if (body.alerts && typeof body.alerts === 'object') r.alerts = { pre: body.alerts.pre !== false, start: body.alerts.start !== false, end: body.alerts.end !== false };
+if (body.repeat !== undefined) r.repeat = (body.repeat && typeof body.repeat === 'object' && ['daily', 'weekly', 'monthly'].includes(body.repeat.type)) ? { type: body.repeat.type } : null;
 if (body.done !== undefined) {
 if (body.done && !r.done) bump('rd');
 r.done = !!body.done;
 }
+} else if (body.action === 'doneDate') {
+const r = list.find((x) => x.id === body.id);
+if (!r) throw apiError(404, 'Niet gevonden');
+const date = String(body.date || '').slice(0, 10);
+if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw apiError(400, 'Ongeldige datum');
+r.doneDates = Array.isArray(r.doneDates) ? r.doneDates : [];
+if (r.doneDates.includes(date)) { r.doneDates = r.doneDates.filter((x) => x !== date); }
+else { r.doneDates.push(date); bump('rd'); }
 } else if (body.action === 'delete') {
 list = list.filter((x) => x.id !== body.id);
 } else {
@@ -2870,7 +2901,7 @@ for (const [k, v] of codes) if (now > v.expires) codes.delete(k);
 // 45 min), zodat een net-wakkere instance gemiste meldingen alsnog stuurt.
 setInterval(() => {
 pushDueReminderCheck().catch((e) => console.error('push interval error:', e.message));
-}, 5 * 60 * 1000).unref();
+}, 60 * 1000).unref();
 setTimeout(() => {
 pushDueReminderCheck().catch((e) => console.error('push boot-check error:', e.message));
 }, 20 * 1000).unref();
