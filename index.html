@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>VDK Business Services</title>
   <style>
+    /* Voorkom per ongeluk selecteren van tekst/vakken */
+    * { -webkit-user-select: none; user-select: none; }
+    input, textarea, select, [contenteditable="true"], [contenteditable=""] { -webkit-user-select: text; user-select: text; }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body { height: 100%; }
     body {
