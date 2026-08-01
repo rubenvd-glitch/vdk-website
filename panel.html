@@ -721,7 +721,10 @@ header { padding: 10px 16px; }
 .tls-err { color: #f28b8b; font-size: 12.5px; margin: 6px 16px 0; min-height: 14px; }
 @keyframes tlsShake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
 .tls-shake { animation: tlsShake .3s ease 0s 1; }
-.tls-iconpick { position: absolute; top: 92px; left: 14px; right: 14px; background: #1c2433; border: 1px solid #2a3547; border-radius: 14px; padding: 10px; z-index: 5; display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.tls-iconpick { position: absolute; top: 92px; left: 14px; right: 14px; background: #1c2433; border: 1px solid #2a3547; border-radius: 14px; padding: 10px; z-index: 5; }
+.tls-icongrid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; max-height: 210px; overflow-y: auto; }
+.tls-iconsearch { width: 100%; background: #232c3a; border: 1px solid #2a3547; border-radius: 9px; color: #e8ecf1; padding: 7px 11px; font-size: 12.5px; margin: 8px 0; outline: none; box-sizing: border-box; }
+.tls-color-custom { background: conic-gradient(#e05252, #f0b45c, #7fd68f, #5cb8e8, #8b7cf7, #e05252); position: relative; overflow: hidden; }
 .tls-iconpick button { background: #232c3a; border: 1px solid transparent; border-radius: 10px; padding: 9px 0; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 .tls-iconpick button:hover { background: #2a3547; }
 .tls-iconpick button.sel { border-color: #7aa2f7; }
@@ -5033,13 +5036,13 @@ $('tlsPill').textContent = st.time ? (st.time + ' - ' + tlsFmt(tlsMinOf(st.time)
 function tlsRenderWheel() {
 const el = $('tlsWheel');
 el.innerHTML = '';
-for (let i = 0; i < 96; i++) {
+for (let i = 0; i < 288; i++) {
 const d = document.createElement('div');
 d.className = 'tls-wopt';
-d.textContent = tlsFmt(i * 15);
+d.textContent = tlsFmt(i * 5);
 el.appendChild(d);
 }
-el.scrollTop = Math.round(tlsMinOf(tlsState.time) / 15) * 32;
+el.scrollTop = Math.round(tlsMinOf(tlsState.time) / 5) * 32;
 }
 function tlsRenderDur() {
 const el = $('tlsDur');
@@ -5199,6 +5202,28 @@ tlsSubmit(tlsState.mode === 'edit' ? 'update' : 'create', tlsPayload());
 }
 };
 $('tlsIco').style.cursor = 'pointer';
+const TLS_ICON_SEARCH = { alarm: 'wekker alarm opstaan', bed: 'bed slapen nap rusten', dumbbell: 'gym sport fitness trainen krachttraining', coffee: 'koffie thee cafe drinken', briefcase: 'werk koffer meeting zakelijk overleg', book: 'boek lezen studie school leren', heart: 'hart hardlopen rennen wandelen fietsen zwemmen gezondheid yoga', car: 'auto rijden garage vervoer', home: 'huis thuis schoonmaken huishouden', bell: 'bel herinnering melding', phone: 'telefoon bellen gesprek', mail: 'mail email post bericht', calendar: 'agenda kalender afspraak datum', cart: 'winkelwagen boodschappen winkelen shoppen', gift: 'cadeau verjaardag geschenk', music: 'muziek liedje afspelen', plane: 'vliegtuig reizen vakantie vlucht', utensils: 'eten bestek lunch diner ontbijt koken maaltijd', pill: 'pil medicijn dokter tandarts gezondheid', wrench: 'sleutel klus gereedschap reparatie fixen' };
+function tlsRenderIconGrid(query) {
+const grid = document.getElementById('tlsIconGrid');
+if (!grid || !tlsState) return;
+grid.innerHTML = '';
+const q = String(query || '').toLowerCase().trim();
+const titleNow = String($('tlsTitle').value || '').toLowerCase();
+const sugIcons = [];
+TLS_ICON_WORDS.forEach((pair) => { if (titleNow && titleNow.includes(pair[0]) && !sugIcons.includes(pair[1])) sugIcons.push(pair[1]); });
+let names = sugIcons.concat(Object.keys(TL_ICONS).filter((n2) => !sugIcons.includes(n2)));
+if (q) names = names.filter((n2) => n2.includes(q) || (TLS_ICON_SEARCH[n2] || '').includes(q));
+names.forEach((name) => {
+const b = document.createElement('button');
+b.type = 'button';
+b.innerHTML = tlIcon(name);
+b.style.color = TLS_ICON_COLORS[name] || '#e8ecf1';
+if (tlsState.icon === name) b.classList.add('sel');
+if (sugIcons.includes(name)) b.classList.add('tls-sug');
+b.onclick = (ev) => { ev.stopPropagation(); if (tlsState) { tlsState.icon = name; tlsState.iconManual = true; tlsUpdateHead(); } $('tlsIconPick').style.display = 'none'; };
+grid.appendChild(b);
+});
+}
 $('tlsIco').onclick = () => {
 if (!tlsState) return;
 const el = $('tlsIconPick');
@@ -5214,22 +5239,32 @@ cb.style.background = col || '#e8ecf1';
 cb.onclick = (ev) => { ev.stopPropagation(); if (tlsState) { tlsState.color = col; tlsUpdateHead(); } el.style.display = 'none'; };
 crow.appendChild(cb);
 });
+const custom = document.createElement('button');
+custom.type = 'button';
+custom.className = 'tls-color tls-color-custom' + (tlSafeColor(tlsState.color) && !['#e08a7e', '#e6b54a', '#8fbf5f', '#b5764a', '#4a6fd8', '#3f7d5c', '#5b8fd6', '#d67ec4'].includes(tlsState.color) ? ' sel' : '');
+const cinp = document.createElement('input');
+cinp.type = 'color';
+cinp.value = tlSafeColor(tlsState.color) || '#7aa2f7';
+cinp.style.cssText = 'position:absolute;left:0;top:0;width:100%;height:100%;opacity:0;cursor:pointer;';
+cinp.addEventListener('click', (ev) => ev.stopPropagation());
+cinp.addEventListener('input', () => { if (tlsState) { tlsState.color = cinp.value; tlsUpdateHead(); } });
+cinp.addEventListener('change', () => { el.style.display = 'none'; });
+custom.appendChild(cinp);
+crow.appendChild(custom);
 el.appendChild(crow);
-const sugIcons = [];
-const titleNow = String($('tlsTitle').value || '').toLowerCase();
-TLS_ICON_WORDS.forEach((pair) => { if (titleNow && titleNow.includes(pair[0]) && !sugIcons.includes(pair[1])) sugIcons.push(pair[1]); });
-const ordered = sugIcons.concat(Object.keys(TL_ICONS).filter((n2) => !sugIcons.includes(n2)));
-ordered.forEach((name) => {
-const b = document.createElement('button');
-b.type = 'button';
-b.innerHTML = tlIcon(name);
-b.style.color = TLS_ICON_COLORS[name] || '#e8ecf1';
-if (tlsState.icon === name) b.classList.add('sel');
-if (sugIcons.includes(name)) b.classList.add('tls-sug');
-b.onclick = (ev) => { ev.stopPropagation(); if (tlsState) { tlsState.icon = name; tlsState.iconManual = true; tlsUpdateHead(); } el.style.display = 'none'; };
-el.appendChild(b);
-});
-el.style.display = 'grid';
+const se = document.createElement('input');
+se.type = 'text';
+se.className = 'tls-iconsearch';
+se.placeholder = t('l.iconSearch');
+se.addEventListener('click', (ev) => ev.stopPropagation());
+se.addEventListener('input', () => tlsRenderIconGrid(se.value));
+el.appendChild(se);
+const grid = document.createElement('div');
+grid.id = 'tlsIconGrid';
+grid.className = 'tls-icongrid';
+el.appendChild(grid);
+tlsRenderIconGrid('');
+el.style.display = 'block';
 };
 $('tlsClose').onclick = tlSheetClose;
 $('tlsOverlay').onclick = (e) => { if (e.target === $('tlsOverlay')) tlSheetClose(); };
@@ -5247,8 +5282,8 @@ $('tlsWheel').addEventListener('scroll', () => {
 if (!tlsState) return;
 clearTimeout(tlsWheelTimer);
 tlsWheelTimer = setTimeout(() => {
-const idx = Math.max(0, Math.min(95, Math.round($('tlsWheel').scrollTop / 32)));
-tlsState.time = tlsFmt(idx * 15);
+const idx = Math.max(0, Math.min(287, Math.round($('tlsWheel').scrollTop / 32)));
+tlsState.time = tlsFmt(idx * 5);
 tlsUpdateHead();
 }, 90);
 });
