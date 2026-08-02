@@ -118,16 +118,19 @@ err ? reject(err) : resolve();
 };
 const write = (line) => socket.write(line + '\r\n');
 
+// H-03: elke headerwaarde wordt van regeleindes ontdaan voordat hij in het
+// bericht belandt, en de body krijgt dot-stuffing zodat een regel die met een
+// punt begint de DATA-fase niet vroegtijdig afsluit.
 const message = [
-`From: VDK Business Services <${from}>`,
-`To: <${to}>`,
-`Subject: ${subject}`,
+`From: VDK Business Services <${stripCrlf(from)}>`,
+`To: <${stripCrlf(to)}>`,
+`Subject: ${stripCrlf(subject)}`,
 `Date: ${new Date().toUTCString()}`,
 `Message-ID: <${crypto.randomUUID()}@vdkbusiness-services.nl>`,
 'MIME-Version: 1.0',
 'Content-Type: text/plain; charset=utf-8',
 '',
-text.replace(/\r?\n/g, '\r\n'),
+text.replace(/\r?\n/g, '\r\n').replace(/^\./gm, '..'),
 ].join('\r\n');
 
 // Advance the SMTP conversation based on the reply code + current stage.
@@ -411,12 +414,44 @@ if (KV_URL) { try { await kvCmd('DEL', `code:${key}`); } catch (e) { /* ignore *
 codes.delete(key);
 }
 
-function allowRate(ip) {
-const now = Date.now();
-const e = rateLimit.get(ip);
-if (!e || now > e.resetAt) { rateLimit.set(ip, { count: 1, resetAt: now + 15 * 60 * 1000 }); return true; }
-return ++e.count <= 10;
+// M-03/L-01: achter Render staat altijd een proxy, dus req.socket.remoteAddress
+// is het adres van die proxy en zou alle bezoekers in dezelfde emmer stoppen.
+// X-Forwarded-For is alleen te vertrouwen als er zo'n proxy voor staat die de
+// header overschrijft; vandaar aan in productie, uit lokaal, met TRUST_PROXY
+// als expliciete override.
+const TRUST_PROXY = process.env.TRUST_PROXY ? process.env.TRUST_PROXY === 'true' : IS_PROD;
+function clientIp(req) {
+if (TRUST_PROXY) {
+const xff = req.headers['x-forwarded-for'];
+if (typeof xff === 'string' && xff) {
+const first = xff.split(',')[0].trim();
+if (first) return first;
 }
+}
+return req.socket.remoteAddress || 'onbekend';
+}
+
+// Emmers per sleutel in plaats van alleen per IP. De inlogflow gebruikt er twee:
+// op IP en op e-mailadres, zodat een gedeeld IP niet iedereen buitensluit en een
+// enkel account niet vanaf wisselende adressen te bestoken is.
+function allowRate(key, limit = 10, windowMs = 15 * 60 * 1000) {
+const now = Date.now();
+const e = rateLimit.get(key);
+if (!e || now > e.resetAt) { rateLimit.set(key, { count: 1, resetAt: now + windowMs }); return true; }
+return ++e.count <= limit;
+}
+
+/* ---------- H-03: adresvalidatie en SMTP-headerinjectie ---------- */
+// Geen CR/LF, geen komma's, geen puntkomma's: dat zijn precies de tekens
+// waarmee je in een SMTP-header extra ontvangers of headers smokkelt.
+const EMAIL_RE = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
+function isValidEmail(v) {
+const s = String(v == null ? '' : v).trim();
+return s.length >= 3 && s.length <= 254 && EMAIL_RE.test(s);
+}
+// Vangnet vlak voor de transactie zelf, voor het geval er ooit een adres langs
+// de validatie komt via een ander pad.
+function stripCrlf(v) { return String(v == null ? '' : v).replace(/[\r\n]+/g, ' ').trim(); }
 
 // ---------- HTTP helpers ----------
 // Beveiligingsheaders op elk antwoord. De CSP volgt in een latere commit,
@@ -1128,7 +1163,10 @@ appleId, appPassword, calendarUrl: disc.calendarUrl, calendarUrls: disc.calendar
 logEvent('agenda gekoppeld', `apple (${realm})`);
 return json(res, 200, { ok: true });
 } catch (e) {
-return json(res, 400, { error: e.message || 'Koppelen mislukt. Controleer je gegevens.' });
+// M-08: de tekst van de upstream-fout kan hostnamen, paden of accountdetails
+// bevatten. Die blijft in de log, de gebruiker krijgt een vaste zin.
+console.error('apple connect failed:', (e && (e.stack || e.message)) || String(e));
+return json(res, 400, { error: 'Koppelen mislukt. Controleer je gegevens.' });
 }
 }
 
@@ -1210,11 +1248,17 @@ return json(res, 200, { ok: true, results });
 // Shared 2FA request/verify handlers, parameterized by realm so Base and the
 // CRM never share a login state.
 async function handleRequestCode(req, res, realm) {
-if (!allowRate(req.socket.remoteAddress)) return json(res, 429, { error: 'Too many attempts. Try again later.' });
+if (!allowRate('ip:' + clientIp(req))) return json(res, 429, { error: 'Too many attempts. Try again later.' });
 const body = await readBody(req, res);
 if (!body) return;
 const email = String(body.email || '').trim().toLowerCase();
 const generic = { ok: true, message: 'If this email is authorized, a code has been sent.' };
+// H-03: ongeldige adressen komen nooit tot aan de SMTP-transactie. Het
+// antwoord blijft generiek, zodat dit geen manier wordt om te toetsen welke
+// adressen bestaan.
+if (!isValidEmail(email)) return json(res, 200, generic);
+// M-03: tweede emmer op het adres zelf, tegen bestoken vanaf wisselende IP's.
+if (!allowRate('mail:' + realm + ':' + email, 5)) return json(res, 429, { error: 'Too many attempts. Try again later.' });
 let allowed = email === ADMIN_EMAIL && email.includes('@');
 if (realm === 'admin' && !allowed && email.includes('@') && KV_URL) {
 try {
@@ -1248,8 +1292,10 @@ subject: `Your ${subjectApp} login code: ${code}`,
 text: `Your login code for ${subjectApp} is: ${code}\n\nIt expires in 10 minutes. If you did not request this, ignore this email.`,
 });
 } catch (err) {
+// M-05: een 500 hier verscheen alleen bij adressen die de allowlist haalden,
+// dus het verschil tussen 200 en 500 verklapte welke accounts bestaan. De
+// fout gaat naar de log, de beller krijgt hetzelfde generieke antwoord.
 console.error('SMTP send failed:', (err && (err.stack || err.message)) || String(err));
-return json(res, 500, { error: 'Could not send email. Check SMTP settings.' });
 }
 } else {
 console.log(`[DEV] No SMTP configured. Login code for ${realm}:${email}: ${code}`);
@@ -1258,10 +1304,12 @@ return json(res, 200, generic);
 }
 
 async function handleVerify(req, res, realm) {
-if (!allowRate(req.socket.remoteAddress)) return json(res, 429, { error: 'Too many attempts. Try again later.' });
+if (!allowRate('ip:' + clientIp(req))) return json(res, 429, { error: 'Too many attempts. Try again later.' });
 const body = await readBody(req, res);
 if (!body) return;
 const email = String(body.email || '').trim().toLowerCase();
+if (!isValidEmail(email)) return json(res, 401, { error: 'Code ongeldig of verlopen. Vraag een nieuwe aan.' });
+if (!allowRate('verify:' + realm + ':' + email, 10)) return json(res, 429, { error: 'Too many attempts. Try again later.' });
 const code = String(body.code || '').trim();
 const entry = await getLoginCode(realm, email);
 if (!entry) {
@@ -2369,7 +2417,7 @@ return json(res, 500, { error: 'Opslag niet bereikbaar. Is Upstash gekoppeld?' }
 async function handleRequest(req, res) {
 const url = new URL(req.url, 'http://localhost');
 const p = url.pathname;
-const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress;
+const ip = clientIp(req);
 
 // --- Base auth API ---
 if (req.method === 'POST' && p === '/base/request-code') return handleRequestCode(req, res, 'admin');
@@ -3002,6 +3050,8 @@ for (const realm of Object.keys(sessionStores)) {
 for (const [k, v] of sessionStores[realm]) if (now > v.expires) sessionStores[realm].delete(k);
 }
 for (const [k, v] of codes) if (now > v.expires) codes.delete(k);
+// M-03: verlopen rate-limit emmers weggooien, anders is de map zelf een lek.
+for (const [k, v] of rateLimit) if (now > v.resetAt) rateLimit.delete(k);
 }, 60 * 60 * 1000).unref();
 
 // Ingebouwde push-check: elke 5 minuten kijken of er een reminder met tijd
