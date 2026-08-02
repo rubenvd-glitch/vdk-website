@@ -4147,13 +4147,17 @@ let score = 0;
 Object.keys(volA).forEach((key) => { if (volB[key] !== undefined) score += Math.min(volA[key], volB[key]); });
 return score;
 }
-function gymSplitOverlapWarnings(tpA, tpB) {
+function gymSplitOverlapWarnings(tpA, tpB, gapDays) {
 const volA = gymSplitTemplateVolume(tpA);
 const volB = gymSplitTemplateVolume(tpB);
+const restDays = gymProfile.restDays || 2;
+const gap = gapDays == null ? 1 : gapDays;
 const warnings = [];
 Object.keys(volA).forEach((key) => {
 if (volB[key] === undefined) return;
-if (volA[key] > 6 && volB[key] > 6) warnings.push(gymSplitGroupLabel(key));
+const bothTrained = volA[key] >= 3 && volB[key] >= 3;
+const bothHeavy = volA[key] > 6 && volB[key] > 6;
+if (gap < restDays ? bothTrained : bothHeavy) warnings.push(gymSplitGroupLabel(key));
 });
 return warnings;
 }
@@ -4166,8 +4170,8 @@ const msgs = [];
 for (let i = 0; i < pairsToCheck; i++) {
 const a = tpls[i];
 const b = tpls[(i + 1) % n];
-const warn = gymSplitOverlapWarnings(a, b);
-if (warn.length) msgs.push(`Dag ${i + 1} (${a.name}) en dag ${((i + 1) % n) + 1} (${b.name}) trainen allebei zwaar: ${warn.join(', ')}. Overweeg een andere volgorde of extra rust ertussen.`);
+const warn = gymSplitOverlapWarnings(a, b, 1);
+if (warn.length) msgs.push(`Dag ${i + 1} (${a.name}) en dag ${((i + 1) % n) + 1} (${b.name}) trainen allebei zwaar: ${warn.join(', ')}. Overweeg een andere volgorde of extra rust ertussen (ingesteld: ${gymProfile.restDays || 2} rustdag(en) per spiergroep).`);
 }
 return msgs;
 }
