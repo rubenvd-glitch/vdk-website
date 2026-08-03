@@ -379,6 +379,10 @@ padding: 13px 16px; margin-bottom: 9px; display: flex; gap: 12px; align-items: c
 .gym-log-row .meta { font-size: 12.5px; color: #8b94a1; margin-top: 3px; }
 .gym-log-row .note { font-size: 12.5px; color: #a7afba; margin-top: 3px; white-space: pre-wrap; }
 .gym-log-row .actions { display: flex; gap: 6px; flex-shrink: 0; }
+.gym-log-daygroup { display: flex; align-items: baseline; justify-content: space-between; margin: 18px 0 8px; }
+.gym-log-daygroup:first-child { margin-top: 0; }
+.gym-log-daygroup .d { font-size: 13px; font-weight: 700; color: #e6e9ef; }
+.gym-log-daygroup .t { font-size: 12.5px; color: #8b94a1; }
 .ex-pick { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
 .ex-pick button {
 background: #151a21; border: 1px solid #232a33; color: #cfd6de;
@@ -3485,9 +3489,39 @@ function gymRenderRecent() {
 const recent = gymLog.slice().sort((a, b) => b.createdAt - a.createdAt).slice(0, 8);
 $('gymRecentList').innerHTML = recent.length ? recent.map(gymLogRowHtml).join('') : `<div class="empty">Nog niets gelogd.</div>`;
 }
+function gymFmtTime(ms) {
+const d = new Date(ms);
+return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+function gymFmtDuration(minutes) {
+const h = Math.floor(minutes / 60), m = minutes % 60;
+const parts = [];
+if (h) parts.push(LANG === 'nl' ? `${h}u` : `${h}h`);
+if (m || !h) parts.push(`${m}m`);
+return parts.join(' ');
+}
+
+function gymSessionLabel(items) {
+const times = items.map(x => x.createdAt).filter(x => typeof x === 'number' && !isNaN(x));
+if (!times.length) return '';
+if (times.length === 1) return gymFmtTime(times[0]);
+const start = Math.min(...times), end = Math.max(...times);
+const durMin = Math.max(0, Math.round((end - start) / 60000));
+return `${gymFmtTime(start)}–${gymFmtTime(end)} (${gymFmtDuration(durMin)})`;
+}
+
 function gymRenderLogList() {
 const items = gymLog.slice().sort((a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt);
-$('gymLogList').innerHTML = items.length ? items.map(gymLogRowHtml).join('') : `<div class="empty">Nog geen sets gelogd. Klik op "+ Nieuwe set" om je eerste te loggen.</div>`;
+if (!items.length) { $('gymLogList').innerHTML = `<div class="empty">Nog geen sets gelogd. Klik op "+ Nieuwe set" om je eerste te loggen.</div>`; return; }
+let html = '', lastDate = null, dayItems = [];
+const flushDay = () => { if (!dayItems.length) return; html += `<div class="gym-log-daygroup"><div class="d">${esc(lastDate)}</div><div class="t">${gymSessionLabel(dayItems)}</div></div>` + dayItems.map(gymLogRowHtml).join(''); };
+items.forEach(x => {
+if (x.date !== lastDate) { flushDay(); lastDate = x.date; dayItems = []; }
+dayItems.push(x);
+});
+flushDay();
+$('gymLogList').innerHTML = html;
 }
 
 window.gymEditLog = (id) => { const x = gymLog.find((l) => l.id === id); if (x) gymOpenLogModal(x); };
