@@ -4384,10 +4384,11 @@ const nextReps = slot.repRange ? Math.max(slot.repRange[0], prior.reps) : prior.
 const rangeLabel = slot.repRange ? `${slot.repRange[0]}-${slot.repRange[1]}` : '';
 return { weight: prior.weight, reps: nextReps, note: `Vorige keer: ${prior.weight}${gymUnit()} × ${prior.reps} reps. Zelfde gewicht, focus op reps${rangeLabel ? ' (' + rangeLabel + ')' : ''}.` };
 }
+let gymReplaceOpen = false;
 window.gymStartSession = (id) => {
 const tp = gymSessionTemplates.find((x) => x.id === id);
 if (!tp) return;
-gymActiveSession = { tmpl: tp, plans: {}, progress: {}, values: {}, exIndex: 0, restTickId: null };
+gymActiveSession = { tmpl: { ...tp, exercises: [...tp.exercises] }, plans: {}, progress: {}, values: {}, exIndex: 0, restTickId: null }; gymReplaceOpen = false;
 tp.exercises.forEach((ex) => {
 const plan = gymBuildSetPlan((tp.targets || {})[ex]);
 gymActiveSession.plans[ex] = plan;
@@ -4487,12 +4488,49 @@ const restChip = isDone ? '' : `<div class="sess-rest-chip${restRunning ? ' runn
 return `<div class="${rowClass}"><div class="sess-set-label">${esc(slot.label)}<span class="sess-set-target">${repLabel}</span></div>${v.note ? `<div class="sess-ex-meta">${esc(v.note)}</div>` : ''}${restChip}<div class="sess-ex-row"><div><label>Gewicht (${gymUnit()})</label><input type="number" step="0.5" min="0" id="sessW-${enc}-${i}" value="${v.weight}"${isDone ? ' disabled' : ''}></div><div><label>Reps</label><input type="number" step="1" min="1" id="sessR-${enc}-${i}" value="${v.reps}"${isDone ? ' disabled' : ''}></div>${isDone ? '<span class="sess-set-check">✓</span>' : `<button class="btn-primary" onclick="gymLogActiveSet('${enc}',${i})">Loggen</button>`}</div></div>`;
 }).join('');
 const card = $('gymActiveList');
-card.innerHTML = `<div class="sess-ex-card"><div style="display:flex;align-items:center;justify-content:space-between;"><h5>${esc(ex)}</h5><span class="sess-progress">${done}/${plan.length} sets · oefening ${s.exIndex + 1}/${exList.length}</span></div>${rows}</div>`;
+card.innerHTML = `<div class="sess-ex-card"><div style="display:flex;align-items:center;justify-content:space-between;gap:8px;"><div style="display:flex;align-items:center;gap:8px;"><h5 style="margin:0;">${esc(ex)}</h5><span class="mz-toggle${gymReplaceOpen ? ' open' : ''}" onclick="gymToggleReplaceExercise()" title="Oefening vervangen (alleen deze sessie)">Vervang</span></div><span class="sess-progress">${done}/${plan.length} sets · oefening ${s.exIndex + 1}/${exList.length}</span></div>${gymReplaceOpen ? gymReplacePanelHtml(ex) : ''}${rows}</div>`;
 const cardEl = card.querySelector('.sess-ex-card');
 if (cardEl) { cardEl.classList.remove('view-anim'); void cardEl.offsetWidth; cardEl.classList.add('view-anim'); }
 $('gymActivePrevBtn').disabled = s.exIndex === 0;
 $('gymActiveNextBtn').disabled = s.exIndex === exList.length - 1;
 }
+window.gymToggleReplaceExercise = () => {
+if (!gymActiveSession) return;
+gymReplaceOpen = !gymReplaceOpen;
+gymRenderActiveSession();
+};
+function gymReplacePanelHtml(ex) {
+const info = gymTargetsFor(ex);
+let sugg = [];
+if (info.length) {
+const primary = info.slice().sort((a, b) => b[2] - a[2])[0];
+sugg = gymSuggestExercisesFor(primary[0], primary[1], gymActiveSession.tmpl.exercises);
+}
+const chips = sugg.length
+? sugg.map((s) => `<span class="mz-suggest-item${s.strong ? ' mz-suggest-strong' : ''}" onclick="gymConfirmReplaceExercise('${esc(s.name).replace(/'/g, "\\'")}')">${s.strong ? '★ ' : '+ '}${esc(s.name)}</span>`).join('')
+: '<div class="plan-empty">Geen directe spier-suggesties gevonden.</div>';
+return `<div class="sess-replace-panel" style="margin:10px 0;padding-top:8px;border-top:1px solid rgba(255,255,255,.08);"><div class="plan-empty">Vervang "${esc(ex)}" voor deze sessie (je opgeslagen sjabloon blijft ongewijzigd):</div><div class="mz-suggest-list" style="position:static;display:block;">${chips}</div><div style="display:flex;gap:8px;margin-top:8px;"><input type="text" id="sessReplaceInput" list="gymExNames" placeholder="Of typ een oefening..." style="flex:1;"><button type="button" onclick="gymConfirmReplaceExercise($('sessReplaceInput').value)">Vervang</button><button type="button" onclick="gymToggleReplaceExercise()">Annuleer</button></div></div>`;
+}
+window.gymConfirmReplaceExercise = (newName) => {
+newName = String(newName || '').trim();
+if (!newName) return;
+const s = gymActiveSession;
+if (!s) return;
+const oldName = s.tmpl.exercises[s.exIndex];
+if (newName.toLowerCase() === oldName.toLowerCase()) { gymReplaceOpen = false; gymRenderActiveSession(); return; }
+if (s.tmpl.exercises.some((x, i) => i !== s.exIndex && x.toLowerCase() === newName.toLowerCase())) { flashSetMsg('Deze oefening zit al in de sessie.'); return; }
+if ((s.progress[oldName] || 0) > 0 && !confirm(`Je hebt al sets gelogd voor "${oldName}" in deze sessie. Vervangen verwijdert die voor deze sessie. Doorgaan?`)) return;
+s.tmpl.exercises[s.exIndex] = newName;
+const plan = gymBuildSetPlan((s.tmpl.targets || {})[newName]);
+s.plans[newName] = plan;
+s.progress[newName] = 0;
+s.values[newName] = plan.map((slot, i) => Object.assign(gymSuggestSetValue(newName, slot, i), { rest: { state: 'idle', startedAt: null, seconds: null } }));
+delete s.plans[oldName];
+delete s.progress[oldName];
+delete s.values[oldName];
+gymReplaceOpen = false;
+gymRenderActiveSession();
+};
 window.gymLogActiveSet = async (ex, idx) => {
 const s = gymActiveSession;
 if (!s) return;
