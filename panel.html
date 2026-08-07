@@ -4346,7 +4346,7 @@ uithouding: { warmup: [12, 15], topset: [15, 20], dropset: [20, 25] },
 };
 const GYM_GOAL_LABELS = { kracht: 'Kracht', spiergroei: 'Spiergroei', uithouding: 'Uithouding' };
 function gymBuildSetPlan(target) {
-const t = target || {};
+const t = target || { warmups: 2, topsets: 1, dropset: false };
 if (t.goal === undefined && (t.weight || t.reps || t.sets)) {
 const reps = t.reps || GYM_REP_RANGES.spiergroei.topset[0];
 return [{ type: 'topset', label: 'Topset 1', repRange: [reps, reps], weight: t.weight }];
