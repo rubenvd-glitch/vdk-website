@@ -2055,6 +2055,13 @@ list = list.filter((x) => x.id !== body.id);
 } else if (body.action === 'update') {
 if (!r) throw apiError(404, 'Niet gevonden');
 sanitize(r, body);
+} else if (body.action === 'doneDate') {
+    if (!r) throw apiError(404, 'Niet gevonden');
+    const date = String(body.date || '').slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw apiError(400, 'Ongeldige datum');
+    r.doneDates = Array.isArray(r.doneDates) ? r.doneDates : [];
+    if (!r.doneDates.includes(date)) r.doneDates.push(date);
+  
 } else if (body.action === 'done' || body.action === 'skip') {
 if (!r) throw apiError(404, 'Niet gevonden');
 r.nextDue = addCycle(r, r.nextDue > todayISO ? r.nextDue : todayISO);

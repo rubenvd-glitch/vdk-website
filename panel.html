@@ -1283,6 +1283,33 @@ header { padding: 10px 16px; }
 </div>
 </div>
 
+<div class="overlay" id="sugCardOverlay">
+<div class="modal" style="width:min(420px,100%);">
+<h3 id="sugCardTitle"></h3>
+<div class="sub" data-i18n="sug.cardModalSub">Wat wil je doen met deze suggestie?</div>
+
+<div class="advice" style="margin-top:0;">
+<div class="acts" style="flex-direction:column; align-items:stretch;">
+<button type="button" class="ok" id="sugCardDoneBtn" data-i18n="ttl.done">Afgerond</button>
+<button type="button" id="sugCardLaterBtn" data-i18n="ttl.later">Later</button>
+<button type="button" id="sugCardSkipBtn" data-i18n="ttl.skip">Deze keer overslaan</button>
+<button type="button" id="sugCardToRemBtn" data-i18n="ttl.toRem">Maak er een reminder van</button>
+</div>
+</div>
+
+<label data-i18n="l.doneDate" style="margin-top:18px;">Al voldaan op een andere datum?</label>
+<div style="display:flex; gap:8px;">
+<input type="date" id="sugCardDoneDate">
+<button type="button" class="btn-primary" id="sugCardDoneDateBtn" data-i18n="ttl.markDoneOn" style="white-space:nowrap;">Markeer als gedaan</button>
+</div>
+<div class="hint" id="sugCardLastDone" style="font-size:12.5px; color:#8b94a1; margin-top:8px;"></div>
+
+<div class="err" id="sugCardErr"></div>
+<div class="modal-actions">
+<button class="btn-ghost" id="sugCardCloseBtn" data-i18n="cancel">Annuleren</button>
+</div>
+</div>
+</div>
 <div class="overlay" id="tlsOverlay">
 <div class="tls-sheet">
 <button type="button" class="tls-x" id="tlsClose">&#10005;</button>
@@ -1539,6 +1566,8 @@ en: {
 'err.title':'Please enter a title.','err.sug':'Please enter a suggestion.',
 'meta.nodate':'No date','confirm.rem':'Delete this reminder?','confirm.sug':'Delete this suggestion?','confirm.idea':'Delete this idea permanently?',
 'ttl.done':'Done','ttl.edit':'Edit','ttl.del':'Delete','ttl.reopen':'Reopen','ttl.later':'Later','ttl.skip':'Skip this time','ttl.toRem':'Turn into a reminder',
+'sug.cardModalSub':'What do you want to do with this suggestion?','sug.lastDone':'Last done on',
+'l.doneDate':'Already done on a different date?','ttl.markDoneOn':'Mark as done','err.date':'Pick a date.',
 'sug.title':'Suggestions','sug.new':'+ New suggestion',
 'sug.sub':'Things you want to keep doing regularly, like a weekly run. They appear on your dashboard at the rhythm you set.',
 'sug.modalSub':'A recurring idea that appears by itself when it is time.',
@@ -1622,6 +1651,8 @@ nl: {
 'err.title':'Vul een titel in.','err.sug':'Vul een suggestie in.',
 'meta.nodate':'Geen datum','confirm.rem':'Deze herinnering verwijderen?','confirm.sug':'Deze suggestie verwijderen?','confirm.idea':'Dit idee definitief verwijderen?',
 'ttl.done':'Afgerond','ttl.edit':'Bewerken','ttl.del':'Verwijderen','ttl.reopen':'Heropenen','ttl.later':'Later','ttl.skip':'Deze keer overslaan','ttl.toRem':'Maak er een reminder van',
+'sug.cardModalSub':'Wat wil je doen met deze suggestie?','sug.lastDone':'Laatst gedaan op',
+'l.doneDate':'Al voldaan op een andere datum?','ttl.markDoneOn':'Markeer als gedaan','err.date':'Kies een datum.',
 'sug.title':'Suggesties','sug.new':'+ Nieuwe suggestie',
 'sug.sub':'Dingen die je regelmatig wilt blijven doen zoals wekelijks hardlopen. Op het ritme dat jij instelt verschijnen ze vanzelf op het dashboard.',
 'sug.modalSub':'Een terugkerend idee dat vanzelf verschijnt wanneer het tijd is.',
@@ -1806,7 +1837,7 @@ function renderSug() {
 const todayISO = iso(new Date());
 const due = suggestions.filter((r) => r.nextDue <= todayISO);
 $('sugCards').innerHTML = profile.showSugCards === false ? '' : due.map((r) => `
-<div class="sug-card">
+<div class="sug-card" onclick="openSugCardModal('${r.id}')" style="cursor:pointer;">
 <div class="txt">${esc(r.text)}</div>
 </div>`).join('');
 
@@ -1839,6 +1870,40 @@ body: JSON.stringify({ action, id, days: profile.sugSnoozeDays || 3 }),
 suggestions = d.suggestions; renderSug();
 } catch (e) { alert(e.message); }
 };
+let sugCardId = null;
+window.openSugCardModal = (id) => {
+const r = suggestions.find((x) => x.id === id);
+if (!r) return;
+sugCardId = id;
+$('sugCardTitle').textContent = r.text;
+$('sugCardDoneDate').value = iso(new Date());
+$('sugCardErr').textContent = '';
+const dates = Array.isArray(r.doneDates) ? r.doneDates.slice().sort() : [];
+$('sugCardLastDone').textContent = dates.length
+? `${t('sug.lastDone')}: ${fmt(new Date(dates[dates.length - 1] + 'T00:00:00'))}`
+: '';
+$('sugCardOverlay').classList.add('open');
+};
+function closeSugCardModal() { $('sugCardOverlay').classList.remove('open'); sugCardId = null; }
+$('sugCardCloseBtn').onclick = closeSugCardModal;
+$('sugCardOverlay').onclick = (e) => { if (e.target === $('sugCardOverlay')) closeSugCardModal(); };
+$('sugCardDoneBtn').onclick = async () => { if (sugCardId) await sugAct(sugCardId, 'done'); closeSugCardModal(); };
+$('sugCardLaterBtn').onclick = async () => { if (sugCardId) await sugAct(sugCardId, 'snooze'); closeSugCardModal(); };
+$('sugCardSkipBtn').onclick = async () => { if (sugCardId) await sugAct(sugCardId, 'skip'); closeSugCardModal(); };
+$('sugCardToRemBtn').onclick = () => { const id = sugCardId; closeSugCardModal(); if (id) convertSug(id); };
+$('sugCardDoneDateBtn').onclick = async () => {
+const date = $('sugCardDoneDate').value;
+if (!date) { $('sugCardErr').textContent = t('err.date'); return; }
+try {
+const d = await api('/api/suggestions', {
+method: 'POST', headers: { 'Content-Type': 'application/json' },
+body: JSON.stringify({ action: 'doneDate', id: sugCardId, date }),
+});
+suggestions = d.suggestions; renderSug();
+closeSugCardModal();
+} catch (e) { $('sugCardErr').textContent = e.message; }
+};
+
 
 async function saveProfile(partial) {
 const d = await api('/api/profile', {
