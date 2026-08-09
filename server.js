@@ -1408,6 +1408,7 @@ async function buildAssistantContext(email) {
   const weekAheadISO = new Date(now + 7 * 86400000).toISOString().slice(0, 10);
   const twoWeeksAgoISO = new Date(now - 14 * 86400000).toISOString().slice(0, 10);
   const upcomingReminders = (reminders || [])
+.filter((r) => !r.tl)
     .filter((r) => !r.done)
     .filter((r) => !r.due || r.due <= weekAheadISO)
     .slice(0, 30)
@@ -1439,7 +1440,7 @@ async function buildAssistantContext(email) {
     gymPrefs: gymPrefs || {},
     onboarding: {
       hasAccountName: !!(pref && pref.name),
-      hasAnyReminders: (reminders || []).length > 0,
+      hasAnyReminders: (reminders || []).filter((r) => !r.tl).length > 0,
       hasGymSetup: (gymGoals || []).length > 0 || (gymLog || []).length > 0,
     },
   };
