@@ -3816,10 +3816,38 @@ gymPlanGroups = gymPlanGroups.includes(k) ? gymPlanGroups.filter((x) => x !== k)
 gymRenderPlanGroupChips();
 gymRenderSessionPlanner();
 };
+function gymSuggestSetPlan(name) {
+  const key = (name || '').trim();
+  if (!key) return { goal: 'spiergroei', warmups: 2, topsets: 1, dropset: false };
+  const keyLower = key.toLowerCase();
+  let groups = [];
+  try { groups = gymTargetsFor(key) || []; } catch (e) { groups = []; }
+  const distinctGroups = new Set(groups.map((g) => g[0])).size;
+  const compound = distinctGroups >= 2;
+  const hist = (typeof gymLog !== 'undefined' ? gymLog : []).filter((e) => (e.exercise || '').trim().toLowerCase() === keyLower);
+  const byDate = {};
+  hist.forEach((e) => { byDate[e.date] = (byDate[e.date] || 0) + 1; });
+  const counts = Object.keys(byDate).sort().reverse().slice(0, 5).map((d) => byDate[d]);
+  const avgSets = counts.length ? Math.round(counts.reduce((a, b) => a + b, 0) / counts.length) : (compound ? 4 : 3);
+  let warmups, topsets, dropset;
+  if (compound) {
+    warmups = avgSets <= 2 ? 1 : 2;
+    dropset = false;
+    topsets = Math.max(1, avgSets - warmups);
+  } else {
+    dropset = avgSets >= 4;
+    warmups = avgSets >= 4 ? 1 : (avgSets <= 2 ? 0 : 1);
+    topsets = Math.max(1, avgSets - warmups - (dropset ? 1 : 0));
+  }
+  return { goal: 'spiergroei', warmups: warmups, topsets: topsets, dropset: dropset, _suggested: true, _basis: { compound: compound, avgSets: avgSets, sessions: counts.length } };
+}
 function gymAddPlanExercise(name) {
 name = (name || '').trim();
 if (!name) return;
-if (!gymPlanExercises.some((x) => x.toLowerCase() === name.toLowerCase())) gymPlanExercises.push(name);
+if (!gymPlanExercises.some((x) => x.toLowerCase() === name.toLowerCase())) {
+    gymPlanExercises.push(name);
+    if (!gymPlanTargets[name]) gymPlanTargets[name] = gymSuggestSetPlan(name);
+  }
 $('gymPlanExInput').value = '';
 gymRenderSessionPlanner();
 }
