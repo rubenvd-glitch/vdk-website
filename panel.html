@@ -1310,6 +1310,18 @@ header { padding: 10px 16px; }
 </div>
 </div>
 </div>
+      <div class="overlay" id="remDeleteOverlay">
+      <div class="modal" style="width:min(420px,100%);">
+        <h3>Herhalende taak verwijderen</h3>
+        <div class="sub">Deze taak herhaalt zich. Wat wil je doen?</div>
+        <div class="acts" style="flex-direction:column; margin-top:12px;">
+          <button type="button" class="ok" onclick="remDeleteChoice('today')">Alleen vandaag verwijderen</button>
+          <button type="button" onclick="remDeleteChoice('future')">Stoppen vanaf morgen</button>
+          <button type="button" onclick="remDeleteChoice('all')">Helemaal verwijderen (met geschiedenis)</button>
+          <button type="button" class="btn-ghost" onclick="remDeleteClose()">Annuleren</button>
+        </div>
+      </div>
+    </div>
 <div class="overlay" id="tlsOverlay">
 <div class="tls-sheet">
 <button type="button" class="tls-x" id="tlsClose">&#10005;</button>
@@ -2287,6 +2299,7 @@ tlNowTimer = setInterval(() => { if (window.__tlBlocks) renderTlList(window.__tl
 function tlOccursOn(r, dateISO) {
 if (r.due === dateISO) return true;
 if (!r.repeat || !r.repeat.type || !r.due || dateISO < r.due) return false;
+      if (r.repeat.until && dateISO > r.repeat.until) return false;
 if (r.repeat.type === 'daily') return true;
 const a = new Date(r.due + 'T00:00:00');
 const d = new Date(dateISO + 'T00:00:00');
@@ -2930,15 +2943,51 @@ reminders = d.reminders; render();
 } catch (e) { alert(e.message); }
 };
 
+let remDeleteTarget = null;
 window.removeRem = async (id) => {
-if (!confirm(t('confirm.rem'))) return;
-try {
-const d = await api('/api/reminders', {
-method: 'POST', headers: { 'Content-Type': 'application/json' },
-body: JSON.stringify({ action: 'delete', id }),
-});
-reminders = d.reminders; render();
-} catch (e) { alert(e.message); }
+  const r = reminders.find((x) => x.id === id);
+  if (r && r.repeat && r.repeat.type) {
+    remDeleteTarget = r;
+    $('remDeleteOverlay').style.display = 'flex';
+    return;
+  }
+  if (!confirm(t('confirm.rem'))) return;
+  try {
+    const d = await api('/api/reminders', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'delete', id })
+    });
+    reminders = d.reminders; render();
+  } catch (e) { alert(e.message); }
+};
+window.remDeleteClose = () => { remDeleteTarget = null; $('remDeleteOverlay').style.display = 'none'; };
+window.remDeleteChoice = async (mode) => {
+  const r = remDeleteTarget;
+  if (!r) return;
+  window.remDeleteClose();
+  const today = new Date().toISOString().slice(0, 10);
+  try {
+    if (mode === 'today') {
+      const d = await api('/api/reminders', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'doneDate', id: r.id, date: today })
+      });
+      reminders = d.reminders; render();
+    } else if (mode === 'future') {
+      const d = await api('/api/reminders', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'update', id: r.id, repeat: { type: r.repeat.type, until: today } })
+      });
+      reminders = d.reminders; render();
+    } else if (mode === 'all') {
+      if (!confirm(t('confirm.rem'))) return;
+      const d = await api('/api/reminders', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete', id: r.id })
+      });
+      reminders = d.reminders; render();
+    }
+  } catch (e) { alert(e.message); }
 };
 
 $('newBtn').onclick = () => openModal(null);
@@ -5593,6 +5642,11 @@ if (q.get('add') === '1') setTimeout(() => tlSheetOpen('new', { due: tlDate }), 
 })();
 pushInit();
 setTimeout(assistantProactiveCheck, 2500);
+  (function baseSessionCheck() {
+  if (sessionStorage.getItem('baseSessionStarted')) return;
+  sessionStorage.setItem('baseSessionStarted', '1');
+  fetch('/api/assistant/newsession', { method: 'POST', credentials: 'same-origin' }).catch(() => {});
+})();
 </script>
 </body>
 </html>
