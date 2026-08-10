@@ -1038,6 +1038,7 @@ const fmtHM = (ms) => { const mtot = Math.round((ms - midnightMs) / 60000); retu
 const occursToday = (r) => {
 if (r.due === todayISO) return true;
 if (!r.repeat || !r.repeat.type || !r.due || todayISO < r.due) return false;
+      if (r.repeat.until && todayISO > r.repeat.until) return false;
 if (r.repeat.type === 'daily') return true;
 const a = new Date(r.due + 'T00:00:00Z');
 const d = new Date(todayISO + 'T00:00:00Z');
@@ -1392,9 +1393,10 @@ function gymBcKey(email) { return `gymbc:${email}`; }
 function gymGoalKey(email) { return `gymgoal:${email}`; }
 
 function assistantHistKey(email) { return 'asst:' + email; }
+  function assistantMemKey(email) { return 'asstmem:' + email; }
 
 async function buildAssistantContext(email) {
-  const [reminders, sugs, ideas, gymGoals, gymLog, gymPrefs, pref] = await Promise.all([
+  const [reminders, sugs, ideas, gymGoals, gymLog, gymPrefs, pref, mem] = await Promise.all([
     kvGetJson('rem:' + email).catch(() => null),
     kvGetJson('sug:' + email).catch(() => null),
     kvGetJson('idea:' + email).catch(() => null),
@@ -1402,6 +1404,7 @@ async function buildAssistantContext(email) {
     kvGetJson(gymLogKey(email)).catch(() => null),
     kvGetJson('gympref:' + email).catch(() => null),
     kvGetJson('pref:' + email).catch(() => null),
+        kvGetJson(assistantMemKey(email)).catch(() => null),
   ]);
   const now = Date.now();
   const todayISO = new Date(now).toISOString().slice(0, 10);
@@ -1432,6 +1435,7 @@ async function buildAssistantContext(email) {
     .map((x) => ({ exercise: x.exercise, date: x.date, weight: x.weight, reps: x.reps, muscle: x.muscle, restSeconds: x.restSeconds || null }));
   return {
     today: todayISO,
+        memory: mem || '',
     upcomingReminders: upcomingReminders,
     dueSuggestions: dueSuggestions,
     openIdeas: openIdeas,
@@ -1535,6 +1539,7 @@ function buildAssistantSystemPrompt(page, lang, ctx) {
       "Dry humor, never at the cost of clarity — Q: \"Ik heb weer drie dagen niet getraind\" A: \"Dat is dan drie dagen op rij dat 'morgen' de dag is. Sessie inplannen, of hou je het bij goede voornemens?\" " +
       "Out of scope, no over-apologizing — Q: \"Verwijder die herinnering\" A: \"Verwijderen kan ik nog niet, dat komt in een latere ronde. Wil je dat ik 'm afvink in plaats van weglaten?\"",
     "You can see ONLY this one user's own data below (reminders, suggestions, ideas, Gym goals/logs) — never claim to know anything else, and never invent data that isn't in this context.",
+          (ctx.memory ? ("MEMORY FROM EARLIER CONVERSATIONS (compact summary; use only if the user references something from before, don't dump it unprompted): " + ctx.memory) : ""),
     'Today is ' + ctx.today + ' (Europe/Amsterdam). The user is currently looking at the "' + (page || 'home') + '" section of the app.',
     'Reply in ' + langName + '.',
     "ACTIONS: you can now PROPOSE (never silently execute) a small set of actions. Reply with STRICT JSON only, no text outside it, shaped exactly as {\"reply\": string, \"action\": null or {\"type\": string, \"params\": object}}.",
@@ -1570,6 +1575,46 @@ async function handleAssistantClear(req, res) {
     return json(res, 200, { ok: true });
   } catch (e) {
     return json(res, 500, { error: 'Kon het gesprek niet wissen' });
+  }
+}
+
+async function handleAssistantNewSession(req, res) {
+  const s = await getSession(req, 'admin');
+  if (!s) return json(res, 401, { error: 'Not logged in.' });
+  try {
+    const histKey = assistantHistKey(s.email);
+    const memKey = assistantMemKey(s.email);
+    const history = (await kvGetJson(histKey)) || [];
+    if (!history.length) return json(res, 200, { ok: true });
+    const apiKey = (process.env.GROQ_API_KEY || '').trim();
+    if (!apiKey) { await kvDel(histKey); return json(res, 200, { ok: true }); }
+    const oldMemory = (await kvGetJson(memKey)) || '';
+    const model = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
+    const convoText = history.slice(-40).map((m) => (m.role === 'user' ? 'User: ' : 'Base: ') + String(m.content || '').slice(0, 500)).join('\n');
+    const sumPrompt = [
+      'Update the running memory summary for this user\'s assistant "Base" (VDK Business Services admin panel).',
+      'Existing memory summary (may be empty):',
+      oldMemory || '(none yet)',
+      '',
+      'New conversation to fold in:',
+      convoText,
+      '',
+      'Write an updated compact summary (max ~200 words, plain text, no markdown) capturing durable facts, preferences, decisions and things the user said that might matter later. Drop small talk. Keep it in the same language the user used most.',
+    ].join('\n');
+    const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
+      body: JSON.stringify({ model: model, messages: [{ role: 'user', content: sumPrompt }], max_tokens: 400, temperature: 0.2 }),
+    });
+    const d = await r.json().catch(() => ({}));
+    const newMemory = ((d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content) || '').trim();
+    if (newMemory) await kvSetJson(memKey, newMemory);
+    await kvDel(histKey);
+    return json(res, 200, { ok: true });
+  } catch (e) {
+    console.error('assistant newsession failed:', e);
+    try { await kvDel(assistantHistKey(s.email)); } catch (_) {}
+    return json(res, 200, { ok: true });
   }
 }
 
@@ -1978,7 +2023,7 @@ color: isHexColor(body.color) ? String(body.color).toLowerCase() : '',
 duration: Math.min(480, Math.max(0, Number(body.duration) || 0)), // minutes; 0 = unspecified (timeline defaults to 1h)
 tl: body.tl === true,
 alerts: (body.alerts && typeof body.alerts === 'object') ? { pre: body.alerts.pre !== false, start: body.alerts.start !== false, end: body.alerts.end !== false } : { pre: true, start: true, end: true },
-repeat: (body.repeat && typeof body.repeat === 'object' && ['daily', 'weekly', 'monthly'].includes(body.repeat.type)) ? { type: body.repeat.type } : null,
+      repeat: (body.repeat && typeof body.repeat === 'object' && ['daily','weekly','monthly'].includes(body.repeat.type)) ? { type: body.repeat.type, until: /^\d{4}-\d{2}-\d{2}$/.test(String(body.repeat.until || '')) ? body.repeat.until : null } : null,
 done: false,
 createdAt: Date.now(),
 });
@@ -1996,7 +2041,7 @@ if (body.color !== undefined) r.color = isHexColor(body.color) ? String(body.col
 if (body.duration !== undefined) r.duration = Math.min(480, Math.max(0, Number(body.duration) || 0));
 if (body.tl !== undefined) r.tl = body.tl === true;
 if (body.alerts && typeof body.alerts === 'object') r.alerts = { pre: body.alerts.pre !== false, start: body.alerts.start !== false, end: body.alerts.end !== false };
-if (body.repeat !== undefined) r.repeat = (body.repeat && typeof body.repeat === 'object' && ['daily', 'weekly', 'monthly'].includes(body.repeat.type)) ? { type: body.repeat.type } : null;
+    if (body.repeat !== undefined) r.repeat = (body.repeat && typeof body.repeat === 'object' && ['daily','weekly','monthly'].includes(body.repeat.type)) ? { type: body.repeat.type, until: /^\d{4}-\d{2}-\d{2}$/.test(String(body.repeat.until || '')) ? body.repeat.until : null } : null;
 if (body.done !== undefined) {
 if (body.done && !r.done) bump('rd');
 r.done = !!body.done;
@@ -2556,6 +2601,7 @@ if (p === '/api/gym/split') return handleGymSplit(req, res);
 if (p === '/api/assistant/history') return handleAssistantHistory(req, res);
 if (p === '/api/assistant/chat') return handleAssistantChat(req, res);
 if (p === '/api/assistant/clear') return handleAssistantClear(req, res);
+    if (p === '/api/assistant/newsession') return handleAssistantNewSession(req, res);
 if (p === '/api/assistant/action') return handleAssistantAction(req, res);
 if (p === '/api/assistant/proactive') return handleAssistantProactive(req, res);
 if (p === '/api/assistant/feedback') return handleAssistantFeedback(req, res);
