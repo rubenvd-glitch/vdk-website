@@ -2576,6 +2576,58 @@ return json(res, 500, { error: 'Kon waardegeschiedenis niet ophalen.' });
 }
 }
 
+function investSectorKey(email) { return `investsector:${email}`; }
+
+async function investGetInstrumentCountry(symbol) {
+return investCached(`investcountry:${symbol}`, 365 * 24 * 60 * 60 * 1000, async () => {
+const r = await tdFetch('/stocks', { symbol });
+const list = r && r.data;
+if (r.error || !list || !list.length) return null;
+return list[0].country || null;
+});
+}
+
+async function handleInvestDiversification(req, res) {
+const s = await getSession(req, 'admin');
+if (!s) return json(res, 401, { error: 'Not logged in' });
+try {
+if (req.method === 'POST') {
+const body = await readBody(req, res);
+if (!body) return;
+const symbol = String(body.symbol || '').trim();
+if (!symbol) return json(res, 400, { error: 'Ticker is verplicht.' });
+const sector = String(body.sector || '').trim();
+const key = investSectorKey(s.email);
+const map = (await kvGetJson(key)) || {};
+if (sector) map[symbol] = sector; else delete map[symbol];
+await kvSetJson(key, map);
+}
+const transactions = (await kvGetJson(investTxKey(s.email))) || [];
+const holdings = investComputeHoldings(transactions).filter((h) => !h.closed);
+const sectorMap = (await kvGetJson(investSectorKey(s.email))) || {};
+const byCountryMap = new Map();
+const bySectorMap = new Map();
+let total = 0;
+for (const h of holdings) {
+const quote = await investGetQuote(h.symbol);
+const fx = await investGetFxRate(h.currency, 'EUR');
+const price = quote ? quote.price : null;
+const valueEUR = price != null ? price * h.shares * fx : 0;
+total += valueEUR;
+const country = (await investGetInstrumentCountry(h.symbol)) || 'Onbekend';
+byCountryMap.set(country, (byCountryMap.get(country) || 0) + valueEUR);
+const sector = sectorMap[h.symbol] || 'Onbekend';
+bySectorMap.set(sector, (bySectorMap.get(sector) || 0) + valueEUR);
+}
+const toList = (map) => [...map.entries()].map(([key, valueEUR]) => ({ key, valueEUR, pct: total > 0 ? valueEUR / total : 0 })).sort((a, b) => b.valueEUR - a.valueEUR);
+return json(res, 200, { byCountry: toList(byCountryMap), bySector: toList(bySectorMap), totalValueEUR: total, sectors: sectorMap, holdings: holdings.map((h) => ({ symbol: h.symbol, name: h.name })) });
+} catch (e) {
+if (e && e.httpStatus) return json(res, e.httpStatus, { error: e.message });
+console.error('invest diversification API error:', e.message);
+return json(res, 500, { error: 'Kon diversificatie niet berekenen.' });
+}
+}
+
 async function handleInvestDividendCalendar(req, res) {
 const s = await getSession(req, 'admin');
 if (!s) return json(res, 401, { error: 'Not logged in' });
@@ -3027,6 +3079,7 @@ if (p === '/api/invest/holdings') return handleInvestHoldings(req, res);
 if (p === '/api/invest/dividend-calendar') return handleInvestDividendCalendar(req, res);
 if (p === '/api/invest/dividend-growth') return handleInvestDividendGrowth(req, res);
 if (p === '/api/invest/value-history') return handleInvestValueHistory(req, res);
+if (p === '/api/invest/diversification') return handleInvestDiversification(req, res);
 
 
 // --- Base Assistant API (AI chat widget, same 'admin' session as Gym) ---
