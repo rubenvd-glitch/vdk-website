@@ -2175,6 +2175,294 @@ function gymValidCreatedAt(v) {
 const t = Number(v);
 return Number.isFinite(t) && t > 1577836800000 && t <= Date.now() + 5 * 60 * 1000 ? t : null;
 }
+function investTxKey(email) { return `investtx:${email}`; }
+function investDivKey(email) { return `investdiv:${email}`; }
+function investValidCreatedAt(v) {
+const t = Number(v);
+return Number.isFinite(t) && t > 1577836800000 && t <= Date.now() + 5 * 60 * 1000 ? t : null;
+}
+
+function investComputeHoldings(transactions) {
+const bySymbol = new Map();
+const sorted = [...transactions].sort((a, b) => (a.date < b.date ? -1 : 1));
+for (const tx of sorted) {
+if (!bySymbol.has(tx.symbol)) {
+bySymbol.set(tx.symbol, { symbol: tx.symbol, name: tx.name, currency: tx.currency, shares: 0, costBasis: 0, realizedPnl: 0 });
+}
+const h = bySymbol.get(tx.symbol);
+if (tx.type === 'buy') {
+h.shares += tx.shares;
+h.costBasis += tx.shares * tx.price + (tx.fees || 0);
+} else if (tx.type === 'sell') {
+if (h.shares > 0) {
+const costPerShare = h.costBasis / h.shares;
+const sellShares = Math.min(tx.shares, h.shares);
+h.costBasis -= sellShares * costPerShare;
+h.shares -= sellShares;
+h.realizedPnl += sellShares * (tx.price - costPerShare) - (tx.fees || 0);
+} else {
+h.realizedPnl -= tx.fees || 0;
+}
+}
+}
+return [...bySymbol.values()].map((h) => ({ ...h, avgCost: h.shares > 0 ? h.costBasis / h.shares : 0, closed: h.shares <= 0 }));
+}
+
+function investEstimateNextDividend(history) {
+if (!history || history.length < 2) return null;
+const dates = history.map((h) => new Date(h.exDate).getTime()).filter((t) => !Number.isNaN(t)).sort((a, b) => a - b);
+if (dates.length < 2) return null;
+const gaps = [];
+for (let i = 1; i < dates.length; i++) gaps.push(dates[i] - dates[i - 1]);
+const avgGapMs = gaps.reduce((a, b) => a + b, 0) / gaps.length;
+const lastDate = dates[dates.length - 1];
+const lastAmount = history[history.length - 1].amount;
+return { estimatedDate: new Date(lastDate + avgGapMs).toISOString().slice(0, 10), amountPerShare: lastAmount, confidence: 'estimate' };
+}
+
+function investYieldOnCost(holding, dividends) {
+if (!holding.avgCost || holding.shares <= 0) return 0;
+const oneYearAgo = Date.now() - 365 * 24 * 60 * 60 * 1000;
+const last12m = dividends.filter((d) => d.symbol === holding.symbol && new Date(d.payDate).getTime() >= oneYearAgo).reduce((sum, d) => sum + d.amountPerShare, 0);
+return last12m / holding.avgCost;
+}
+
+async function tdFetch(path, params) {
+const apiKey = process.env.TWELVE_DATA_API_KEY;
+if (!apiKey) return { error: 'TWELVE_DATA_API_KEY niet gezet' };
+const qs = new URLSearchParams({ ...params, apikey: apiKey }).toString();
+try {
+const res = await fetch(`https://api.twelvedata.com${path}?${qs}`);
+if (!res.ok) return { error: `Twelve Data ${res.status}` };
+return await res.json();
+} catch (e) {
+return { error: String((e && e.message) || e) };
+}
+}
+
+async function investCached(cacheKey, ttlMs, fetchFn) {
+const cache = (await kvGetJson(cacheKey)) || {};
+const now = Date.now();
+if (cache.fetchedAt && now - cache.fetchedAt < ttlMs) return cache.data;
+const data = await fetchFn();
+await kvSetJson(cacheKey, { data, fetchedAt: now });
+return data;
+}
+
+async function investGetQuote(symbol) {
+return investCached(`investquote:${symbol}`, 15 * 60 * 1000, async () => {
+const r = await tdFetch('/price', { symbol });
+if (r.error || r.price === undefined) return null;
+return { price: parseFloat(r.price) };
+});
+}
+
+async function investGetDividendHistory(symbol) {
+return investCached(`investdivhist:${symbol}`, 12 * 60 * 60 * 1000, async () => {
+const r = await tdFetch('/dividends', { symbol });
+if (r.error || !r.dividends) return [];
+return r.dividends.map((d) => ({ exDate: d.ex_date, amount: parseFloat(d.amount) }));
+});
+}
+
+async function investGetFxRate(from, to) {
+if (from === to) return 1;
+return investCached(`investfx:${from}${to}`, 60 * 60 * 1000, async () => {
+const r = await tdFetch('/exchange_rate', { symbol: `${from}/${to}` });
+if (r.error || r.rate === undefined) return 1;
+return parseFloat(r.rate);
+});
+}
+
+async function applyInvestTxAction(email, body) {
+const key = investTxKey(email);
+let list = (await kvGetJson(key)) || [];
+if (body.action === 'create') {
+const symbol = String(body.symbol || '').trim().slice(0, 30);
+if (!symbol) throw apiError(400, 'Vul een ticker in.');
+const type = body.type === 'sell' ? 'sell' : 'buy';
+const shares = Number(body.shares);
+const price = Number(body.price);
+if (!shares || shares <= 0) throw apiError(400, 'Vul een geldig aantal aandelen in.');
+if (!price || price <= 0) throw apiError(400, 'Vul een geldige prijs in.');
+const date = /^\d{4}-\d{2}-\d{2}$/.test(String(body.date || '')) ? String(body.date) : new Date().toISOString().slice(0, 10);
+list.push({
+id: crypto.randomUUID(),
+type, symbol,
+name: String(body.name || symbol).trim().slice(0, 100),
+currency: /^[A-Z]{3}$/.test(String(body.currency || '')) ? body.currency : 'EUR',
+shares, price,
+fees: Math.max(0, Number(body.fees) || 0),
+date,
+note: String(body.note || '').trim().slice(0, 500),
+createdAt: investValidCreatedAt(body.createdAt) || Date.now(),
+});
+} else if (body.action === 'update') {
+const it = list.find((x) => x.id === body.id);
+if (!it) throw apiError(404, 'Niet gevonden');
+if (body.type !== undefined) it.type = body.type === 'sell' ? 'sell' : 'buy';
+if (body.symbol !== undefined) it.symbol = String(body.symbol).trim().slice(0, 30) || it.symbol;
+if (body.name !== undefined) it.name = String(body.name).trim().slice(0, 100) || it.name;
+if (body.currency !== undefined) it.currency = /^[A-Z]{3}$/.test(String(body.currency)) ? body.currency : it.currency;
+if (body.shares !== undefined) it.shares = Number(body.shares) || it.shares;
+if (body.price !== undefined) it.price = Number(body.price) || it.price;
+if (body.fees !== undefined) it.fees = Math.max(0, Number(body.fees) || 0);
+if (body.date !== undefined) it.date = /^\d{4}-\d{2}-\d{2}$/.test(String(body.date)) ? String(body.date) : it.date;
+if (body.note !== undefined) it.note = String(body.note).trim().slice(0, 500);
+if (body.createdAt !== undefined) { const ca = investValidCreatedAt(body.createdAt); if (ca) it.createdAt = ca; }
+} else if (body.action === 'delete') {
+list = list.filter((x) => x.id !== body.id);
+} else {
+throw apiError(400, 'Onbekende actie');
+}
+await kvSetJson(key, list);
+return list;
+}
+
+async function applyInvestDivAction(email, body) {
+const key = investDivKey(email);
+let list = (await kvGetJson(key)) || [];
+if (body.action === 'create') {
+const symbol = String(body.symbol || '').trim().slice(0, 30);
+if (!symbol) throw apiError(400, 'Vul een ticker in.');
+const amountPerShare = Number(body.amountPerShare);
+const shares = Number(body.shares);
+if (!amountPerShare || amountPerShare <= 0) throw apiError(400, 'Vul een geldig dividend per aandeel in.');
+if (!shares || shares <= 0) throw apiError(400, 'Vul een geldig aantal aandelen in.');
+const payDate = /^\d{4}-\d{2}-\d{2}$/.test(String(body.payDate || '')) ? String(body.payDate) : new Date().toISOString().slice(0, 10);
+list.push({
+id: crypto.randomUUID(),
+symbol,
+amountPerShare, shares,
+totalAmount: Number(body.totalAmount) || amountPerShare * shares,
+currency: /^[A-Z]{3}$/.test(String(body.currency || '')) ? body.currency : 'EUR',
+payDate,
+exDate: /^\d{4}-\d{2}-\d{2}$/.test(String(body.exDate || '')) ? String(body.exDate) : null,
+source: 'manual',
+note: String(body.note || '').trim().slice(0, 500),
+createdAt: investValidCreatedAt(body.createdAt) || Date.now(),
+});
+} else if (body.action === 'update') {
+const it = list.find((x) => x.id === body.id);
+if (!it) throw apiError(404, 'Niet gevonden');
+if (body.symbol !== undefined) it.symbol = String(body.symbol).trim().slice(0, 30) || it.symbol;
+if (body.amountPerShare !== undefined) it.amountPerShare = Number(body.amountPerShare) || it.amountPerShare;
+if (body.shares !== undefined) it.shares = Number(body.shares) || it.shares;
+if (body.totalAmount !== undefined) it.totalAmount = Number(body.totalAmount) || it.totalAmount;
+if (body.currency !== undefined) it.currency = /^[A-Z]{3}$/.test(String(body.currency)) ? body.currency : it.currency;
+if (body.payDate !== undefined) it.payDate = /^\d{4}-\d{2}-\d{2}$/.test(String(body.payDate)) ? String(body.payDate) : it.payDate;
+if (body.exDate !== undefined) it.exDate = /^\d{4}-\d{2}-\d{2}$/.test(String(body.exDate)) ? String(body.exDate) : it.exDate;
+if (body.note !== undefined) it.note = String(body.note).trim().slice(0, 500);
+if (body.createdAt !== undefined) { const ca = investValidCreatedAt(body.createdAt); if (ca) it.createdAt = ca; }
+} else if (body.action === 'delete') {
+list = list.filter((x) => x.id !== body.id);
+} else {
+throw apiError(400, 'Onbekende actie');
+}
+await kvSetJson(key, list);
+return list;
+}
+
+async function handleInvestTx(req, res) {
+const s = await getSession(req, 'admin');
+if (!s) return json(res, 401, { error: 'Not logged in' });
+try {
+if (req.method === 'GET') return json(res, 200, (await kvGetJson(investTxKey(s.email))) || []);
+if (req.method === 'POST') {
+const body = await readBody(req, res);
+if (!body) return;
+const list = await applyInvestTxAction(s.email, body);
+return json(res, 200, { ok: true, transactions: list });
+}
+} catch (e) {
+if (e && e.httpStatus) return json(res, e.httpStatus, { error: e.message });
+console.error('invest tx API error:', e.message);
+return json(res, 500, { error: 'Opslag niet bereikbaar. Is Upstash gekoppeld?' });
+}
+}
+
+async function handleInvestDiv(req, res) {
+const s = await getSession(req, 'admin');
+if (!s) return json(res, 401, { error: 'Not logged in' });
+try {
+if (req.method === 'GET') return json(res, 200, (await kvGetJson(investDivKey(s.email))) || []);
+if (req.method === 'POST') {
+const body = await readBody(req, res);
+if (!body) return;
+const list = await applyInvestDivAction(s.email, body);
+return json(res, 200, { ok: true, dividends: list });
+}
+} catch (e) {
+if (e && e.httpStatus) return json(res, e.httpStatus, { error: e.message });
+console.error('invest div API error:', e.message);
+return json(res, 500, { error: 'Opslag niet bereikbaar. Is Upstash gekoppeld?' });
+}
+}
+
+async function handleInvestHoldings(req, res) {
+const s = await getSession(req, 'admin');
+if (!s) return json(res, 401, { error: 'Not logged in' });
+try {
+const transactions = (await kvGetJson(investTxKey(s.email))) || [];
+const dividends = (await kvGetJson(investDivKey(s.email))) || [];
+const holdings = investComputeHoldings(transactions).filter((h) => !h.closed);
+let valueEUR = 0, investedEUR = 0, dividendYtdEUR = 0, dividendAllTimeEUR = 0;
+const enriched = [];
+for (const h of holdings) {
+const quote = await investGetQuote(h.symbol);
+const fx = await investGetFxRate(h.currency, 'EUR');
+const price = quote ? quote.price : null;
+const valueNative = price != null ? price * h.shares : null;
+const valueInEur = valueNative != null ? valueNative * fx : null;
+const investedInEur = h.costBasis * fx;
+if (valueInEur != null) valueEUR += valueInEur;
+investedEUR += investedInEur;
+enriched.push({ ...h, currentPrice: price, valueNative, valueEUR: valueInEur, unrealizedEUR: valueInEur != null ? valueInEur - investedInEur : null, yieldOnCost: investYieldOnCost(h, dividends) });
+}
+const oneYearAgo = Date.now() - 365 * 24 * 60 * 60 * 1000;
+for (const d of dividends) {
+const fx = await investGetFxRate(d.currency, 'EUR');
+const amountEUR = d.totalAmount * fx;
+dividendAllTimeEUR += amountEUR;
+if (new Date(d.payDate).getTime() >= oneYearAgo) dividendYtdEUR += amountEUR;
+}
+return json(res, 200, {
+holdings: enriched,
+totals: {
+valueEUR, investedEUR, unrealizedEUR: valueEUR - investedEUR,
+unrealizedPct: investedEUR > 0 ? (valueEUR - investedEUR) / investedEUR : 0,
+dividendYtdEUR, dividendAllTimeEUR,
+avgYieldOnCost: investedEUR > 0 ? dividendYtdEUR / investedEUR : 0,
+},
+});
+} catch (e) {
+console.error('invest holdings API error:', e.message);
+return json(res, 500, { error: 'Kon holdings niet berekenen.' });
+}
+}
+
+async function handleInvestDividendCalendar(req, res) {
+const s = await getSession(req, 'admin');
+if (!s) return json(res, 401, { error: 'Not logged in' });
+try {
+const transactions = (await kvGetJson(investTxKey(s.email))) || [];
+const holdings = investComputeHoldings(transactions).filter((h) => !h.closed);
+const upcoming = [];
+for (const h of holdings) {
+const history = await investGetDividendHistory(h.symbol);
+const est = investEstimateNextDividend(history);
+if (est) upcoming.push({ symbol: h.symbol, name: h.name, estimatedDate: est.estimatedDate, amountPerShare: est.amountPerShare, currency: h.currency, confidence: 'estimate' });
+}
+upcoming.sort((a, b) => (a.estimatedDate < b.estimatedDate ? -1 : 1));
+return json(res, 200, { upcoming });
+} catch (e) {
+console.error('invest dividend-calendar API error:', e.message);
+return json(res, 500, { error: 'Kon dividendkalender niet ophalen.' });
+}
+}
+
+
+
 async function applyGymLogAction(email, body) {
 const key = gymLogKey(email);
 let list = (await kvGetJson(key)) || [];
@@ -2596,6 +2884,13 @@ if (p === '/api/gym/bodycomp') return handleGymBodycomp(req, res);
 if (p === '/api/gym/goals') return handleGymGoals(req, res);
 if (p === '/api/gym/sessions') return handleGymSessions(req, res);
 if (p === '/api/gym/split') return handleGymSplit(req, res);
+
+// --- Beleggen API (dividend-tracker, admin session) ---
+if (p === '/api/invest/transactions') return handleInvestTx(req, res);
+if (p === '/api/invest/dividends') return handleInvestDiv(req, res);
+if (p === '/api/invest/holdings') return handleInvestHoldings(req, res);
+if (p === '/api/invest/dividend-calendar') return handleInvestDividendCalendar(req, res);
+
 
 // --- Base Assistant API (AI chat widget, same 'admin' session as Gym) ---
 if (p === '/api/assistant/history') return handleAssistantHistory(req, res);
