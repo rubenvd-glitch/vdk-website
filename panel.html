@@ -1060,6 +1060,7 @@ header { padding: 10px 16px; }
 <h2 style="font-size:16px;" data-i18n="invest.holdings">Posities</h2>
 </div>
 <button onclick="investOpenTxForm()" data-i18n="invest.addTransaction">+ Transactie</button>
+<button onclick="investOpenCsvForm()" data-i18n="invest.importCsv">CSV importeren</button>
 <table class="invest-table">
 <thead><tr>
 <th data-i18n="invest.col.symbol">Ticker</th>
@@ -1100,6 +1101,17 @@ header { padding: 10px 16px; }
 <div class="invest-form-actions">
 <button onclick="investSubmitTx()" data-i18n="invest.form.save">Opslaan</button>
 <button onclick="investCloseTxForm()" data-i18n="invest.form.cancel">Annuleren</button>
+</div>
+</div>
+
+<div id="investCsvForm" class="invest-form" style="display:none;">
+<div class="section-sub" data-i18n="invest.form.csvHint">Ondersteunt de CSV-export van Trading 212 (Geschiedenis &gt; Exporteren). Koop-/verkooptransacties en dividenduitkeringen worden geïmporteerd; stortingen, opnames, rente en valutaconversies worden overgeslagen.</div>
+<input type="file" id="investCsvFile" accept=".csv,text/csv" />
+<div id="investCsvPreview" style="margin-top:10px;font-size:13px;opacity:.85;"></div>
+<div class="invest-form-actions">
+<button onclick="investCsvAnalyze()" data-i18n="invest.form.csvAnalyze">Analyseren</button>
+<button onclick="investCsvImport()" id="investCsvImportBtn" style="display:none;" data-i18n="invest.form.csvConfirm">Importeren</button>
+<button onclick="investCloseCsvForm()" data-i18n="invest.form.cancel">Annuleren</button>
 </div>
 </div>
 
@@ -1655,7 +1667,7 @@ header { padding: 10px 16px; }
 
 const I18N = {
 en: {
-'nav.home':'Dashboard','nav.rem':'Reminders','nav.timeline':'Timeline','nav.sug':'Suggestions','nav.gym':'Gym','nav.invest':'Investing','invest.title':'Investing','invest.sub':'Dividend tracker: keep track of your positions, transactions and dividend income.','invest.portfolioValue':'Portfolio value','invest.dividendYtd':'Dividend this year','invest.avgYield':'Avg. yield-on-cost','invest.unrealized':'Unrealized','invest.holdings':'Holdings','invest.addTransaction':'+ Transaction','invest.dividendCalendar':'Dividend calendar','invest.logDividend':'+ Log dividend','invest.estimated':'estimate','invest.noUpcoming':'No dividend estimates yet.','invest.noHoldings':'No positions yet. Add your first transaction to get started.','invest.col.symbol':'Ticker','invest.col.shares':'Shares','invest.col.avgCost':'Avg. price','invest.col.currentPrice':'Price','invest.col.value':'Value','invest.col.unrealized':'Return','invest.col.yield':'Yield-on-cost','invest.form.symbolTx':'Ticker (e.g. AAPL or ASML:XAMS)','invest.form.name':'Name','invest.form.type':'Type','invest.form.buy':'Buy','invest.form.sell':'Sell','invest.form.shares':'Number of shares','invest.form.price':'Price per share','invest.form.currency':'Currency','invest.form.fees':'Fees (optional)','invest.form.date':'Date','invest.form.save':'Save','invest.form.cancel':'Cancel','invest.form.amountPerShare':'Dividend per share','invest.form.payDate':'Payment date','invest.form.divShares':'Shares held','nav.idea':'Idea box','nav.log':'Log',
+'nav.home':'Dashboard','nav.rem':'Reminders','nav.timeline':'Timeline','nav.sug':'Suggestions','nav.gym':'Gym','nav.invest':'Investing','invest.title':'Investing','invest.sub':'Dividend tracker: keep track of your positions, transactions and dividend income.','invest.portfolioValue':'Portfolio value','invest.dividendYtd':'Dividend this year','invest.avgYield':'Avg. yield-on-cost','invest.unrealized':'Unrealized','invest.holdings':'Holdings','invest.addTransaction':'+ Transaction','invest.dividendCalendar':'Dividend calendar','invest.logDividend':'+ Log dividend','invest.estimated':'estimate','invest.noUpcoming':'No dividend estimates yet.','invest.noHoldings':'No positions yet. Add your first transaction to get started.','invest.col.symbol':'Ticker','invest.col.shares':'Shares','invest.col.avgCost':'Avg. price','invest.col.currentPrice':'Price','invest.col.value':'Value','invest.col.unrealized':'Return','invest.col.yield':'Yield-on-cost','invest.form.symbolTx':'Ticker (e.g. AAPL or ASML:XAMS)','invest.form.name':'Name','invest.form.type':'Type','invest.form.buy':'Buy','invest.form.sell':'Sell','invest.form.shares':'Number of shares','invest.form.price':'Price per share','invest.form.currency':'Currency','invest.form.fees':'Fees (optional)','invest.form.date':'Date','invest.form.save':'Save','invest.form.cancel':'Cancel','invest.form.amountPerShare':'Dividend per share','invest.form.payDate':'Payment date','invest.form.divShares':'Shares held','invest.importCsv':'Import CSV','invest.form.csvHint':'Supports the Trading 212 CSV export (History > Export). Buy/sell transactions and dividend payouts are imported; deposits, withdrawals, interest and currency conversions are skipped.','invest.form.csvAnalyze':'Analyze','invest.form.csvConfirm':'Import','invest.form.csvNoFile':'Choose a CSV file first.','nav.idea':'Idea box','nav.log':'Log',
 'save':'Save','cancel':'Cancel',
 'tl.title':'Timeline','tl.add':'+ New item','tl.today':'Today','tl.emptyDay':'Nothing planned for this day.',
 'tl.sub':'A visual day overview of your actions, reminders and calendar.',
@@ -1740,7 +1752,7 @@ en: {
 'locale':'en-GB'
 },
 nl: {
-'nav.home':'Dashboard','nav.rem':'Herinneringen','nav.timeline':'Tijdlijn','nav.sug':'Suggesties','nav.gym':'Gym','nav.invest':'Beleggen','invest.title':'Beleggen','invest.sub':'Dividend-tracker: houd je posities, transacties en dividendinkomsten bij.','invest.portfolioValue':'Portfoliowaarde','invest.dividendYtd':'Dividend dit jaar','invest.avgYield':'Gem. yield-on-cost','invest.unrealized':'Ongerealiseerd','invest.holdings':'Posities','invest.addTransaction':'+ Transactie','invest.dividendCalendar':'Dividendkalender','invest.logDividend':'+ Dividend loggen','invest.estimated':'schatting','invest.noUpcoming':'Nog geen dividendschattingen.','invest.noHoldings':'Nog geen posities. Voeg je eerste transactie toe om te beginnen.','invest.col.symbol':'Ticker','invest.col.shares':'Aandelen','invest.col.avgCost':'Gem. prijs','invest.col.currentPrice':'Koers','invest.col.value':'Waarde','invest.col.unrealized':'Rendement','invest.col.yield':'Yield-on-cost','invest.form.symbolTx':'Ticker (bv. AAPL of ASML:XAMS)','invest.form.name':'Naam','invest.form.type':'Type','invest.form.buy':'Koop','invest.form.sell':'Verkoop','invest.form.shares':'Aantal aandelen','invest.form.price':'Prijs per aandeel','invest.form.currency':'Valuta','invest.form.fees':'Kosten (optioneel)','invest.form.date':'Datum','invest.form.save':'Opslaan','invest.form.cancel':'Annuleren','invest.form.amountPerShare':'Dividend per aandeel','invest.form.payDate':'Betaaldatum','invest.form.divShares':'Aantal aandelen (op uitkeringsmoment)','nav.idea':'Ideeënbox','nav.log':'Logboek',
+'nav.home':'Dashboard','nav.rem':'Herinneringen','nav.timeline':'Tijdlijn','nav.sug':'Suggesties','nav.gym':'Gym','nav.invest':'Beleggen','invest.title':'Beleggen','invest.sub':'Dividend-tracker: houd je posities, transacties en dividendinkomsten bij.','invest.portfolioValue':'Portfoliowaarde','invest.dividendYtd':'Dividend dit jaar','invest.avgYield':'Gem. yield-on-cost','invest.unrealized':'Ongerealiseerd','invest.holdings':'Posities','invest.addTransaction':'+ Transactie','invest.dividendCalendar':'Dividendkalender','invest.logDividend':'+ Dividend loggen','invest.estimated':'schatting','invest.noUpcoming':'Nog geen dividendschattingen.','invest.noHoldings':'Nog geen posities. Voeg je eerste transactie toe om te beginnen.','invest.col.symbol':'Ticker','invest.col.shares':'Aandelen','invest.col.avgCost':'Gem. prijs','invest.col.currentPrice':'Koers','invest.col.value':'Waarde','invest.col.unrealized':'Rendement','invest.col.yield':'Yield-on-cost','invest.form.symbolTx':'Ticker (bv. AAPL of ASML:XAMS)','invest.form.name':'Naam','invest.form.type':'Type','invest.form.buy':'Koop','invest.form.sell':'Verkoop','invest.form.shares':'Aantal aandelen','invest.form.price':'Prijs per aandeel','invest.form.currency':'Valuta','invest.form.fees':'Kosten (optioneel)','invest.form.date':'Datum','invest.form.save':'Opslaan','invest.form.cancel':'Annuleren','invest.form.amountPerShare':'Dividend per aandeel','invest.form.payDate':'Betaaldatum','invest.form.divShares':'Aantal aandelen (op uitkeringsmoment)','invest.importCsv':'CSV importeren','invest.form.csvHint':'Ondersteunt de CSV-export van Trading 212 (Geschiedenis > Exporteren). Koop-/verkooptransacties en dividenduitkeringen worden geïmporteerd; stortingen, opnames, rente en valutaconversies worden overgeslagen.','invest.form.csvAnalyze':'Analyseren','invest.form.csvConfirm':'Importeren','invest.form.csvNoFile':'Kies eerst een CSV-bestand.','nav.idea':'Ideeënbox','nav.log':'Logboek',
 'save':'Opslaan','cancel':'Annuleren',
 'tl.title':'Tijdlijn','tl.add':'+ Nieuw item','tl.today':'Vandaag','tl.emptyDay':'Niets gepland op deze dag.',
 'tl.sub':'Een visueel dagoverzicht van je acties, herinneringen en agenda.',
@@ -2901,6 +2913,100 @@ investLoadHoldings();
 } catch (e) {
 alert(e.message);
 }
+};
+
+window.investOpenCsvForm = () => { $('investCsvForm').style.display = 'block'; $('investCsvPreview').innerHTML = ''; $('investCsvImportBtn').style.display = 'none'; investCsvParsed = null; };
+window.investCloseCsvForm = () => { $('investCsvForm').style.display = 'none'; };
+
+function investCsvSplitLine(line) {
+const out = []; let cur = ''; let inQ = false;
+for (let i = 0; i < line.length; i++) {
+const c = line[i];
+if (inQ) {
+if (c === '"') { if (line[i + 1] === '"') { cur += '"'; i++; } else { inQ = false; } }
+else cur += c;
+} else {
+if (c === '"') inQ = true;
+else if (c === ',') { out.push(cur); cur = ''; }
+else cur += c;
+}
+}
+out.push(cur);
+return out;
+}
+
+function investParseBrokerCsv(text) {
+const lines = text.split(/\r?\n/).filter((l) => l.trim().length);
+if (!lines.length) return { txs: [], divs: [], skipped: 0 };
+const headers = investCsvSplitLine(lines[0]).map((h) => h.trim());
+const col = (row, name) => {
+const i = headers.findIndex((h) => h === name || h.indexOf(name + ' (') === 0);
+return i === -1 ? '' : (row[i] || '').trim();
+};
+const num = (v) => { const n = parseFloat(String(v).replace(',', '.')); return isFinite(n) ? n : 0; };
+const txs = [], divs = [];
+let skipped = 0;
+for (let i = 1; i < lines.length; i++) {
+const row = investCsvSplitLine(lines[i]);
+const action = (col(row, 'Action') || '').toLowerCase();
+const timeRaw = col(row, 'Time') || col(row, 'Time (UTC)');
+const dm = timeRaw.match(/(\d{4}-\d{2}-\d{2})/);
+const date = dm ? dm[1] : '';
+const ticker = col(row, 'Ticker');
+const currency = col(row, 'Currency (Price / share)') || 'EUR';
+if (action.indexOf('buy') !== -1 || action.indexOf('sell') !== -1) {
+const shares = num(col(row, 'No. of shares'));
+const price = num(col(row, 'Price / share'));
+if (!ticker || !shares || !price || !date) { skipped++; continue; }
+const fees = num(col(row, 'Charge amount')) + num(col(row, 'Stamp duty reserve tax')) + num(col(row, 'French transaction tax')) + num(col(row, 'Currency conversion fee'));
+txs.push({ type: action.indexOf('sell') !== -1 ? 'sell' : 'buy', symbol: ticker, name: col(row, 'Name') || ticker, currency, shares, price, fees, date });
+} else if (action.indexOf('dividend') === 0) {
+const shares = num(col(row, 'No. of shares'));
+const amountPerShare = num(col(row, 'Price / share'));
+if (!ticker || !shares || !amountPerShare || !date) { skipped++; continue; }
+divs.push({ symbol: ticker, amountPerShare, shares, totalAmount: amountPerShare * shares, currency, payDate: date });
+} else {
+skipped++;
+}
+}
+return { txs, divs, skipped };
+}
+
+let investCsvParsed = null;
+window.investCsvAnalyze = async () => {
+const f = $('investCsvFile').files[0];
+if (!f) { alert(t('invest.form.csvNoFile')); return; }
+const text = await f.text();
+const parsed = investParseBrokerCsv(text);
+investCsvParsed = parsed;
+$('investCsvPreview').textContent = parsed.txs.length + ' transactie(s), ' + parsed.divs.length + ' dividend(en) gevonden, ' + parsed.skipped + ' regel(s) overgeslagen.';
+$('investCsvImportBtn').style.display = (parsed.txs.length || parsed.divs.length) ? 'inline-block' : 'none';
+};
+
+window.investCsvImport = async () => {
+if (!investCsvParsed) return;
+const btn = $('investCsvImportBtn');
+btn.disabled = true;
+const total = investCsvParsed.txs.length + investCsvParsed.divs.length;
+let done = 0, failed = 0;
+for (const tx of investCsvParsed.txs) {
+try { await api('/api/invest/transactions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({ action: 'create' }, tx)) }); }
+catch (e) { failed++; }
+done++;
+$('investCsvPreview').textContent = 'Importeren... ' + done + '/' + total;
+}
+for (const dv of investCsvParsed.divs) {
+try { await api('/api/invest/dividends', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({ action: 'create' }, dv)) }); }
+catch (e) { failed++; }
+done++;
+$('investCsvPreview').textContent = 'Importeren... ' + done + '/' + total;
+}
+btn.disabled = false;
+btn.style.display = 'none';
+$('investCsvPreview').textContent = 'Klaar: ' + (done - failed) + ' geïmporteerd' + (failed ? ', ' + failed + ' mislukt' : '') + '.';
+investCsvParsed = null;
+investLoadHoldings();
+investLoadCalendar();
 };
 
 let bootTotal = 6, bootDone = 0, bootHidden = false;
