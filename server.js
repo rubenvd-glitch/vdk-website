@@ -2620,7 +2620,7 @@ const sector = sectorMap[h.symbol] || 'Onbekend';
 bySectorMap.set(sector, (bySectorMap.get(sector) || 0) + valueEUR);
 }
 const toList = (map) => [...map.entries()].map(([key, valueEUR]) => ({ key, valueEUR, pct: total > 0 ? valueEUR / total : 0 })).sort((a, b) => b.valueEUR - a.valueEUR);
-return json(res, 200, { byCountry: toList(byCountryMap), bySector: toList(bySectorMap), totalValueEUR: total, sectors: sectorMap });
+return json(res, 200, { byCountry: toList(byCountryMap), bySector: toList(bySectorMap), totalValueEUR: total, sectors: sectorMap, holdings: holdings.map((h) => ({ symbol: h.symbol, name: h.name })) });
 } catch (e) {
 if (e && e.httpStatus) return json(res, e.httpStatus, { error: e.message });
 console.error('invest diversification API error:', e.message);
