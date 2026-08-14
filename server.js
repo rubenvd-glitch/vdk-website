@@ -2399,6 +2399,39 @@ return json(res, 500, { error: 'Opslag niet bereikbaar. Is Upstash gekoppeld?' }
 }
 }
 
+async function investGetFxRateOnDate(from, to, date) {
+if (from === to) return 1;
+return investCached(`investfxdate:${from}${to}:${date}`, 30 * 24 * 60 * 60 * 1000, async () => {
+const r = await tdFetch('/time_series', { symbol: `${from}/${to}`, interval: '1day', start_date: date, end_date: date, outputsize: 1 });
+const vals = r && r.values;
+if (r.error || !vals || !vals.length) return null;
+return parseFloat(vals[0].close);
+});
+}
+
+async function investComputeHoldingsEurBasis(transactions) {
+const bySymbol = new Map();
+const sorted = [...transactions].sort((a, b) => (a.date < b.date ? -1 : 1));
+for (const tx of sorted) {
+if (!bySymbol.has(tx.symbol)) bySymbol.set(tx.symbol, { symbol: tx.symbol, shares: 0, costBasisEUR: 0 });
+const h = bySymbol.get(tx.symbol);
+let fx = await investGetFxRateOnDate(tx.currency, 'EUR', tx.date);
+if (fx == null) fx = await investGetFxRate(tx.currency, 'EUR');
+if (tx.type === 'buy') {
+h.shares += tx.shares;
+h.costBasisEUR += (tx.shares * tx.price + (tx.fees || 0)) * fx;
+} else if (tx.type === 'sell') {
+if (h.shares > 0) {
+const costPerShareEUR = h.costBasisEUR / h.shares;
+const sellShares = Math.min(tx.shares, h.shares);
+h.costBasisEUR -= sellShares * costPerShareEUR;
+h.shares -= sellShares;
+}
+}
+}
+return bySymbol;
+}
+
 async function handleInvestHoldings(req, res) {
 const s = await getSession(req, 'admin');
 if (!s) return json(res, 401, { error: 'Not logged in' });
@@ -2406,7 +2439,8 @@ try {
 const transactions = (await kvGetJson(investTxKey(s.email))) || [];
 const dividends = (await kvGetJson(investDivKey(s.email))) || [];
 const holdings = investComputeHoldings(transactions).filter((h) => !h.closed);
-let valueEUR = 0, investedEUR = 0, dividendYtdEUR = 0, dividendAllTimeEUR = 0;
+const eurBasis = await investComputeHoldingsEurBasis(transactions);
+let valueEUR = 0, investedEUR = 0, investedEURHistorical = 0, dividendYtdEUR = 0, dividendAllTimeEUR = 0;
 const enriched = [];
 for (const h of holdings) {
 const quote = await investGetQuote(h.symbol);
@@ -2415,9 +2449,13 @@ const price = quote ? quote.price : null;
 const valueNative = price != null ? price * h.shares : null;
 const valueInEur = valueNative != null ? valueNative * fx : null;
 const investedInEur = h.costBasis * fx;
+const investedInEurHist = (eurBasis.get(h.symbol) || {}).costBasisEUR || investedInEur;
 if (valueInEur != null) valueEUR += valueInEur;
 investedEUR += investedInEur;
-enriched.push({ ...h, currentPrice: price, valueNative, valueEUR: valueInEur, unrealizedEUR: valueInEur != null ? valueInEur - investedInEur : null, yieldOnCost: investYieldOnCost(h, dividends) });
+investedEURHistorical += investedInEurHist;
+const priceReturnEUR = valueInEur != null ? valueInEur - investedInEur : null;
+const currencyEffectEUR = investedInEur - investedInEurHist;
+enriched.push({ ...h, currentPrice: price, valueNative, valueEUR: valueInEur, unrealizedEUR: priceReturnEUR, priceReturnEUR, currencyEffectEUR, totalReturnEUR: priceReturnEUR != null ? priceReturnEUR + currencyEffectEUR : null, yieldOnCost: investYieldOnCost(h, dividends) });
 }
 const oneYearAgo = Date.now() - 365 * 24 * 60 * 60 * 1000;
 for (const d of dividends) {
@@ -2426,11 +2464,14 @@ const amountEUR = d.totalAmount * fx;
 dividendAllTimeEUR += amountEUR;
 if (new Date(d.payDate).getTime() >= oneYearAgo) dividendYtdEUR += amountEUR;
 }
+const currencyEffectEURTotal = investedEUR - investedEURHistorical;
 return json(res, 200, {
 holdings: enriched,
 totals: {
 valueEUR, investedEUR, unrealizedEUR: valueEUR - investedEUR,
 unrealizedPct: investedEUR > 0 ? (valueEUR - investedEUR) / investedEUR : 0,
+investedEURHistorical, currencyEffectEUR: currencyEffectEURTotal,
+totalReturnEUR: valueEUR - investedEURHistorical,
 dividendYtdEUR, dividendAllTimeEUR,
 avgYieldOnCost: investedEUR > 0 ? dividendYtdEUR / investedEUR : 0,
 },
@@ -2438,6 +2479,40 @@ avgYieldOnCost: investedEUR > 0 ? dividendYtdEUR / investedEUR : 0,
 } catch (e) {
 console.error('invest holdings API error:', e.message);
 return json(res, 500, { error: 'Kon holdings niet berekenen.' });
+}
+}
+
+async function handleInvestDividendGrowth(req, res) {
+const s = await getSession(req, 'admin');
+if (!s) return json(res, 401, { error: 'Not logged in' });
+try {
+const dividends = (await kvGetJson(investDivKey(s.email))) || [];
+const byYear = new Map();
+const byMonth = new Map();
+for (const d of dividends) {
+const fx = await investGetFxRate(d.currency, 'EUR');
+const amountEUR = d.totalAmount * fx;
+const year = String(d.payDate).slice(0, 4);
+const month = String(d.payDate).slice(0, 7);
+byYear.set(year, (byYear.get(year) || 0) + amountEUR);
+byMonth.set(month, (byMonth.get(month) || 0) + amountEUR);
+}
+const yearly = [...byYear.entries()].sort(([a], [b]) => (a < b ? -1 : 1)).map(([year, totalEUR]) => ({ year, totalEUR }));
+const monthly = [...byMonth.entries()].sort(([a], [b]) => (a < b ? -1 : 1)).map(([month, totalEUR]) => ({ month, totalEUR }));
+const currentYear = String(new Date().getFullYear());
+const completed = yearly.filter((y) => y.year !== currentYear);
+const cagr = (years) => {
+const n = completed.length;
+if (n < years + 1) return null;
+const start = completed[n - 1 - years].totalEUR;
+const end = completed[n - 1].totalEUR;
+if (!start || start <= 0) return null;
+return Math.pow(end / start, 1 / years) - 1;
+};
+return json(res, 200, { yearly, monthly, cagr1y: cagr(1), cagr3y: cagr(3), cagr5y: cagr(5) });
+} catch (e) {
+console.error('invest dividend growth API error:', e.message);
+return json(res, 500, { error: 'Kon dividendgroei niet berekenen.' });
 }
 }
 
@@ -2890,6 +2965,7 @@ if (p === '/api/invest/transactions') return handleInvestTx(req, res);
 if (p === '/api/invest/dividends') return handleInvestDiv(req, res);
 if (p === '/api/invest/holdings') return handleInvestHoldings(req, res);
 if (p === '/api/invest/dividend-calendar') return handleInvestDividendCalendar(req, res);
+if (p === '/api/invest/dividend-growth') return handleInvestDividendGrowth(req, res);
 
 
 // --- Base Assistant API (AI chat widget, same 'admin' session as Gym) ---
