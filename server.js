@@ -2516,6 +2516,66 @@ return json(res, 500, { error: 'Kon dividendgroei niet berekenen.' });
 }
 }
 
+function investSnapKey(email) { return `investsnap:${email}`; }
+
+async function investGetHistoricalPrice(symbol, date) {
+return investCached(`investhist:${symbol}:${date}`, 365 * 24 * 60 * 60 * 1000, async () => {
+const r = await tdFetch('/time_series', { symbol, interval: '1day', start_date: date, end_date: date, outputsize: 1 });
+const vals = r && r.values;
+if (r.error || !vals || !vals.length) return null;
+return parseFloat(vals[0].close);
+});
+}
+
+async function investSnapshotPortfolio(email) {
+try {
+const transactions = (await kvGetJson(investTxKey(email))) || [];
+if (!transactions.length) return;
+const holdings = investComputeHoldings(transactions).filter((h) => !h.closed);
+let valueEUR = 0, investedEUR = 0;
+for (const h of holdings) {
+const quote = await investGetQuote(h.symbol);
+const fx = await investGetFxRate(h.currency, 'EUR');
+const price = quote ? quote.price : null;
+if (price != null) valueEUR += price * h.shares * fx;
+investedEUR += h.costBasis * fx;
+}
+const date = new Date().toISOString().slice(0, 10);
+const key = investSnapKey(email);
+const list = (await kvGetJson(key)) || [];
+const idx = list.findIndex((x) => x.date === date);
+const entry = { date, valueEUR, investedEUR };
+if (idx !== -1) list[idx] = entry; else list.push(entry);
+await kvSetJson(key, list);
+} catch (e) {
+console.error('invest snapshot error:', e.message);
+}
+}
+
+async function handleInvestValueHistory(req, res) {
+const s = await getSession(req, 'admin');
+if (!s) return json(res, 401, { error: 'Not logged in' });
+try {
+const history = (await kvGetJson(investSnapKey(s.email))) || [];
+const benchmarkSymbol = (process.env.INVEST_BENCHMARK_SYMBOL || 'SPY').trim();
+let benchmark = [];
+if (history.length) {
+const firstValue = history[0].valueEUR;
+const firstPrice = await investGetHistoricalPrice(benchmarkSymbol, history[0].date);
+if (firstPrice) {
+for (const h of history) {
+const p = await investGetHistoricalPrice(benchmarkSymbol, h.date);
+benchmark.push({ date: h.date, valueEUR: p != null ? firstValue * (p / firstPrice) : null });
+}
+}
+}
+return json(res, 200, { history, benchmark, benchmarkSymbol });
+} catch (e) {
+console.error('invest value history API error:', e.message);
+return json(res, 500, { error: 'Kon waardegeschiedenis niet ophalen.' });
+}
+}
+
 async function handleInvestDividendCalendar(req, res) {
 const s = await getSession(req, 'admin');
 if (!s) return json(res, 401, { error: 'Not logged in' });
@@ -2966,6 +3026,7 @@ if (p === '/api/invest/dividends') return handleInvestDiv(req, res);
 if (p === '/api/invest/holdings') return handleInvestHoldings(req, res);
 if (p === '/api/invest/dividend-calendar') return handleInvestDividendCalendar(req, res);
 if (p === '/api/invest/dividend-growth') return handleInvestDividendGrowth(req, res);
+if (p === '/api/invest/value-history') return handleInvestValueHistory(req, res);
 
 
 // --- Base Assistant API (AI chat widget, same 'admin' session as Gym) ---
@@ -3372,6 +3433,7 @@ if (!secret || url.searchParams.get('key') !== secret) {
 return json(res, 403, { error: 'Forbidden' });
 }
 try {
+await investSnapshotPortfolio(ADMIN_EMAIL);
 const range = url.searchParams.get('range');
 const text = range === 'week' ? await weeklySummaryText() : await dailySummaryText();
 const ok = await tgSend(text);
