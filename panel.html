@@ -1148,6 +1148,11 @@ header { padding: 10px 16px; }
 </div>
 <div id="investDivGrowthChart" style="padding:10px 0;"></div>
 <div id="investCagrLine" style="opacity:.7;font-size:12px;margin-top:4px;"></div>
+<div class="section-head" style="margin-top:20px;">
+<h2 style="font-size:16px;" data-i18n="invest.valueHistory">Portefeuillewaarde over tijd</h2>
+</div>
+<div id="investValueHistoryChart" style="padding:10px 0;"></div>
+<div id="investValueHistoryLegend" style="opacity:.7;font-size:12px;margin-top:4px;"></div>
 </div>
 
 <div id="view-ideas" style="display:none;">
@@ -1675,7 +1680,7 @@ header { padding: 10px 16px; }
 
 const I18N = {
 en: {
-'nav.home':'Dashboard','nav.rem':'Reminders','nav.timeline':'Timeline','nav.sug':'Suggestions','nav.gym':'Gym','nav.invest':'Investing','invest.title':'Investing','invest.sub':'Dividend tracker: keep track of your positions, transactions and dividend income.','invest.portfolioValue':'Portfolio value','invest.dividendYtd':'Dividend this year','invest.avgYield':'Avg. yield-on-cost','invest.unrealized':'Unrealized','invest.holdings':'Holdings','invest.addTransaction':'+ Transaction','invest.dividendCalendar':'Dividend calendar','invest.logDividend':'+ Log dividend','invest.estimated':'estimate','invest.noUpcoming':'No dividend estimates yet.','invest.noHoldings':'No positions yet. Add your first transaction to get started.','invest.col.symbol':'Ticker','invest.col.shares':'Shares','invest.col.avgCost':'Avg. price','invest.col.currentPrice':'Price','invest.col.value':'Value','invest.col.unrealized':'Return','invest.col.yield':'Yield-on-cost','invest.form.symbolTx':'Ticker (e.g. AAPL or ASML:XAMS)','invest.form.name':'Name','invest.form.type':'Type','invest.form.buy':'Buy','invest.form.sell':'Sell','invest.form.shares':'Number of shares','invest.form.price':'Price per share','invest.form.currency':'Currency','invest.form.fees':'Fees (optional)','invest.form.date':'Date','invest.form.save':'Save','invest.form.cancel':'Cancel','invest.form.amountPerShare':'Dividend per share','invest.form.payDate':'Payment date','invest.form.divShares':'Shares held','invest.currencyEffect':'Currency effect','invest.totalReturn':'Total return','invest.dividendGrowth':'Dividend growth','invest.noDividendData':'No dividend data yet.','invest.cagr1y':'CAGR 1y','invest.cagr3y':'CAGR 3y','invest.cagr5y':'CAGR 5y','invest.importCsv':'Import CSV','invest.form.csvHint':'Supports the Trading 212 CSV export (History > Export). Buy/sell transactions and dividend payouts are imported; deposits, withdrawals, interest and currency conversions are skipped.','invest.form.csvAnalyze':'Analyze','invest.form.csvConfirm':'Import','invest.form.csvNoFile':'Choose a CSV file first.','nav.idea':'Idea box','nav.log':'Log',
+'nav.home':'Dashboard','nav.rem':'Reminders','nav.timeline':'Timeline','nav.sug':'Suggestions','nav.gym':'Gym','nav.invest':'Investing','invest.title':'Investing','invest.sub':'Dividend tracker: keep track of your positions, transactions and dividend income.','invest.portfolioValue':'Portfolio value','invest.dividendYtd':'Dividend this year','invest.avgYield':'Avg. yield-on-cost','invest.unrealized':'Unrealized','invest.holdings':'Holdings','invest.addTransaction':'+ Transaction','invest.dividendCalendar':'Dividend calendar','invest.logDividend':'+ Log dividend','invest.estimated':'estimate','invest.noUpcoming':'No dividend estimates yet.','invest.noHoldings':'No positions yet. Add your first transaction to get started.','invest.col.symbol':'Ticker','invest.col.shares':'Shares','invest.col.avgCost':'Avg. price','invest.col.currentPrice':'Price','invest.col.value':'Value','invest.col.unrealized':'Return','invest.col.yield':'Yield-on-cost','invest.form.symbolTx':'Ticker (e.g. AAPL or ASML:XAMS)','invest.form.name':'Name','invest.form.type':'Type','invest.form.buy':'Buy','invest.form.sell':'Sell','invest.form.shares':'Number of shares','invest.form.price':'Price per share','invest.form.currency':'Currency','invest.form.fees':'Fees (optional)','invest.form.date':'Date','invest.form.save':'Save','invest.form.cancel':'Cancel','invest.form.amountPerShare':'Dividend per share','invest.form.payDate':'Payment date','invest.form.divShares':'Shares held','invest.currencyEffect':'Currency effect','invest.totalReturn':'Total return','invest.dividendGrowth':'Dividend growth','invest.noDividendData':'No dividend data yet.','invest.cagr1y':'CAGR 1y','invest.cagr3y':'CAGR 3y','invest.cagr5y':'CAGR 5y','invest.valueHistory':'Portfolio value over time','invest.noValueHistory':'No value history yet — check back after a few daily snapshots.','invest.portfolioLabel':'Portfolio','invest.importCsv':'Import CSV','invest.form.csvHint':'Supports the Trading 212 CSV export (History > Export). Buy/sell transactions and dividend payouts are imported; deposits, withdrawals, interest and currency conversions are skipped.','invest.form.csvAnalyze':'Analyze','invest.form.csvConfirm':'Import','invest.form.csvNoFile':'Choose a CSV file first.','nav.idea':'Idea box','nav.log':'Log',
 'save':'Save','cancel':'Cancel',
 'tl.title':'Timeline','tl.add':'+ New item','tl.today':'Today','tl.emptyDay':'Nothing planned for this day.',
 'tl.sub':'A visual day overview of your actions, reminders and calendar.',
@@ -1760,7 +1765,7 @@ en: {
 'locale':'en-GB'
 },
 nl: {
-'nav.home':'Dashboard','nav.rem':'Herinneringen','nav.timeline':'Tijdlijn','nav.sug':'Suggesties','nav.gym':'Gym','nav.invest':'Beleggen','invest.title':'Beleggen','invest.sub':'Dividend-tracker: houd je posities, transacties en dividendinkomsten bij.','invest.portfolioValue':'Portfoliowaarde','invest.dividendYtd':'Dividend dit jaar','invest.avgYield':'Gem. yield-on-cost','invest.unrealized':'Ongerealiseerd','invest.holdings':'Posities','invest.addTransaction':'+ Transactie','invest.dividendCalendar':'Dividendkalender','invest.logDividend':'+ Dividend loggen','invest.estimated':'schatting','invest.noUpcoming':'Nog geen dividendschattingen.','invest.noHoldings':'Nog geen posities. Voeg je eerste transactie toe om te beginnen.','invest.col.symbol':'Ticker','invest.col.shares':'Aandelen','invest.col.avgCost':'Gem. prijs','invest.col.currentPrice':'Koers','invest.col.value':'Waarde','invest.col.unrealized':'Rendement','invest.col.yield':'Yield-on-cost','invest.form.symbolTx':'Ticker (bv. AAPL of ASML:XAMS)','invest.form.name':'Naam','invest.form.type':'Type','invest.form.buy':'Koop','invest.form.sell':'Verkoop','invest.form.shares':'Aantal aandelen','invest.form.price':'Prijs per aandeel','invest.form.currency':'Valuta','invest.form.fees':'Kosten (optioneel)','invest.form.date':'Datum','invest.form.save':'Opslaan','invest.form.cancel':'Annuleren','invest.form.amountPerShare':'Dividend per aandeel','invest.form.payDate':'Betaaldatum','invest.form.divShares':'Aantal aandelen (op uitkeringsmoment)','invest.currencyEffect':'Valuta-effect','invest.totalReturn':'Totaal rendement','invest.dividendGrowth':'Dividendgroei','invest.noDividendData':'Nog geen dividenddata.','invest.cagr1y':'CAGR 1j','invest.cagr3y':'CAGR 3j','invest.cagr5y':'CAGR 5j','invest.importCsv':'CSV importeren','invest.form.csvHint':'Ondersteunt de CSV-export van Trading 212 (Geschiedenis > Exporteren). Koop-/verkooptransacties en dividenduitkeringen worden geïmporteerd; stortingen, opnames, rente en valutaconversies worden overgeslagen.','invest.form.csvAnalyze':'Analyseren','invest.form.csvConfirm':'Importeren','invest.form.csvNoFile':'Kies eerst een CSV-bestand.','nav.idea':'Ideeënbox','nav.log':'Logboek',
+'nav.home':'Dashboard','nav.rem':'Herinneringen','nav.timeline':'Tijdlijn','nav.sug':'Suggesties','nav.gym':'Gym','nav.invest':'Beleggen','invest.title':'Beleggen','invest.sub':'Dividend-tracker: houd je posities, transacties en dividendinkomsten bij.','invest.portfolioValue':'Portfoliowaarde','invest.dividendYtd':'Dividend dit jaar','invest.avgYield':'Gem. yield-on-cost','invest.unrealized':'Ongerealiseerd','invest.holdings':'Posities','invest.addTransaction':'+ Transactie','invest.dividendCalendar':'Dividendkalender','invest.logDividend':'+ Dividend loggen','invest.estimated':'schatting','invest.noUpcoming':'Nog geen dividendschattingen.','invest.noHoldings':'Nog geen posities. Voeg je eerste transactie toe om te beginnen.','invest.col.symbol':'Ticker','invest.col.shares':'Aandelen','invest.col.avgCost':'Gem. prijs','invest.col.currentPrice':'Koers','invest.col.value':'Waarde','invest.col.unrealized':'Rendement','invest.col.yield':'Yield-on-cost','invest.form.symbolTx':'Ticker (bv. AAPL of ASML:XAMS)','invest.form.name':'Naam','invest.form.type':'Type','invest.form.buy':'Koop','invest.form.sell':'Verkoop','invest.form.shares':'Aantal aandelen','invest.form.price':'Prijs per aandeel','invest.form.currency':'Valuta','invest.form.fees':'Kosten (optioneel)','invest.form.date':'Datum','invest.form.save':'Opslaan','invest.form.cancel':'Annuleren','invest.form.amountPerShare':'Dividend per aandeel','invest.form.payDate':'Betaaldatum','invest.form.divShares':'Aantal aandelen (op uitkeringsmoment)','invest.currencyEffect':'Valuta-effect','invest.totalReturn':'Totaal rendement','invest.dividendGrowth':'Dividendgroei','invest.noDividendData':'Nog geen dividenddata.','invest.cagr1y':'CAGR 1j','invest.cagr3y':'CAGR 3j','invest.cagr5y':'CAGR 5j','invest.valueHistory':'Portefeuillewaarde over tijd','invest.noValueHistory':'Nog geen waardegeschiedenis — kom terug na een paar dagelijkse snapshots.','invest.portfolioLabel':'Portefeuille','invest.importCsv':'CSV importeren','invest.form.csvHint':'Ondersteunt de CSV-export van Trading 212 (Geschiedenis > Exporteren). Koop-/verkooptransacties en dividenduitkeringen worden geïmporteerd; stortingen, opnames, rente en valutaconversies worden overgeslagen.','invest.form.csvAnalyze':'Analyseren','invest.form.csvConfirm':'Importeren','invest.form.csvNoFile':'Kies eerst een CSV-bestand.','nav.idea':'Ideeënbox','nav.log':'Logboek',
 'save':'Opslaan','cancel':'Annuleren',
 'tl.title':'Tijdlijn','tl.add':'+ Nieuw item','tl.today':'Vandaag','tl.emptyDay':'Niets gepland op deze dag.',
 'tl.sub':'Een visueel dagoverzicht van je acties, herinneringen en agenda.',
@@ -2908,10 +2913,65 @@ console.error('invest dividend growth error', e);
 }
 }
 
+function investRenderValueHistory(data) {
+const box = $('investValueHistoryChart');
+const history = data.history || [];
+if (!history.length) { box.innerHTML = '<div style="opacity:.6;padding:8px 0;">' + t('invest.noValueHistory') + '</div>'; $('investValueHistoryLegend').textContent = ''; return; }
+const benchmark = data.benchmark || [];
+const w = 600, h = 160, padL = 4, padR = 4, padB = 20, padT = 10;
+const values = history.map((p) => p.valueEUR).filter((v) => v != null);
+const benchValues = benchmark.map((p) => p.valueEUR).filter((v) => v != null);
+const allValues = values.concat(benchValues);
+const max = Math.max.apply(null, allValues.concat([1]));
+const min = Math.min.apply(null, allValues.concat([0]));
+const range = (max - min) || 1;
+const n = history.length;
+const xStep = n > 1 ? (w - padL - padR) / (n - 1) : 0;
+const yFor = (v) => padT + (h - padT - padB) * (1 - (v - min) / range);
+const xFor = (i) => padL + i * xStep;
+const pathFor = (arr) => {
+let d = '';
+let started = false;
+for (let i = 0; i < arr.length; i++) {
+const v = arr[i] ? arr[i].valueEUR : null;
+if (v == null) { started = false; continue; }
+const x = xFor(i), y = yFor(v);
+d += (started ? 'L' : 'M') + x.toFixed(1) + ',' + y.toFixed(1) + ' ';
+started = true;
+}
+return d.trim();
+};
+const portfolioPath = pathFor(history);
+const benchPath = benchmark.length === history.length ? pathFor(benchmark) : '';
+let svg = '<svg viewBox="0 0 ' + w + ' ' + h + '" style="width:100%;height:auto;max-width:700px;">';
+svg += '<path d="' + portfolioPath + '" fill="none" stroke="#7fd68f" stroke-width="2"></path>';
+if (benchPath) svg += '<path d="' + benchPath + '" fill="none" stroke="#ffb454" stroke-width="2" stroke-dasharray="4,3"></path>';
+svg += '</svg>';
+box.innerHTML = svg;
+const last = history[history.length - 1];
+const lastBench = benchmark.length ? benchmark[benchmark.length - 1] : null;
+const legendParts = [];
+legendParts.push('<span style="color:#7fd68f;">\u25CF</span> ' + t('invest.portfolioLabel') + ': ' + investFmtEUR(last.valueEUR));
+if (lastBench && lastBench.valueEUR != null) {
+legendParts.push('<span style="color:#ffb454;">\u25CF</span> ' + (data.benchmarkSymbol || 'SPY') + ': ' + investFmtEUR(lastBench.valueEUR));
+}
+$('investValueHistoryLegend').innerHTML = legendParts.join('&nbsp;&nbsp;&nbsp;');
+}
+
+async function investLoadValueHistory() {
+try {
+const d = await api('/api/invest/value-history');
+investRenderValueHistory(d || {});
+} catch (e) {
+console.error('invest value history error', e);
+}
+}
+
 function loadInvestPage() {
 investLoadHoldings();
 investLoadCalendar();
 investLoadDividendGrowth();
+investLoadValueHistory();
 }
 
 window.investOpenTxForm = () => { $('investTxForm').style.display = 'block'; };
