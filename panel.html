@@ -791,6 +791,7 @@ header { padding: 10px 16px; }
 <button onclick="showView('timeline')"><span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></span><span data-i18n="nav.timeline">Tijdlijn</span></button>
 <button onclick="showView('sugs')"><span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l1.4 4.2L18 8l-4.2 1.4L12 14l-1.4-4.2L6 8l4.2-1.6L12 2z"/></svg></span><span data-i18n="nav.sug">Suggesties</span></button>
 <button onclick="showView('gym')"><span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12h12"/><path d="M2 10v4M22 10v4"/><rect x="4" y="8" width="4" height="8" rx="1"/><rect x="16" y="8" width="4" height="8" rx="1"/></svg></span><span data-i18n="nav.gym">Gym</span></button>
+<button onclick="showView('invest')"><span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg></span><span data-i18n="nav.invest">Beleggen</span></button>
 <button onclick="showView('ideas')"><span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.2 1 2.3h6c0-1.1.4-1.8 1-2.3A7 7 0 0 0 12 2z"/></svg></span><span data-i18n="nav.idea">Ideeënbox</span></button>
 <button onclick="showView('log')" id="logMenuBtn" style="display:none;"><span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5V4.5A2.5 2.5 0 0 1 6.5 2H20v18H6.5A2.5 2.5 0 0 0 4 22"/><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/></svg></span><span data-i18n="nav.log">Logboek</span></button>
 <a href="/crm" style="display:block; width:100%; box-sizing:border-box; text-align:left; background:none; border:none; color:#e6e9ed; font-size:15px; padding:12px 14px; border-radius:9px; font-family:inherit; text-decoration:none;" onmouseover="this.style.background='#1c222b'" onmouseout="this.style.background='none'"><span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>→ Naar CRM</a>
@@ -1025,6 +1026,107 @@ header { padding: 10px 16px; }
 <h2 style="font-size:16px;">Opgeslagen sessies toevoegen</h2>
 </div>
 <div id="gymSplitAvailableList"></div>
+</div>
+</div>
+
+<style>
+.invest-summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin:12px 0 20px;}
+.invest-stat{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:10px 12px;}
+.invest-stat-label{display:block;font-size:12px;opacity:.6;margin-bottom:4px;}
+.invest-stat-value{display:block;font-size:17px;font-weight:600;}
+.invest-table{width:100%;border-collapse:collapse;margin-top:10px;}
+.invest-table th{text-align:left;font-size:12px;opacity:.6;font-weight:500;padding:6px 8px;border-bottom:1px solid rgba(255,255,255,.1);}
+.invest-table td{padding:8px;border-bottom:1px solid rgba(255,255,255,.06);font-size:14px;vertical-align:top;}
+.invest-form{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:14px;margin-top:12px;}
+.invest-form label{display:block;font-size:12px;opacity:.7;margin:10px 0 4px;}
+.invest-form input,.invest-form select{width:100%;box-sizing:border-box;padding:8px;border-radius:6px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.03);color:inherit;font-size:14px;}
+.invest-form-actions{margin-top:14px;display:flex;gap:8px;}
+</style>
+
+<div id="view-invest" style="display:none;">
+<div class="section-head">
+<h2 data-i18n="invest.title">Beleggen</h2>
+</div>
+<div class="section-sub" data-i18n="invest.sub">Dividend-tracker: houd je posities, transacties en dividendinkomsten bij.</div>
+
+<div class="invest-summary-grid">
+<div class="invest-stat"><span class="invest-stat-label" data-i18n="invest.portfolioValue">Portfoliowaarde</span><span class="invest-stat-value" id="investValueEUR">–</span></div>
+<div class="invest-stat"><span class="invest-stat-label" data-i18n="invest.dividendYtd">Dividend dit jaar</span><span class="invest-stat-value" id="investDividendYtd">–</span></div>
+<div class="invest-stat"><span class="invest-stat-label" data-i18n="invest.avgYield">Gem. yield-on-cost</span><span class="invest-stat-value" id="investAvgYield">–</span></div>
+<div class="invest-stat"><span class="invest-stat-label" data-i18n="invest.unrealized">Ongerealiseerd</span><span class="invest-stat-value" id="investUnrealized">–</span></div>
+</div>
+
+<div class="section-head" style="margin-top:20px;">
+<h2 style="font-size:16px;" data-i18n="invest.holdings">Posities</h2>
+</div>
+<button onclick="investOpenTxForm()" data-i18n="invest.addTransaction">+ Transactie</button>
+<table class="invest-table">
+<thead><tr>
+<th data-i18n="invest.col.symbol">Ticker</th>
+<th data-i18n="invest.col.shares">Aandelen</th>
+<th data-i18n="invest.col.avgCost">Gem. prijs</th>
+<th data-i18n="invest.col.currentPrice">Koers</th>
+<th data-i18n="invest.col.value">Waarde</th>
+<th data-i18n="invest.col.unrealized">Rendement</th>
+<th data-i18n="invest.col.yield">Yield-on-cost</th>
+</tr></thead>
+<tbody id="investHoldingsBody"></tbody>
+</table>
+<div id="investHoldingsEmpty" style="display:none;opacity:.6;padding:10px 0;" data-i18n="invest.noHoldings">Nog geen posities. Voeg je eerste transactie toe om te beginnen.</div>
+
+<div id="investTxForm" class="invest-form" style="display:none;">
+<label data-i18n="invest.form.symbolTx">Ticker (bv. AAPL of ASML:XAMS)</label>
+<input type="text" id="investTxSymbol" />
+<label data-i18n="invest.form.name">Naam</label>
+<input type="text" id="investTxName" />
+<label data-i18n="invest.form.type">Type</label>
+<select id="investTxType">
+<option value="buy" data-i18n="invest.form.buy">Koop</option>
+<option value="sell" data-i18n="invest.form.sell">Verkoop</option>
+</select>
+<label data-i18n="invest.form.shares">Aantal aandelen</label>
+<input type="number" id="investTxShares" step="any" />
+<label data-i18n="invest.form.price">Prijs per aandeel</label>
+<input type="number" id="investTxPrice" step="any" />
+<label data-i18n="invest.form.currency">Valuta</label>
+<select id="investTxCurrency">
+<option value="EUR">EUR</option>
+<option value="USD">USD</option>
+</select>
+<label data-i18n="invest.form.fees">Kosten (optioneel)</label>
+<input type="number" id="investTxFees" step="any" value="0" />
+<label data-i18n="invest.form.date">Datum</label>
+<input type="date" id="investTxDate" />
+<div class="invest-form-actions">
+<button onclick="investSubmitTx()" data-i18n="invest.form.save">Opslaan</button>
+<button onclick="investCloseTxForm()" data-i18n="invest.form.cancel">Annuleren</button>
+</div>
+</div>
+
+<div class="section-head" style="margin-top:20px;">
+<h2 style="font-size:16px;" data-i18n="invest.dividendCalendar">Dividendkalender</h2>
+</div>
+<button onclick="investOpenDivForm()" data-i18n="invest.logDividend">+ Dividend loggen</button>
+<div id="investCalendarList"></div>
+
+<div id="investDivForm" class="invest-form" style="display:none;">
+<label data-i18n="invest.form.symbolTx">Ticker (bv. AAPL of ASML:XAMS)</label>
+<input type="text" id="investDivSymbol" />
+<label data-i18n="invest.form.amountPerShare">Dividend per aandeel</label>
+<input type="number" id="investDivAmount" step="any" />
+<label data-i18n="invest.form.divShares">Aantal aandelen (op uitkeringsmoment)</label>
+<input type="number" id="investDivShares" step="any" />
+<label data-i18n="invest.form.currency">Valuta</label>
+<select id="investDivCurrency">
+<option value="EUR">EUR</option>
+<option value="USD">USD</option>
+</select>
+<label data-i18n="invest.form.payDate">Betaaldatum</label>
+<input type="date" id="investDivPayDate" />
+<div class="invest-form-actions">
+<button onclick="investSubmitDiv()" data-i18n="invest.form.save">Opslaan</button>
+<button onclick="investCloseDivForm()" data-i18n="invest.form.cancel">Annuleren</button>
+</div>
 </div>
 </div>
 
@@ -1553,7 +1655,7 @@ header { padding: 10px 16px; }
 
 const I18N = {
 en: {
-'nav.home':'Dashboard','nav.rem':'Reminders','nav.timeline':'Timeline','nav.sug':'Suggestions','nav.gym':'Gym','nav.idea':'Idea box','nav.log':'Log',
+'nav.home':'Dashboard','nav.rem':'Reminders','nav.timeline':'Timeline','nav.sug':'Suggestions','nav.gym':'Gym','nav.invest':'Investing','invest.title':'Investing','invest.sub':'Dividend tracker: keep track of your positions, transactions and dividend income.','invest.portfolioValue':'Portfolio value','invest.dividendYtd':'Dividend this year','invest.avgYield':'Avg. yield-on-cost','invest.unrealized':'Unrealized','invest.holdings':'Holdings','invest.addTransaction':'+ Transaction','invest.dividendCalendar':'Dividend calendar','invest.logDividend':'+ Log dividend','invest.estimated':'estimate','invest.noUpcoming':'No dividend estimates yet.','invest.noHoldings':'No positions yet. Add your first transaction to get started.','invest.col.symbol':'Ticker','invest.col.shares':'Shares','invest.col.avgCost':'Avg. price','invest.col.currentPrice':'Price','invest.col.value':'Value','invest.col.unrealized':'Return','invest.col.yield':'Yield-on-cost','invest.form.symbolTx':'Ticker (e.g. AAPL or ASML:XAMS)','invest.form.name':'Name','invest.form.type':'Type','invest.form.buy':'Buy','invest.form.sell':'Sell','invest.form.shares':'Number of shares','invest.form.price':'Price per share','invest.form.currency':'Currency','invest.form.fees':'Fees (optional)','invest.form.date':'Date','invest.form.save':'Save','invest.form.cancel':'Cancel','invest.form.amountPerShare':'Dividend per share','invest.form.payDate':'Payment date','invest.form.divShares':'Shares held','nav.idea':'Idea box','nav.log':'Log',
 'save':'Save','cancel':'Cancel',
 'tl.title':'Timeline','tl.add':'+ New item','tl.today':'Today','tl.emptyDay':'Nothing planned for this day.',
 'tl.sub':'A visual day overview of your actions, reminders and calendar.',
@@ -1638,7 +1740,7 @@ en: {
 'locale':'en-GB'
 },
 nl: {
-'nav.home':'Dashboard','nav.rem':'Herinneringen','nav.timeline':'Tijdlijn','nav.sug':'Suggesties','nav.gym':'Gym','nav.idea':'Ideeënbox','nav.log':'Logboek',
+'nav.home':'Dashboard','nav.rem':'Herinneringen','nav.timeline':'Tijdlijn','nav.sug':'Suggesties','nav.gym':'Gym','nav.invest':'Beleggen','invest.title':'Beleggen','invest.sub':'Dividend-tracker: houd je posities, transacties en dividendinkomsten bij.','invest.portfolioValue':'Portfoliowaarde','invest.dividendYtd':'Dividend dit jaar','invest.avgYield':'Gem. yield-on-cost','invest.unrealized':'Ongerealiseerd','invest.holdings':'Posities','invest.addTransaction':'+ Transactie','invest.dividendCalendar':'Dividendkalender','invest.logDividend':'+ Dividend loggen','invest.estimated':'schatting','invest.noUpcoming':'Nog geen dividendschattingen.','invest.noHoldings':'Nog geen posities. Voeg je eerste transactie toe om te beginnen.','invest.col.symbol':'Ticker','invest.col.shares':'Aandelen','invest.col.avgCost':'Gem. prijs','invest.col.currentPrice':'Koers','invest.col.value':'Waarde','invest.col.unrealized':'Rendement','invest.col.yield':'Yield-on-cost','invest.form.symbolTx':'Ticker (bv. AAPL of ASML:XAMS)','invest.form.name':'Naam','invest.form.type':'Type','invest.form.buy':'Koop','invest.form.sell':'Verkoop','invest.form.shares':'Aantal aandelen','invest.form.price':'Prijs per aandeel','invest.form.currency':'Valuta','invest.form.fees':'Kosten (optioneel)','invest.form.date':'Datum','invest.form.save':'Opslaan','invest.form.cancel':'Annuleren','invest.form.amountPerShare':'Dividend per aandeel','invest.form.payDate':'Betaaldatum','invest.form.divShares':'Aantal aandelen (op uitkeringsmoment)','nav.idea':'Ideeënbox','nav.log':'Logboek',
 'save':'Opslaan','cancel':'Annuleren',
 'tl.title':'Tijdlijn','tl.add':'+ Nieuw item','tl.today':'Vandaag','tl.emptyDay':'Niets gepland op deze dag.',
 'tl.sub':'Een visueel dagoverzicht van je acties, herinneringen en agenda.',
@@ -2638,13 +2740,14 @@ flashSetMsg(t('set.tgSent'));
 } catch (e) { flashSetMsg(e.message); }
 };
 
-const views = { home: 'view-home', reminders: 'view-reminders', timeline: 'view-timeline', sugs: 'view-sugs', gym: 'view-gym', ideas: 'view-ideas', settings: 'view-settings', log: 'view-log' };
+const views = { home: 'view-home', reminders: 'view-reminders', timeline: 'view-timeline', sugs: 'view-sugs', gym: 'view-gym', invest: 'view-invest', ideas: 'view-ideas', settings: 'view-settings', log: 'view-log' };
 function closeDrawer() { $('drawer').classList.remove('open'); $('backdrop').classList.remove('show'); }
 window.showView = (v) => {
 if (v === 'log' && !(me && me.isAdmin)) v = 'home';
 for (const k in views) $(views[k]).style.display = k === v ? 'block' : 'none';
 if (v === 'log') loadLog();
 if (v === 'timeline') loadTimeline();
+if (v === 'invest') loadInvestPage();
 const el = $(views[v]);
 el.classList.remove('view-anim');
 void el.offsetWidth;
@@ -2685,6 +2788,120 @@ const d = await r.json().catch(() => ({}));
 if (!r.ok) throw new Error(d.error || 'Er ging iets mis');
 return d;
 }
+
+function investFmtEUR(n) {
+if (n == null || Number.isNaN(n)) return '–';
+return new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' }).format(n);
+}
+function investFmtPct(n) {
+if (n == null || Number.isNaN(n)) return '–';
+return new Intl.NumberFormat('nl-NL', { style: 'percent', maximumFractionDigits: 1 }).format(n);
+}
+
+function investRenderHoldings(holdings, totals) {
+$('investValueEUR').textContent = investFmtEUR(totals.valueEUR);
+$('investDividendYtd').textContent = investFmtEUR(totals.dividendYtdEUR);
+$('investAvgYield').textContent = investFmtPct(totals.avgYieldOnCost);
+$('investUnrealized').textContent = investFmtEUR(totals.unrealizedEUR) + (totals.unrealizedPct != null ? ' (' + investFmtPct(totals.unrealizedPct) + ')' : '');
+const body = $('investHoldingsBody');
+body.innerHTML = '';
+$('investHoldingsEmpty').style.display = holdings.length ? 'none' : 'block';
+for (const h of holdings) {
+const tr = document.createElement('tr');
+const pnlColor = (h.unrealizedEUR || 0) >= 0 ? '#7fd68f' : '#f28b8b';
+tr.innerHTML = '<td>' + h.symbol + '<br><span style="opacity:.6;font-size:12px;">' + (h.name || '') + '</span></td>'
++ '<td>' + h.shares + '</td>'
++ '<td>' + (h.avgCost != null ? h.avgCost.toFixed(2) : '–') + ' ' + h.currency + '</td>'
++ '<td>' + (h.currentPrice != null ? h.currentPrice.toFixed(2) : '–') + ' ' + h.currency + '</td>'
++ '<td>' + investFmtEUR(h.valueEUR) + '</td>'
++ '<td style="color:' + pnlColor + ';">' + investFmtEUR(h.unrealizedEUR) + '</td>'
++ '<td>' + investFmtPct(h.yieldOnCost) + '</td>';
+body.appendChild(tr);
+}
+}
+
+function investRenderCalendar(upcoming) {
+const list = $('investCalendarList');
+list.innerHTML = '';
+if (!upcoming || !upcoming.length) { list.innerHTML = '<div style="opacity:.6;padding:8px 0;">' + t('invest.noUpcoming') + '</div>'; return; }
+for (const item of upcoming) {
+const row = document.createElement('div');
+row.style.padding = '8px 0';
+row.style.borderBottom = '1px solid rgba(255,255,255,.08)';
+row.innerHTML = '<strong>' + item.symbol + '</strong> — ' + item.estimatedDate
++ ' <span style="opacity:.6;font-size:12px;">(' + t('invest.estimated') + ')</span>'
++ '<span style="float:right;">' + item.amountPerShare + ' ' + item.currency + '</span>';
+list.appendChild(row);
+}
+}
+
+async function investLoadHoldings() {
+try {
+const d = await api('/api/invest/holdings');
+investRenderHoldings(d.holdings || [], d.totals || {});
+} catch (e) {
+console.error('invest holdings error', e);
+}
+}
+
+async function investLoadCalendar() {
+try {
+const d = await api('/api/invest/dividend-calendar');
+investRenderCalendar(d.upcoming || []);
+} catch (e) {
+console.error('invest calendar error', e);
+}
+}
+
+function loadInvestPage() {
+investLoadHoldings();
+investLoadCalendar();
+}
+
+window.investOpenTxForm = () => { $('investTxForm').style.display = 'block'; };
+window.investCloseTxForm = () => { $('investTxForm').style.display = 'none'; };
+window.investOpenDivForm = () => { $('investDivForm').style.display = 'block'; };
+window.investCloseDivForm = () => { $('investDivForm').style.display = 'none'; };
+
+window.investSubmitTx = async () => {
+const body = {
+action: 'create',
+type: $('investTxType').value,
+symbol: $('investTxSymbol').value,
+name: $('investTxName').value,
+currency: $('investTxCurrency').value,
+shares: Number($('investTxShares').value),
+price: Number($('investTxPrice').value),
+fees: Number($('investTxFees').value) || 0,
+date: $('investTxDate').value,
+};
+try {
+await api('/api/invest/transactions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+$('investTxForm').style.display = 'none';
+investLoadHoldings();
+investLoadCalendar();
+} catch (e) {
+alert(e.message);
+}
+};
+
+window.investSubmitDiv = async () => {
+const body = {
+action: 'create',
+symbol: $('investDivSymbol').value,
+amountPerShare: Number($('investDivAmount').value),
+shares: Number($('investDivShares').value),
+currency: $('investDivCurrency').value,
+payDate: $('investDivPayDate').value,
+};
+try {
+await api('/api/invest/dividends', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+$('investDivForm').style.display = 'none';
+investLoadHoldings();
+} catch (e) {
+alert(e.message);
+}
+};
 
 let bootTotal = 6, bootDone = 0, bootHidden = false;
 function bootGreet() {
