@@ -1108,7 +1108,7 @@ return false;
 };
 const remFor = (d) => reminders
 .filter((r) => ((r.repeat && r.repeat.type) ? !(Array.isArray(r.doneDates) && r.doneDates.includes(d)) : !r.done) && occursOnW(r, d))
-.map((r) => ({ title: r.title, time: r.time || null, prio: r.prio, icon: r.icon || null, color: r.color || null, duration: r.duration || 0 }))
+.map((r) => ({ title: r.title, time: r.time || null, prio: r.prio, icon: r.icon || null, color: r.color || null, duration: r.duration || 0, tl: !!r.tl }))
 .sort((a, b) => String(a.time || '99').localeCompare(String(b.time || '99')));
 let events = [];
 try {
