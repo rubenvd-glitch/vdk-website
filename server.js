@@ -2553,7 +2553,7 @@ investedEUR += investedInEur;
 investedEURHistorical += investedInEurHist;
 const priceReturnEUR = valueInEur != null ? valueInEur - investedInEur : null;
 const currencyEffectEUR = investedInEur - investedInEurHist;
-enriched.push({ ...h, currentPrice: price, valueNative, valueEUR: valueInEur, unrealizedEUR: priceReturnEUR, priceReturnEUR, currencyEffectEUR, totalReturnEUR: priceReturnEUR != null ? priceReturnEUR + currencyEffectEUR : null, yieldOnCost: investYieldOnCost(h, dividends) });
+enriched.push({ ...h, currentPrice: price, valueNative, valueEUR: valueInEur, unrealizedEUR: priceReturnEUR, priceReturnEUR, currencyEffectEUR, totalReturnEUR: priceReturnEUR !== null ? priceReturnEUR + currencyEffectEUR : null, yieldOnCost: investYieldOnCost(h, dividends), investedEUR: investedInEur })
 }
 const oneYearAgo = Date.now() - 365 * 24 * 60 * 60 * 1000;
 for (const d of dividends) {
