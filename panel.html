@@ -1078,6 +1078,8 @@ header { padding: 10px 16px; }
 <th data-i18n="invest.col.value">Waarde</th>
 <th data-i18n="invest.col.unrealized">Rendement</th>
 <th data-i18n="invest.col.yield">Yield-on-cost</th>
+<th data-i18n="invest.col.currentYield">Yield</th>
+<th data-i18n="invest.col.cagr1y">Div. CAGR (1j)</th>
 </tr></thead>
 <tbody id="investHoldingsBody"></tbody>
 </table>
@@ -1153,6 +1155,10 @@ header { padding: 10px 16px; }
 <div class="section-head" style="margin-top:20px;">
 <h2 style="font-size:16px;" data-i18n="invest.dividendGrowth">Dividendgroei</h2>
 </div>
+<div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:10px;">
+<div><span style="opacity:.6;font-size:12px;">PADI (verwacht jaarlijks dividend)</span><br><span id="investPadiEUR" style="font-size:16px;font-weight:600;">–</span> <span id="investPadiGrowth" style="font-size:12px;"></span></div>
+</div>
+<select id="investDivFilterSymbol" onchange="investLoadDividendGrowth()" style="margin-bottom:8px;"><option value="">Alle posities</option></select>
 <div id="investDivGrowthChart" style="padding:10px 0;"></div>
 <div id="investCagrLine" style="opacity:.7;font-size:12px;margin-top:4px;"></div>
 <div class="section-head" style="margin-top:20px;">
@@ -2899,6 +2905,8 @@ $('investAvgYield').textContent = investFmtPct(totals.avgYieldOnCost);
 $('investUnrealized').textContent = investFmtEUR(totals.unrealizedEUR) + (totals.unrealizedPct != null ? ' (' + investFmtPct(totals.unrealizedPct) + ')' : '');
 $('investCurrencyEffect').textContent = investFmtEUR(totals.currencyEffectEUR);
 $('investTotalReturn').textContent = investFmtEUR(totals.totalReturnEUR);
+if ($('investPadiEUR')) $('investPadiEUR').textContent = investFmtEUR(totals.padiEUR);
+if ($('investPadiGrowth')) $('investPadiGrowth').textContent = totals.padiGrowthPct !== null && totals.padiGrowthPct !== undefined ? (totals.padiGrowthPct >= 0 ? '+' : '') + investFmtPct(totals.padiGrowthPct) + ' t.o.v. vorig jaar' : '';
 const body = $('investHoldingsBody');
 body.innerHTML = '';
 $('investHoldingsEmpty').style.display = holdings.length ? 'none' : 'block';
@@ -2911,8 +2919,16 @@ tr.innerHTML = '<td>' + h.symbol + '<br><span style="opacity:.6;font-size:12px;"
 + '<td>' + (h.currentPrice != null ? h.currentPrice.toFixed(2) : '–') + ' ' + h.currency + '</td>'
 + '<td>' + investFmtEUR(h.valueEUR) + '</td>'
 + '<td style="color:' + pnlColor + ';">' + investFmtEUR(h.unrealizedEUR) + '</td>'
-+ '<td>' + investFmtPct(h.yieldOnCost) + '</td>';
++ '<td>' + investFmtPct(h.yieldOnCost) + '</td>'
++ '<td>' + investFmtPct(h.currentYield) + '</td>'
++ '<td>' + investFmtPct(h.cagr1y) + '</td>';
 body.appendChild(tr);
+}
+const filterSel = $('investDivFilterSymbol');
+if (filterSel) {
+const current = filterSel.value;
+const symbols = holdings.map((h) => h.symbol);
+filterSel.innerHTML = '<option value="">Alle posities</option>' + symbols.map((sym) => '<option value="' + sym + '"' + (sym === current ? ' selected' : '') + '>' + sym + '</option>').join('');
 }
 }
 
@@ -2970,12 +2986,16 @@ const parts = [];
 if (data.cagr1y != null) parts.push(t('invest.cagr1y') + ': ' + investFmtPct(data.cagr1y));
 if (data.cagr3y != null) parts.push(t('invest.cagr3y') + ': ' + investFmtPct(data.cagr3y));
 if (data.cagr5y != null) parts.push(t('invest.cagr5y') + ': ' + investFmtPct(data.cagr5y));
+if (data.cagr10y !== null) parts.push(t('invest.cagr10y') + ': ' + investFmtPct(data.cagr10y));
+if (yearly.length >= 2) { const prevY = yearly[yearly.length - 2], curY = yearly[yearly.length - 1]; if (prevY.totalEUR > 0) parts.push(curY.year + ' vs ' + prevY.year + ': ' + ((curY.totalEUR >= prevY.totalEUR ? '+' : '') + investFmtPct((curY.totalEUR - prevY.totalEUR) / prevY.totalEUR))); }
 $('investCagrLine').textContent = parts.join('   ·   ');
 }
 
 async function investLoadDividendGrowth() {
 try {
-const d = await api(investUrl('/api/invest/dividend-growth'));
+const filterSel = $('investDivFilterSymbol');
+const symbolParam = filterSel && filterSel.value ? '&symbol=' + encodeURIComponent(filterSel.value) : '';
+const d = await api(investUrl('/api/invest/dividend-growth') + symbolParam);
 investRenderDividendGrowth(d || {});
 } catch (e) {
 console.error('invest dividend growth error', e);
