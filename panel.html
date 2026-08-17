@@ -1168,6 +1168,19 @@ header { padding: 10px 16px; }
 <div style="font-size:12px;opacity:.7;margin:10px 0 2px;" data-i18n="invest.bySector">Sector</div>
 <div id="investSectorBreakdown" style="padding:4px 0;"></div>
 <div id="investSectorEditor" style="margin-top:10px;font-size:12px;"></div>
+<div style="font-size:12px;opacity:.7;margin:10px 0 2px;">Werelddeel</div>
+<div id="investWorldPartBreakdown" style="padding:4px 0;"></div>
+<div style="font-size:12px;opacity:.7;margin:10px 0 2px;">Valuta</div>
+<div id="investCurrencyBreakdown" style="padding:4px 0;"></div>
+<div style="font-size:12px;opacity:.7;margin:10px 0 2px;">Beurs</div>
+<div id="investExchangeBreakdown" style="padding:4px 0;"></div>
+<div style="font-size:12px;opacity:.7;margin:10px 0 2px;">Effecttype</div>
+<div id="investAssetTypeBreakdown" style="padding:4px 0;"></div>
+<div style="font-size:12px;opacity:.7;margin:10px 0 2px;">Strategie</div>
+<div id="investStrategyBreakdown" style="padding:4px 0;"></div>
+<div id="investStrategyEditor" style="margin-top:10px;font-size:12px;"></div>
+<div style="font-size:12px;opacity:.7;margin:10px 0 2px;">Broker</div>
+<div id="investBrokerBreakdown" style="padding:4px 0;"></div>
 </div>
 
 <div id="view-ideas" style="display:none;">
@@ -3052,6 +3065,12 @@ el.innerHTML = html;
 function investRenderDiversification(data) {
 investRenderBreakdownList($('investCountryBreakdown'), data.byCountry || []);
 investRenderBreakdownList($('investSectorBreakdown'), data.bySector || []);
+investRenderBreakdownList($('investWorldPartBreakdown'), data.byWorldPart || [])
+investRenderBreakdownList($('investCurrencyBreakdown'), data.byCurrency || [])
+investRenderBreakdownList($('investExchangeBreakdown'), data.byExchange || [])
+investRenderBreakdownList($('investAssetTypeBreakdown'), data.byAssetType || [])
+investRenderBreakdownList($('investStrategyBreakdown'), data.byStrategy || [])
+investRenderBreakdownList($('investBrokerBreakdown'), data.byBroker || [])
 const holdings = data.holdings || [];
 const sectors = data.sectors || {};
 const editor = $('investSectorEditor');
@@ -3065,6 +3084,19 @@ html += '<div style="display:flex;justify-content:space-between;align-items:cent
 + '</div>';
 }
 editor.innerHTML = html;
+const strategies = data.strategies || {}
+const stratEditor = $('investStrategyEditor')
+if (stratEditor) {
+let stratHtml = '<div style="opacity:.6;margin-bottom:4px;">Klik om een strategie aan een positie te koppelen (bijv. GARP, Growth, Value, Dividend).</div>'
+for (const h of holdings) {
+const safeSymbol2 = h.symbol.replace(/'/g, "\\'")
+stratHtml += '<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;">'
++ '<span>' + h.symbol + '</span>'
++ '<a href="#" onclick="investEditStrategy(\'' + safeSymbol2 + '\');return false;" style="opacity:.8;">' + (strategies[h.symbol] || 'Strategie instellen') + '</a>'
++ '</div>'
+}
+stratEditor.innerHTML = holdings.length ? stratHtml : ''
+}
 }
 
 async function investLoadDiversification() {
@@ -3086,6 +3118,17 @@ investRenderDiversification(d || {});
 alert(e.message);
 }
 };
+
+window.investEditStrategy = async (symbol) => {
+const strategy = prompt('Strategie voor ' + symbol + ' (bijv. GARP, Growth, Value, Dividend)')
+if (strategy === null) return
+try {
+const d = await api('/api/invest/diversification', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ symbol, strategy, portfolioId: investPortfolioId }) })
+investRenderDiversification(d || {})
+} catch (e) {
+alert(e.message)
+}
+}
 
 function loadInvestPage() {
 investLoadPortfolios();
@@ -3267,7 +3310,7 @@ btn.disabled = true;
 const total = investCsvParsed.txs.length + investCsvParsed.divs.length;
 let done = 0, failed = 0;
 for (const tx of investCsvParsed.txs) {
-try { await api('/api/invest/transactions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({ action: 'create', portfolioId: investPortfolioId }, tx)) }); }
+try { await api('/api/invest/transactions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({ action: 'create', portfolioId: investPortfolioId, broker: investCsvParsed.broker === 'revolut' ? 'Revolut' : 'Trading 212' }, tx)) }) }
 catch (e) { failed++; }
 done++;
 $('investCsvPreview').textContent = 'Importeren... ' + done + '/' + total;
