@@ -2279,11 +2279,32 @@ const lastAmount = history[history.length - 1].amount;
 return { estimatedDate: new Date(lastDate + avgGapMs).toISOString().slice(0, 10), amountPerShare: lastAmount, confidence: 'estimate' };
 }
 
+function investLast12mDividendPerShare(dividends, symbol) {
+const oneYearAgo = Date.now() - 365 * 24 * 60 * 60 * 1000;
+return dividends.filter((d) => d.symbol === symbol && new Date(d.payDate).getTime() >= oneYearAgo).reduce((sum, d) => sum + d.amountPerShare, 0);
+}
 function investYieldOnCost(holding, dividends) {
 if (!holding.avgCost || holding.shares <= 0) return 0;
-const oneYearAgo = Date.now() - 365 * 24 * 60 * 60 * 1000;
-const last12m = dividends.filter((d) => d.symbol === holding.symbol && new Date(d.payDate).getTime() >= oneYearAgo).reduce((sum, d) => sum + d.amountPerShare, 0);
-return last12m / holding.avgCost;
+return investLast12mDividendPerShare(dividends, holding.symbol) / holding.avgCost;
+}
+function investDividendCagrForSymbol(dividends, symbol) {
+const byYear = new Map();
+for (const d of dividends) {
+if (d.symbol !== symbol) continue;
+const year = String(d.payDate).slice(0, 4);
+byYear.set(year, (byYear.get(year) || 0) + d.amountPerShare);
+}
+const currentYear = String(new Date().getFullYear());
+const completed = [...byYear.entries()].filter(([y]) => y !== currentYear).sort(([a], [b]) => (a < b ? -1 : 1)).map(([, v]) => v);
+const cagr = (years) => {
+const n = completed.length;
+if (n < years + 1) return null;
+const start = completed[n - 1 - years];
+const end = completed[n - 1];
+if (!start || start <= 0) return null;
+return Math.pow(end / start, 1 / years) - 1;
+};
+return { cagr1y: cagr(1), cagr3y: cagr(3), cagr5y: cagr(5), cagr10y: cagr(10) };
 }
 
 async function tdFetch(path, params) {
@@ -2502,22 +2523,26 @@ const transactions = (await kvGetJson(investTxKey(s.email, portfolioId))) || [];
 const dividends = (await kvGetJson(investDivKey(s.email, portfolioId))) || [];
 const holdings = investComputeHoldings(transactions).filter((h) => !h.closed);
 const eurBasis = await investComputeHoldingsEurBasis(transactions);
-let valueEUR = 0, investedEUR = 0, investedEURHistorical = 0, dividendYtdEUR = 0, dividendAllTimeEUR = 0;
+let valueEUR = 0, investedEUR = 0, investedEURHistorical = 0, dividendYtdEUR = 0, dividendAllTimeEUR = 0, padiEUR = 0;
 const enriched = [];
 for (const h of holdings) {
 const quote = await investGetQuote(h.symbol);
 const fx = await investGetFxRate(h.currency, 'EUR');
 const price = quote ? quote.price : null;
-const valueNative = price != null ? price * h.shares : null;
-const valueInEur = valueNative != null ? valueNative * fx : null;
+const valueNative = price !== null ? price * h.shares : null;
+const valueInEur = valueNative !== null ? valueNative * fx : null;
 const investedInEur = h.costBasis * fx;
 const investedInEurHist = (eurBasis.get(h.symbol) || {}).costBasisEUR || investedInEur;
-if (valueInEur != null) valueEUR += valueInEur;
+if (valueInEur !== null) valueEUR += valueInEur;
 investedEUR += investedInEur;
 investedEURHistorical += investedInEurHist;
-const priceReturnEUR = valueInEur != null ? valueInEur - investedInEur : null;
+const priceReturnEUR = valueInEur !== null ? valueInEur - investedInEur : null;
 const currencyEffectEUR = investedInEur - investedInEurHist;
-enriched.push({ ...h, currentPrice: price, valueNative, valueEUR: valueInEur, unrealizedEUR: priceReturnEUR, priceReturnEUR, currencyEffectEUR, totalReturnEUR: priceReturnEUR != null ? priceReturnEUR + currencyEffectEUR : null, yieldOnCost: investYieldOnCost(h, dividends) });
+const last12mPerShare = investLast12mDividendPerShare(dividends, h.symbol);
+const hPadiEUR = last12mPerShare * h.shares * fx;
+padiEUR += hPadiEUR;
+const cagrH = investDividendCagrForSymbol(dividends, h.symbol);
+enriched.push({ ...h, currentPrice: price, valueNative, valueEUR: valueInEur, unrealizedEUR: priceReturnEUR, priceReturnEUR, currencyEffectEUR, totalReturnEUR: priceReturnEUR !== null ? priceReturnEUR + currencyEffectEUR : null, yieldOnCost: investYieldOnCost(h, dividends), currentYield: price ? last12mPerShare / price : null, padiEUR: hPadiEUR, cagr1y: cagrH.cagr1y, cagr3y: cagrH.cagr3y, cagr5y: cagrH.cagr5y, cagr10y: cagrH.cagr10y });
 }
 const oneYearAgo = Date.now() - 365 * 24 * 60 * 60 * 1000;
 for (const d of dividends) {
@@ -2527,6 +2552,17 @@ dividendAllTimeEUR += amountEUR;
 if (new Date(d.payDate).getTime() >= oneYearAgo) dividendYtdEUR += amountEUR;
 }
 const currencyEffectEURTotal = investedEUR - investedEURHistorical;
+const padi12mAgo = Date.now() - 365 * 24 * 60 * 60 * 1000;
+const padi24mAgo = Date.now() - 730 * 24 * 60 * 60 * 1000;
+let padiPrior12mEUR = 0;
+for (const d of dividends) {
+const dt = new Date(d.payDate).getTime();
+if (dt >= padi24mAgo && dt < padi12mAgo) {
+const fxp = await investGetFxRate(d.currency, 'EUR');
+padiPrior12mEUR += d.totalAmount * fxp;
+}
+}
+const padiGrowthPct = padiPrior12mEUR > 0 ? (dividendYtdEUR - padiPrior12mEUR) / padiPrior12mEUR : null;
 return json(res, 200, {
 holdings: enriched,
 totals: {
@@ -2536,6 +2572,7 @@ investedEURHistorical, currencyEffectEUR: currencyEffectEURTotal,
 totalReturnEUR: valueEUR - investedEURHistorical,
 dividendYtdEUR, dividendAllTimeEUR,
 avgYieldOnCost: investedEUR > 0 ? dividendYtdEUR / investedEUR : 0,
+padiEUR, padiGrowthPct,
 },
 });
 } catch (e) {
@@ -2550,9 +2587,11 @@ if (!s) return json(res, 401, { error: 'Not logged in' });
 try {
 const portfolioId = investPortfolioIdFromReq(req, new URL(req.url, 'http://localhost'), null);
 const dividends = (await kvGetJson(investDivKey(s.email, portfolioId))) || [];
+const filterSymbol = String(new URL(req.url, 'http://localhost').searchParams.get('symbol') || '').trim();
+const filteredDividends = filterSymbol ? dividends.filter((d) => d.symbol === filterSymbol) : dividends;
 const byYear = new Map();
 const byMonth = new Map();
-for (const d of dividends) {
+for (const d of filteredDividends) {
 const fx = await investGetFxRate(d.currency, 'EUR');
 const amountEUR = d.totalAmount * fx;
 const year = String(d.payDate).slice(0, 4);
@@ -2572,7 +2611,7 @@ const end = completed[n - 1].totalEUR;
 if (!start || start <= 0) return null;
 return Math.pow(end / start, 1 / years) - 1;
 };
-return json(res, 200, { yearly, monthly, cagr1y: cagr(1), cagr3y: cagr(3), cagr5y: cagr(5) });
+return json(res, 200, { yearly, monthly, cagr1y: cagr(1), cagr3y: cagr(3), cagr5y: cagr(5), cagr10y: cagr(10) });
 } catch (e) {
 console.error('invest dividend growth API error:', e.message);
 return json(res, 500, { error: 'Kon dividendgroei niet berekenen.' });
