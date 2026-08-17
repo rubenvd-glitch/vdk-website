@@ -1589,7 +1589,7 @@ async function handleAssistantNewSession(req, res) {
     const apiKey = (process.env.GROQ_API_KEY || '').trim();
     if (!apiKey) { await kvDel(histKey); return json(res, 200, { ok: true }); }
     const oldMemory = (await kvGetJson(memKey)) || '';
-    const model = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
+    const model = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
     const convoText = history.slice(-40).map((m) => (m.role === 'user' ? 'User: ' : 'Base: ') + String(m.content || '').slice(0, 500)).join('\n');
     const sumPrompt = [
       'Update the running memory summary for this user\'s assistant "Base" (VDK Business Services admin panel).',
@@ -1641,7 +1641,7 @@ async function handleAssistantChat(req, res) {
       .concat(history.slice(-20).map((m) => ({ role: m.role, content: m.content })));
     apiMessages.push({ role: 'user', content: message });
 
-    const model = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
+    const model = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
     const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -1832,7 +1832,7 @@ async function handleAssistantProactive(req, res) {
 
     const apiMessages = [{ role: 'system', content: systemPrompt }];
 
-    const model = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
+    const model = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
     const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
