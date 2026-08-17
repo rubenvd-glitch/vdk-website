@@ -3147,118 +3147,193 @@ window.investOpenCsvForm = () => { $('investCsvForm').style.display = 'block'; $
 window.investCloseCsvForm = () => { $('investCsvForm').style.display = 'none'; };
 
 function investCsvSplitLine(line) {
-const out = []; let cur = ''; let inQ = false;
+const out = []; let cur = ''; let inQ = false
 for (let i = 0; i < line.length; i++) {
-const c = line[i];
+const c = line[i]
 if (inQ) {
-if (c === '"') { if (line[i + 1] === '"') { cur += '"'; i++; } else { inQ = false; } }
-else cur += c;
+if (c === '"') { if (line[i + 1] === '"') { cur += '"'; i++ } else { inQ = false } }
+else cur += c
 } else {
-if (c === '"') inQ = true;
-else if (c === ',') { out.push(cur); cur = ''; }
-else cur += c;
+if (c === '"') inQ = true
+else if (c === ',') { out.push(cur); cur = '' }
+else cur += c
 }
 }
-out.push(cur);
-return out;
+out.push(cur)
+return out
 }
 
-function investCsvCol(headers, row, name) {
-const i = headers.findIndex((h) => h === name || h.indexOf(name + ' (') === 0);
-return i === -1 ? '' : (row[i] || '').trim();
+// Revolut money fields are compound strings like "USD 159" or "EUR -50" (currency
+// code + amount, space separated). A bare parseFloat() on those silently returns
+// NaN, which is the main reason rows were being dropped before.
+function investParseRevolutMoney(field) {
+const s = (field || '').trim()
+if (!s) return null
+const m = s.match(/^([A-Z]{3})\s+(-?[0-9]+(?:\.[0-9]+)?)$/)
+if (!m) return null
+return { currency: m[1], amount: Number(m[2]) }
 }
-function investCsvNum(v) {
-const n = parseFloat(String(v).replace(',', '.'));
-return isFinite(n) ? n : 0;
+
+function investParseRevolutRows(text) {
+const lines = String(text).replace(/\r\n/g, '\n').split('\n').filter((l) => l.trim().length > 0)
+if (!lines.length) return { rows: [], errors: [], totalLines: 0 }
+const header = investCsvSplitLine(lines[0]).map((h) => h.trim())
+const idx = {
+date: header.indexOf('Date'), ticker: header.indexOf('Ticker'), type: header.indexOf('Type'),
+quantity: header.indexOf('Quantity'), pricePerShare: header.indexOf('Price per share'),
+totalAmount: header.indexOf('Total Amount'), currency: header.indexOf('Currency'), fxRate: header.indexOf('FX Rate'),
 }
-function investDetectBrokerCsv(headers) {
-const has = (name) => headers.some((h) => h === name || h.indexOf(name) === 0);
-if (has('Action') && has('ISIN')) return 'trading212';
-if (has('Ticker') || has('Symbol')) return 'revolut';
-return 'trading212';
-}
-function investParseTrading212Csv(lines, headers) {
-const col = (row, name) => investCsvCol(headers, row, name);
-const num = investCsvNum;
-const feeCols = headers.map((h, i) => ({ h, i })).filter((c) => /fee|tax|charge/i.test(c.h) && !/free/i.test(c.h));
-const txs = [], divs = [];
-let skipped = 0;
+const missing = Object.entries(idx).filter(([, v]) => v === -1).map(([k]) => k)
+if (missing.length) throw new Error('Revolut CSV: onbekend format, kolommen ontbreken: ' + missing.join(', '))
+const rows = [], errors = []
 for (let i = 1; i < lines.length; i++) {
-const row = investCsvSplitLine(lines[i]);
-const action = (col(row, 'Action') || '').toLowerCase();
-const timeRaw = col(row, 'Time') || col(row, 'Time (UTC)');
-const dm = timeRaw.match(/(\d{4}-\d{2}-\d{2})/);
-const date = dm ? dm[1] : '';
-const ticker = col(row, 'Ticker');
-const currency = col(row, 'Currency (Price / share)') || 'EUR';
-const isin = col(row, 'ISIN');
-const fees = feeCols.reduce((sum, c) => sum + num(row[c.i]), 0);
+const raw = lines[i]
+const cells = investCsvSplitLine(raw)
+if (cells.length !== header.length) { errors.push({ line: i + 1, raw, reason: 'verwacht ' + header.length + ' kolommen, kreeg ' + cells.length }); continue }
+try {
+const dateStr = (cells[idx.date] || '').trim()
+const date = new Date(dateStr)
+if (Number.isNaN(date.getTime())) throw new Error('ongeldige datum: "' + dateStr + '"')
+const type = (cells[idx.type] || '').trim()
+if (!type) throw new Error('type ontbreekt')
+const ticker = (cells[idx.ticker] || '').trim()
+const quantityStr = (cells[idx.quantity] || '').trim()
+const quantity = quantityStr === '' ? null : Number(quantityStr)
+if (quantityStr !== '' && Number.isNaN(quantity)) throw new Error('ongeldige hoeveelheid: "' + quantityStr + '"')
+const pricePerShare = investParseRevolutMoney(cells[idx.pricePerShare])
+const totalAmount = investParseRevolutMoney(cells[idx.totalAmount])
+if (!totalAmount) throw new Error('totaalbedrag ontbreekt')
+const currency = (cells[idx.currency] || '').trim()
+rows.push({
+date: date.toISOString().slice(0, 10), ticker: ticker || null, type, quantity,
+pricePerShare: pricePerShare ? pricePerShare.amount : null, priceCurrency: pricePerShare ? pricePerShare.currency : null,
+totalAmount: totalAmount.amount, totalCurrency: totalAmount.currency, currency: currency || totalAmount.currency,
+})
+} catch (e) { errors.push({ line: i + 1, raw, reason: e.message }) }
+}
+return { rows, errors, totalLines: lines.length - 1 }
+}
+
+function investParseTrading212Rows(text) {
+const lines = String(text).replace(/\r\n/g, '\n').replace(/^\uFEFF/, '').split('\n').filter((l) => l.length > 0)
+if (!lines.length) return { rows: [], errors: [], totalLines: 0 }
+const header = investCsvSplitLine(lines[0]).map((h) => h.trim())
+const col = (name) => header.indexOf(name)
+const idx = {
+action: col('Action'), time: col('Time (UTC)'), isin: col('ISIN'), ticker: col('Ticker'), name: col('Name'),
+notes: col('Notes'), id: col('ID'), shares: col('No. of shares'), pricePerShare: col('Price / share'),
+priceCurrency: col('Currency (Price / share)'), fxRate: col('Exchange rate'), result: col('Result'),
+resultCurrency: col('Currency (Result)'), total: col('Total'), totalCurrency: col('Currency (Total)'),
+withholdingTax: col('Withholding tax'), withholdingTaxCurrency: col('Currency (Withholding tax)'),
+conversionFee: col('Currency conversion fee'), conversionFeeCurrency: col('Currency (Currency conversion fee)'),
+}
+const missing = Object.entries(idx).filter(([, v]) => v === -1).map(([k]) => k)
+if (missing.length) throw new Error('Trading 212 CSV: onbekend format, kolommen ontbreken: ' + missing.join(', '))
+function num(field) { const s = (field || '').trim(); if (s === '') return null; const n = Number(s); if (Number.isNaN(n)) throw new Error('ongeldig getal: "' + s + '"'); return n }
+function str(field) { const s = (field || '').trim(); return s === '' ? null : s }
+const rows = [], errors = []
+for (let i = 1; i < lines.length; i++) {
+const raw = lines[i]
+const cells = investCsvSplitLine(raw)
+if (cells.length !== header.length) { errors.push({ line: i + 1, raw, reason: 'verwacht ' + header.length + ' kolommen, kreeg ' + cells.length }); continue }
+try {
+const action = str(cells[idx.action])
+if (!action) throw new Error('actie ontbreekt')
+const timeStr = (cells[idx.time] || '').trim()
+const date = new Date(timeStr.replace(' ', 'T'))
+if (Number.isNaN(date.getTime())) throw new Error('ongeldige datum: "' + timeStr + '"')
+rows.push({
+date: date.toISOString().slice(0, 10), action, isin: str(cells[idx.isin]), ticker: str(cells[idx.ticker]),
+name: str(cells[idx.name]), notes: str(cells[idx.notes]), id: str(cells[idx.id]), shares: num(cells[idx.shares]),
+pricePerShare: num(cells[idx.pricePerShare]), priceCurrency: str(cells[idx.priceCurrency]), fxRate: num(cells[idx.fxRate]),
+result: num(cells[idx.result]), resultCurrency: str(cells[idx.resultCurrency]), total: num(cells[idx.total]),
+totalCurrency: str(cells[idx.totalCurrency]), withholdingTax: num(cells[idx.withholdingTax]),
+conversionFee: num(cells[idx.conversionFee]),
+})
+} catch (e) { errors.push({ line: i + 1, raw, reason: e.message }) }
+}
+return { rows, errors, totalLines: lines.length - 1 }
+}
+
+function investMapRevolutRows(rows) {
+const txs = [], divs = []
+let ignored = 0
+for (const r of rows) {
+const type = (r.type || '').toLowerCase()
+if (type.indexOf('buy') !== -1 || type.indexOf('sell') !== -1) {
+if (!r.ticker || !r.quantity || !r.pricePerShare) { ignored++; continue }
+txs.push({ type: type.indexOf('sell') !== -1 ? 'sell' : 'buy', symbol: r.ticker, name: r.ticker, currency: r.priceCurrency || r.currency || 'USD', shares: r.quantity, price: r.pricePerShare, fees: 0, date: r.date, note: '' })
+} else if (type.indexOf('dividend') !== -1) {
+if (!r.ticker || !r.totalAmount) { ignored++; continue }
+const sharesForDiv = r.quantity || 1
+divs.push({ symbol: r.ticker, amountPerShare: r.totalAmount / sharesForDiv, shares: sharesForDiv, totalAmount: r.totalAmount, currency: r.totalCurrency || r.currency || 'USD', payDate: r.date })
+} else {
+ignored++
+}
+}
+return { txs, divs, ignored }
+}
+
+function investMapTrading212Rows(rows) {
+const txs = [], divs = []
+let ignored = 0
+for (const r of rows) {
+const action = (r.action || '').toLowerCase()
 if (action.indexOf('buy') !== -1 || action.indexOf('sell') !== -1) {
-const shares = num(col(row, 'No. of shares'));
-const price = num(col(row, 'Price / share'));
-if (!ticker || !shares || !price || !date) { skipped++; continue; }
-txs.push({ type: action.indexOf('sell') !== -1 ? 'sell' : 'buy', symbol: ticker, name: col(row, 'Name') || ticker, currency, shares, price, fees, date, note: isin ? ('ISIN: ' + isin) : '' });
-} else if (action.indexOf('dividend') === 0) {
-const shares = num(col(row, 'No. of shares'));
-const amountPerShare = num(col(row, 'Price / share'));
-if (!ticker || !shares || !amountPerShare || !date) { skipped++; continue; }
-divs.push({ symbol: ticker, amountPerShare, shares, totalAmount: amountPerShare * shares, currency, payDate: date });
+if (!r.ticker || !r.shares || !r.pricePerShare) { ignored++; continue }
+txs.push({ type: action.indexOf('sell') !== -1 ? 'sell' : 'buy', symbol: r.ticker, name: r.name || r.ticker, currency: r.priceCurrency || r.totalCurrency || 'EUR', shares: r.shares, price: r.pricePerShare, fees: Math.abs(r.conversionFee || 0), date: r.date, note: r.isin ? ('ISIN: ' + r.isin) : '' })
+} else if (action.indexOf('dividend') !== -1) {
+if (!r.ticker || !r.total) { ignored++; continue }
+const sharesForDiv = r.shares || 1
+divs.push({ symbol: r.ticker, amountPerShare: r.total / sharesForDiv, shares: sharesForDiv, totalAmount: r.total, currency: r.totalCurrency || 'EUR', payDate: r.date })
 } else {
-skipped++;
+ignored++
 }
 }
-return { txs, divs, skipped };
+return { txs, divs, ignored }
 }
-function investParseRevolutCsv(lines, headers) {
-const col = (row, name) => investCsvCol(headers, row, name);
-const num = investCsvNum;
-const txs = [], divs = [];
-let skipped = 0;
-for (let i = 1; i < lines.length; i++) {
-const row = investCsvSplitLine(lines[i]);
-const typeRaw = (col(row, 'Type') || col(row, 'Activity Type') || '').toLowerCase();
-const dateRaw = col(row, 'Date') || col(row, 'Trade Date');
-const dm = dateRaw.match(/(\d{4}-\d{2}-\d{2})/);
-const date = dm ? dm[1] : '';
-const ticker = col(row, 'Ticker') || col(row, 'Symbol');
-const currency = col(row, 'Currency') || 'USD';
-const sharesRaw = Math.abs(num(col(row, 'Quantity')));
-const priceRaw = num(col(row, 'Price per share')) || num(col(row, 'Price'));
-const amountRaw = Math.abs(num(col(row, 'Total Amount')) || num(col(row, 'Amount')) || num(col(row, 'Total')));
-if (typeRaw.indexOf('buy') !== -1 || typeRaw.indexOf('sell') !== -1) {
-const price = priceRaw || (amountRaw && sharesRaw ? amountRaw / sharesRaw : 0);
-if (!ticker || !sharesRaw || !price || !date) { skipped++; continue; }
-txs.push({ type: typeRaw.indexOf('sell') !== -1 ? 'sell' : 'buy', symbol: ticker, name: col(row, 'Description') || ticker, currency, shares: sharesRaw, price, fees: 0, date });
-} else if (typeRaw.indexOf('dividend') !== -1) {
-if (!ticker || !date || !amountRaw) { skipped++; continue; }
-const sharesForDiv = sharesRaw || 1;
-divs.push({ symbol: ticker, amountPerShare: amountRaw / sharesForDiv, shares: sharesForDiv, totalAmount: amountRaw, currency, payDate: date });
-} else {
-skipped++;
+
+function investDetectBrokerCsv(headers) {
+const has = (name) => headers.some((h) => h === name || h.indexOf(name) === 0)
+if (has('Action') && has('ISIN')) return 'trading212'
+if (has('Ticker') || has('Symbol')) return 'revolut'
+return 'trading212'
 }
-}
-return { txs, divs, skipped };
-}
+
 function investParseBrokerCsv(text, forceBroker) {
-const lines = text.split(/\r?\n/).filter((l) => l.trim().length);
-if (!lines.length) return { txs: [], divs: [], skipped: 0, broker: 'unknown' };
-const headers = investCsvSplitLine(lines[0]).map((h) => h.trim());
-const broker = (forceBroker && forceBroker !== 'auto') ? forceBroker : investDetectBrokerCsv(headers);
-const result = broker === 'revolut' ? investParseRevolutCsv(lines, headers) : investParseTrading212Csv(lines, headers);
-result.broker = broker;
-return result;
+const lines = text.split(/\r?\n/).filter((l) => l.trim().length)
+if (!lines.length) return { txs: [], divs: [], skipped: 0, ignored: 0, broker: 'unknown' }
+const headers = investCsvSplitLine(lines[0]).map((h) => h.trim())
+const broker = (forceBroker && forceBroker !== 'auto') ? forceBroker : investDetectBrokerCsv(headers)
+if (broker === 'revolut') {
+const parsed = investParseRevolutRows(text)
+const mapped = investMapRevolutRows(parsed.rows)
+return { txs: mapped.txs, divs: mapped.divs, skipped: parsed.errors.length, ignored: mapped.ignored, errors: parsed.errors, broker }
+}
+const parsed = investParseTrading212Rows(text)
+const mapped = investMapTrading212Rows(parsed.rows)
+return { txs: mapped.txs, divs: mapped.divs, skipped: parsed.errors.length, ignored: mapped.ignored, errors: parsed.errors, broker }
 }
 
 let investCsvParsed = null;
 window.investCsvAnalyze = async () => {
-const f = $('investCsvFile').files[0];
-if (!f) { alert(t('invest.form.csvNoFile')); return; }
-const text = await f.text();
-const parsed = investParseBrokerCsv(text, $('investCsvBroker') ? $('investCsvBroker').value : 'auto');
-investCsvParsed = parsed;
-$('investCsvPreview').textContent = parsed.txs.length + ' transactie(s), ' + parsed.divs.length + ' dividend(en) gevonden, ' + parsed.skipped + ' regel(s) overgeslagen.';
-$('investCsvImportBtn').style.display = (parsed.txs.length || parsed.divs.length) ? 'inline-block' : 'none';
-};
+const f = $('investCsvFile').files[0]
+if (!f) { alert(t('invest.form.csvNoFile')); return }
+const text = await f.text()
+try {
+const parsed = investParseBrokerCsv(text, $('investCsvBroker') ? $('investCsvBroker').value : 'auto')
+investCsvParsed = parsed
+let msg = parsed.txs.length + ' transactie(s), ' + parsed.divs.length + ' dividend(en) gevonden'
+if (parsed.ignored) msg += ', ' + parsed.ignored + ' regel(s) genegeerd (stortingen/opnames/rente e.d.)'
+if (parsed.skipped) msg += ', ' + parsed.skipped + ' regel(s) met een fout'
+$('investCsvPreview').textContent = msg + '.'
+$('investCsvImportBtn').style.display = (parsed.txs.length || parsed.divs.length) ? 'inline-block' : 'none'
+} catch (e) {
+investCsvParsed = null
+$('investCsvPreview').textContent = 'Kon dit bestand niet lezen: ' + e.message
+$('investCsvImportBtn').style.display = 'none'
+}
+}
 
 window.investCsvImport = async () => {
 if (!investCsvParsed) return;
