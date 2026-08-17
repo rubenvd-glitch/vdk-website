@@ -1069,15 +1069,34 @@ header { padding: 10px 16px; }
 </div>
 <button onclick="investOpenTxForm()" data-i18n="invest.addTransaction">+ Transactie</button>
 <button onclick="investOpenCsvForm()" data-i18n="invest.importCsv">CSV importeren</button>
+<button onclick="investToggleColumnsPanel()" style="margin-left:6px;">Kolommen</button>
+<button onclick="investToggleTimetravelPanel()" style="margin-left:6px;">Tijdreis</button>
+<div id="investColumnsPanel" style="display:none;margin:8px 0;padding:8px;border:1px solid rgba(255,255,255,.1);border-radius:6px;font-size:12px;">
+<label style="margin-right:10px;"><input type="checkbox" data-col-toggle="shares" checked onchange="investToggleColumn('shares', this.checked)"> Aandelen</label>
+<label style="margin-right:10px;"><input type="checkbox" data-col-toggle="avgCost" checked onchange="investToggleColumn('avgCost', this.checked)"> Gem. prijs</label>
+<label style="margin-right:10px;"><input type="checkbox" data-col-toggle="currentPrice" checked onchange="investToggleColumn('currentPrice', this.checked)"> Koers</label>
+<label style="margin-right:10px;"><input type="checkbox" data-col-toggle="value" checked onchange="investToggleColumn('value', this.checked)"> Waarde</label>
+<label style="margin-right:10px;"><input type="checkbox" data-col-toggle="unrealized" checked onchange="investToggleColumn('unrealized', this.checked)"> Rendement</label>
+<label style="margin-right:10px;"><input type="checkbox" data-col-toggle="yield" checked onchange="investToggleColumn('yield', this.checked)"> Yield-on-cost</label>
+<label style="margin-right:10px;"><input type="checkbox" data-col-toggle="invested" onchange="investToggleColumn('invested', this.checked)"> Geinvesteerd</label>
+<label style="margin-right:10px;"><input type="checkbox" data-col-toggle="period" onchange="investToggleColumn('period', this.checked)"> Periode</label>
+</div>
+<div id="investTimetravelPanel" style="display:none;margin:8px 0;padding:8px;border:1px solid rgba(255,255,255,.1);border-radius:6px;font-size:12px;">
+<input type="date" id="investTimetravelDate" />
+<button onclick="investLoadTimetravel()">Bekijk</button>
+<div id="investTimetravelResult" style="margin-top:8px;"></div>
+</div>
 <table class="invest-table">
 <thead><tr>
 <th data-i18n="invest.col.symbol">Ticker</th>
-<th data-i18n="invest.col.shares">Aandelen</th>
-<th data-i18n="invest.col.avgCost">Gem. prijs</th>
-<th data-i18n="invest.col.currentPrice">Koers</th>
-<th data-i18n="invest.col.value">Waarde</th>
-<th data-i18n="invest.col.unrealized">Rendement</th>
-<th data-i18n="invest.col.yield">Yield-on-cost</th>
+<th data-col="shares" data-i18n="invest.col.shares">Aandelen</th>
+<th data-col="avgCost" data-i18n="invest.col.avgCost">Gem. prijs</th>
+<th data-col="currentPrice" data-i18n="invest.col.currentPrice">Koers</th>
+<th data-col="value" data-i18n="invest.col.value">Waarde</th>
+<th data-col="unrealized" data-i18n="invest.col.unrealized">Rendement</th>
+<th data-col="yield" data-i18n="invest.col.yield">Yield-on-cost</th>
+<th data-col="invested">Geinvesteerd</th>
+<th data-col="period">Periode</th>
 </tr></thead>
 <tbody id="investHoldingsBody"></tbody>
 </table>
@@ -2906,14 +2925,70 @@ for (const h of holdings) {
 const tr = document.createElement('tr');
 const pnlColor = (h.unrealizedEUR || 0) >= 0 ? '#7fd68f' : '#f28b8b';
 tr.innerHTML = '<td>' + h.symbol + '<br><span style="opacity:.6;font-size:12px;">' + (h.name || '') + '</span></td>'
-+ '<td>' + h.shares + '</td>'
-+ '<td>' + (h.avgCost != null ? h.avgCost.toFixed(2) : '–') + ' ' + h.currency + '</td>'
-+ '<td>' + (h.currentPrice != null ? h.currentPrice.toFixed(2) : '–') + ' ' + h.currency + '</td>'
-+ '<td>' + investFmtEUR(h.valueEUR) + '</td>'
-+ '<td style="color:' + pnlColor + ';">' + investFmtEUR(h.unrealizedEUR) + '</td>'
-+ '<td>' + investFmtPct(h.yieldOnCost) + '</td>';
++ '<td data-col="shares">' + h.shares + '</td>'
++ '<td data-col="avgCost">' + (h.avgCost !== null ? h.avgCost.toFixed(2) : '–') + ' ' + h.currency + '</td>'
++ '<td data-col="currentPrice">' + (h.currentPrice !== null ? h.currentPrice.toFixed(2) : '–') + ' ' + h.currency + '</td>'
++ '<td data-col="value">' + investFmtEUR(h.valueEUR) + '</td>'
++ '<td data-col="unrealized" style="color:' + pnlColor + ';">' + investFmtEUR(h.unrealizedEUR) + '</td>'
++ '<td data-col="yield">' + investFmtPct(h.yieldOnCost) + '</td>'
++ '<td data-col="invested">' + investFmtEUR(h.investedEUR) + '</td>'
++ '<td data-col="period">' + investHoldingPeriod(h.firstBuyDate) + '</td>'
 body.appendChild(tr);
 }
+investApplyColumnVisibility()
+}
+
+let investColumnVisibility = JSON.parse(localStorage.getItem('investColumnVisibility') || '{}')
+function investApplyColumnVisibility() {
+document.querySelectorAll('.invest-table [data-col]').forEach((el) => {
+const col = el.getAttribute('data-col')
+const visible = investColumnVisibility[col] !== undefined ? investColumnVisibility[col] : (col !== 'invested' && col !== 'period')
+el.style.display = visible ? '' : 'none'
+})
+document.querySelectorAll('[data-col-toggle]').forEach((cb) => {
+const col = cb.getAttribute('data-col-toggle')
+cb.checked = investColumnVisibility[col] !== undefined ? investColumnVisibility[col] : (col !== 'invested' && col !== 'period')
+})
+}
+window.investToggleColumn = (col, visible) => {
+investColumnVisibility[col] = visible
+localStorage.setItem('investColumnVisibility', JSON.stringify(investColumnVisibility))
+investApplyColumnVisibility()
+}
+window.investToggleColumnsPanel = () => { const el = $('investColumnsPanel'); el.style.display = el.style.display === 'none' ? 'block' : 'none' }
+window.investToggleTimetravelPanel = () => { const el = $('investTimetravelPanel'); if (el.style.display === 'none' && !$('investTimetravelDate').value) $('investTimetravelDate').value = new Date().toISOString().slice(0, 10); el.style.display = el.style.display === 'none' ? 'block' : 'none' }
+function investHoldingPeriod(dateStr) {
+if (!dateStr) return '–'
+const start = new Date(dateStr)
+const now = new Date()
+let months = (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth())
+if (now.getDate() < start.getDate()) months--
+if (months < 0) months = 0
+const years = Math.floor(months / 12)
+const remMonths = months % 12
+if (years > 0) return years + 'j ' + remMonths + 'm'
+return remMonths + 'm'
+}
+window.investLoadTimetravel = async () => {
+const date = $('investTimetravelDate').value
+if (!date) return
+const el = $('investTimetravelResult')
+el.textContent = 'Laden...'
+try {
+const d = await api(investUrl('/api/invest/timetravel') + '&date=' + encodeURIComponent(date))
+investRenderTimetravel(d || {})
+} catch (e) {
+el.textContent = 'Kon tijdreis niet laden.'
+}
+}
+function investRenderTimetravel(data) {
+const el = $('investTimetravelResult')
+if (!data.holdings || !data.holdings.length) { el.innerHTML = '<div style="opacity:.6;">Geen posities op deze datum.</div>'; return }
+let html = '<div style="margin-bottom:6px;font-weight:600;">Portefeuillewaarde op ' + data.date + ': ' + investFmtEUR(data.totalValueEUR) + '</div>'
+for (const h of data.holdings) {
+html += '<div style="display:flex;justify-content:space-between;padding:2px 0;"><span>' + h.symbol + ' (' + h.shares + ' st.)</span><span>' + (h.valueEUR !== null ? investFmtEUR(h.valueEUR) : '–') + '</span></div>'
+}
+el.innerHTML = html
 }
 
 function investRenderCalendar(upcoming) {
