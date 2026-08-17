@@ -2619,24 +2619,65 @@ async function handleInvestValueHistory(req, res) {
 const s = await getSession(req, 'admin');
 if (!s) return json(res, 401, { error: 'Not logged in' });
 try {
-const portfolioId = investPortfolioIdFromReq(req, new URL(req.url, 'http://localhost'), null);
-const history = (await kvGetJson(investSnapKey(s.email, portfolioId))) || [];
-const benchmarkSymbol = (process.env.INVEST_BENCHMARK_SYMBOL || 'SPY').trim();
-let benchmark = [];
+const __url = new URL(req.url, 'http://localhost')
+const portfolioId = investPortfolioIdFromReq(req, __url, null)
+const history = (await kvGetJson(investSnapKey(s.email, portfolioId))) || []
+const presets = { SP500: 'SPY', AEX: 'IAEX', MSCIACWI: 'ACWI' }
+const requestedParam = __url.searchParams.get('benchmarks')
+const requestedKeys = requestedParam ? requestedParam.split(',').map((x) => x.trim()).filter(Boolean) : ['SP500']
+const benchmarks = {}
+for (const key of requestedKeys) {
+const symbol = presets[key] || key
+let series = []
 if (history.length) {
-const firstValue = history[0].valueEUR;
-const firstPrice = await investGetHistoricalPrice(benchmarkSymbol, history[0].date);
+const firstValue = history[0].valueEUR
+const firstPrice = await investGetHistoricalPrice(symbol, history[0].date)
 if (firstPrice) {
 for (const h of history) {
-const p = await investGetHistoricalPrice(benchmarkSymbol, h.date);
-benchmark.push({ date: h.date, valueEUR: p != null ? firstValue * (p / firstPrice) : null });
+const p = await investGetHistoricalPrice(symbol, h.date)
+series.push({ date: h.date, valueEUR: p !== null ? firstValue * (p / firstPrice) : null })
 }
 }
 }
-return json(res, 200, { history, benchmark, benchmarkSymbol });
+benchmarks[key] = series
+}
+const benchmarkSymbol = (process.env.INVEST_BENCHMARK_SYMBOL || 'SPY').trim()
+const benchmark = benchmarks.SP500 || []
+return json(res, 200, { history, benchmark, benchmarkSymbol, benchmarks, benchmarkPresets: presets })
 } catch (e) {
 console.error('invest value history API error:', e.message);
 return json(res, 500, { error: 'Kon waardegeschiedenis niet ophalen.' });
+}
+}
+
+async function handleInvestCosts(req, res) {
+const s = await getSession(req, 'admin')
+if (!s) return json(res, 401, { error: 'Not logged in' })
+try {
+const portfolioId = investPortfolioIdFromReq(req, new URL(req.url, 'http://localhost'), null)
+const transactions = (await kvGetJson(investTxKey(s.email, portfolioId))) || []
+const byMonthMap = new Map()
+const byBrokerMap = new Map()
+const bySymbolMap = new Map()
+let totalEUR = 0
+for (const tx of transactions) {
+const fees = Number(tx.fees) || 0
+if (!fees) continue
+const fx = await investGetFxRate(tx.currency, 'EUR')
+const feesEUR = fees * fx
+totalEUR += feesEUR
+const month = String(tx.date || '').slice(0, 7)
+byMonthMap.set(month, (byMonthMap.get(month) || 0) + feesEUR)
+const broker = tx.broker || 'Onbekend'
+byBrokerMap.set(broker, (byBrokerMap.get(broker) || 0) + feesEUR)
+bySymbolMap.set(tx.symbol, (bySymbolMap.get(tx.symbol) || 0) + feesEUR)
+}
+const toList = (map) => [...map.entries()].map(([key, valueEUR]) => ({ key, valueEUR, pct: totalEUR > 0 ? valueEUR / totalEUR : 0 })).sort((a, b) => b.valueEUR - a.valueEUR)
+const byMonth = [...byMonthMap.entries()].map(([month, valueEUR]) => ({ month, valueEUR })).sort((a, b) => (a.month < b.month ? -1 : 1))
+return json(res, 200, { byMonth, byBroker: toList(byBrokerMap), bySymbol: toList(bySymbolMap), totalEUR })
+} catch (e) {
+console.error('invest costs API error:', e.message)
+return json(res, 500, { error: 'Kon kostenoverzicht niet berekenen.' })
 }
 }
 
@@ -3149,6 +3190,7 @@ if (p === '/api/invest/dividend-growth') return handleInvestDividendGrowth(req, 
 if (p === '/api/invest/value-history') return handleInvestValueHistory(req, res);
 if (p === '/api/invest/diversification') return handleInvestDiversification(req, res);
 if (p === '/api/invest/portfolios') return handleInvestPortfolios(req, res);
+if (p === '/api/invest/costs') return handleInvestCosts(req, res)
 
 
 // --- Base Assistant API (AI chat widget, same 'admin' session as Gym) ---
