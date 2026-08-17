@@ -1432,7 +1432,7 @@ async function buildAssistantContext(email) {
   const recentSets = (gymLog || [])
     .filter((x) => x.date >= twoWeeksAgoISO)
     .slice(-150)
-    .map((x) => ({ exercise: x.exercise, date: x.date, weight: x.weight, reps: x.reps, muscle: x.muscle, restSeconds: x.restSeconds || null }));
+    .map((x) => ({ exercise: x.exercise, date: x.date, weight: x.weight, reps: x.reps, muscle: x.muscle, restSeconds: x.restSeconds || null, time: x.createdAt ? new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Amsterdam', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(x.createdAt)) : null }));
   return {
     today: todayISO,
         memory: mem || '',
