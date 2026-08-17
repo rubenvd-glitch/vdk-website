@@ -2175,8 +2175,67 @@ function gymValidCreatedAt(v) {
 const t = Number(v);
 return Number.isFinite(t) && t > 1577836800000 && t <= Date.now() + 5 * 60 * 1000 ? t : null;
 }
-function investTxKey(email) { return `investtx:${email}`; }
-function investDivKey(email) { return `investdiv:${email}`; }
+function investTxKey(email, portfolioId) { return (portfolioId && portfolioId !== 'default') ? `investtx:${email}:${portfolioId}` : `investtx:${email}`; }
+function investDivKey(email, portfolioId) { return (portfolioId && portfolioId !== 'default') ? `investdiv:${email}:${portfolioId}` : `investdiv:${email}`; }
+function investPortfoliosKey(email) { return `investportfolios:${email}`; }
+function investPortfolioIdFromReq(req, url, body) {
+const raw = (body && body.portfolioId !== undefined) ? body.portfolioId : (url ? url.searchParams.get('portfolioId') : null);
+const id = String(raw || 'default').trim().slice(0, 40);
+return /^[a-zA-Z0-9_-]+$/.test(id) ? id : 'default';
+}
+async function investGetPortfolios(email) {
+let list = (await kvGetJson(investPortfoliosKey(email))) || [];
+if (!Array.isArray(list) || !list.length) {
+list = [{ id: 'default', name: 'Portfolio 1', createdAt: Date.now() }];
+await kvSetJson(investPortfoliosKey(email), list);
+}
+return list;
+}
+async function handleInvestPortfolios(req, res) {
+const s = await getSession(req, 'admin');
+if (!s) return json(res, 401, { error: 'Not logged in' });
+try {
+if (req.method === 'GET') return json(res, 200, await investGetPortfolios(s.email));
+if (req.method === 'POST') {
+const body = await readBody(req, res);
+if (!body) return;
+const key = investPortfoliosKey(s.email);
+let list = await investGetPortfolios(s.email);
+if (body.action === 'create') {
+const name = String(body.name || '').trim().slice(0, 60);
+if (!name) throw apiError(400, 'Vul een naam in.');
+if (list.length >= 10) throw apiError(400, 'Maximaal 10 portfolios.');
+const id = crypto.randomUUID();
+list.push({ id, name, createdAt: Date.now() });
+await kvSetJson(key, list);
+return json(res, 200, { ok: true, portfolios: list, created: id });
+} else if (body.action === 'rename') {
+const it = list.find((x) => x.id === body.id);
+if (!it) throw apiError(404, 'Niet gevonden');
+const name = String(body.name || '').trim().slice(0, 60);
+if (!name) throw apiError(400, 'Vul een naam in.');
+it.name = name;
+await kvSetJson(key, list);
+return json(res, 200, { ok: true, portfolios: list });
+} else if (body.action === 'delete') {
+if (list.length <= 1) throw apiError(400, 'Je moet minstens 1 portfolio overhouden.');
+const delId = String(body.id || '');
+list = list.filter((x) => x.id !== delId);
+await kvSetJson(key, list);
+await kvSetJson(investTxKey(s.email, delId), []);
+await kvSetJson(investDivKey(s.email, delId), []);
+await kvSetJson(investSnapKey(s.email, delId), []);
+await kvSetJson(investSectorKey(s.email, delId), {});
+return json(res, 200, { ok: true, portfolios: list });
+}
+throw apiError(400, 'Onbekende actie');
+}
+} catch (e) {
+if (e && e.httpStatus) return json(res, e.httpStatus, { error: e.message });
+console.error('invest portfolios API error:', e.message);
+return json(res, 500, { error: 'Opslag niet bereikbaar. Is Upstash gekoppeld?' });
+}
+}
 function investValidCreatedAt(v) {
 const t = Number(v);
 return Number.isFinite(t) && t > 1577836800000 && t <= Date.now() + 5 * 60 * 1000 ? t : null;
@@ -2274,8 +2333,8 @@ return parseFloat(r.rate);
 });
 }
 
-async function applyInvestTxAction(email, body) {
-const key = investTxKey(email);
+async function applyInvestTxAction(email, portfolioId, body) {
+const key = investTxKey(email, portfolioId);
 let list = (await kvGetJson(key)) || [];
 if (body.action === 'create') {
 const symbol = String(body.symbol || '').trim().slice(0, 30);
@@ -2319,8 +2378,8 @@ await kvSetJson(key, list);
 return list;
 }
 
-async function applyInvestDivAction(email, body) {
-const key = investDivKey(email);
+async function applyInvestDivAction(email, portfolioId, body) {
+const key = investDivKey(email, portfolioId);
 let list = (await kvGetJson(key)) || [];
 if (body.action === 'create') {
 const symbol = String(body.symbol || '').trim().slice(0, 30);
@@ -2367,11 +2426,12 @@ async function handleInvestTx(req, res) {
 const s = await getSession(req, 'admin');
 if (!s) return json(res, 401, { error: 'Not logged in' });
 try {
-if (req.method === 'GET') return json(res, 200, (await kvGetJson(investTxKey(s.email))) || []);
+const __url = new URL(req.url, 'http://localhost');
+if (req.method === 'GET') return json(res, 200, (await kvGetJson(investTxKey(s.email, investPortfolioIdFromReq(req, __url, null)))) || []);
 if (req.method === 'POST') {
 const body = await readBody(req, res);
 if (!body) return;
-const list = await applyInvestTxAction(s.email, body);
+const list = await applyInvestTxAction(s.email, investPortfolioIdFromReq(req, __url, body), body);
 return json(res, 200, { ok: true, transactions: list });
 }
 } catch (e) {
@@ -2385,11 +2445,12 @@ async function handleInvestDiv(req, res) {
 const s = await getSession(req, 'admin');
 if (!s) return json(res, 401, { error: 'Not logged in' });
 try {
-if (req.method === 'GET') return json(res, 200, (await kvGetJson(investDivKey(s.email))) || []);
+const __url = new URL(req.url, 'http://localhost');
+if (req.method === 'GET') return json(res, 200, (await kvGetJson(investDivKey(s.email, investPortfolioIdFromReq(req, __url, null)))) || []);
 if (req.method === 'POST') {
 const body = await readBody(req, res);
 if (!body) return;
-const list = await applyInvestDivAction(s.email, body);
+const list = await applyInvestDivAction(s.email, investPortfolioIdFromReq(req, __url, body), body);
 return json(res, 200, { ok: true, dividends: list });
 }
 } catch (e) {
@@ -2436,8 +2497,9 @@ async function handleInvestHoldings(req, res) {
 const s = await getSession(req, 'admin');
 if (!s) return json(res, 401, { error: 'Not logged in' });
 try {
-const transactions = (await kvGetJson(investTxKey(s.email))) || [];
-const dividends = (await kvGetJson(investDivKey(s.email))) || [];
+const portfolioId = investPortfolioIdFromReq(req, new URL(req.url, 'http://localhost'), null);
+const transactions = (await kvGetJson(investTxKey(s.email, portfolioId))) || [];
+const dividends = (await kvGetJson(investDivKey(s.email, portfolioId))) || [];
 const holdings = investComputeHoldings(transactions).filter((h) => !h.closed);
 const eurBasis = await investComputeHoldingsEurBasis(transactions);
 let valueEUR = 0, investedEUR = 0, investedEURHistorical = 0, dividendYtdEUR = 0, dividendAllTimeEUR = 0;
@@ -2486,7 +2548,8 @@ async function handleInvestDividendGrowth(req, res) {
 const s = await getSession(req, 'admin');
 if (!s) return json(res, 401, { error: 'Not logged in' });
 try {
-const dividends = (await kvGetJson(investDivKey(s.email))) || [];
+const portfolioId = investPortfolioIdFromReq(req, new URL(req.url, 'http://localhost'), null);
+const dividends = (await kvGetJson(investDivKey(s.email, portfolioId))) || [];
 const byYear = new Map();
 const byMonth = new Map();
 for (const d of dividends) {
@@ -2516,7 +2579,7 @@ return json(res, 500, { error: 'Kon dividendgroei niet berekenen.' });
 }
 }
 
-function investSnapKey(email) { return `investsnap:${email}`; }
+function investSnapKey(email, portfolioId) { return (portfolioId && portfolioId !== 'default') ? `investsnap:${email}:${portfolioId}` : `investsnap:${email}`; }
 
 async function investGetHistoricalPrice(symbol, date) {
 return investCached(`investhist:${symbol}:${date}`, 365 * 24 * 60 * 60 * 1000, async () => {
@@ -2527,9 +2590,9 @@ return parseFloat(vals[0].close);
 });
 }
 
-async function investSnapshotPortfolio(email) {
+async function investSnapshotPortfolio(email, portfolioId) {
 try {
-const transactions = (await kvGetJson(investTxKey(email))) || [];
+const transactions = (await kvGetJson(investTxKey(email, portfolioId))) || [];
 if (!transactions.length) return;
 const holdings = investComputeHoldings(transactions).filter((h) => !h.closed);
 let valueEUR = 0, investedEUR = 0;
@@ -2541,7 +2604,7 @@ if (price != null) valueEUR += price * h.shares * fx;
 investedEUR += h.costBasis * fx;
 }
 const date = new Date().toISOString().slice(0, 10);
-const key = investSnapKey(email);
+const key = investSnapKey(email, portfolioId);
 const list = (await kvGetJson(key)) || [];
 const idx = list.findIndex((x) => x.date === date);
 const entry = { date, valueEUR, investedEUR };
@@ -2556,7 +2619,8 @@ async function handleInvestValueHistory(req, res) {
 const s = await getSession(req, 'admin');
 if (!s) return json(res, 401, { error: 'Not logged in' });
 try {
-const history = (await kvGetJson(investSnapKey(s.email))) || [];
+const portfolioId = investPortfolioIdFromReq(req, new URL(req.url, 'http://localhost'), null);
+const history = (await kvGetJson(investSnapKey(s.email, portfolioId))) || [];
 const benchmarkSymbol = (process.env.INVEST_BENCHMARK_SYMBOL || 'SPY').trim();
 let benchmark = [];
 if (history.length) {
@@ -2576,7 +2640,7 @@ return json(res, 500, { error: 'Kon waardegeschiedenis niet ophalen.' });
 }
 }
 
-function investSectorKey(email) { return `investsector:${email}`; }
+function investSectorKey(email, portfolioId) { return (portfolioId && portfolioId !== 'default') ? `investsector:${email}:${portfolioId}` : `investsector:${email}`; }
 
 async function investGetInstrumentCountry(symbol) {
 return investCached(`investcountry:${symbol}`, 365 * 24 * 60 * 60 * 1000, async () => {
@@ -2591,20 +2655,23 @@ async function handleInvestDiversification(req, res) {
 const s = await getSession(req, 'admin');
 if (!s) return json(res, 401, { error: 'Not logged in' });
 try {
+const __url = new URL(req.url, 'http://localhost');
+let portfolioId = investPortfolioIdFromReq(req, __url, null);
 if (req.method === 'POST') {
 const body = await readBody(req, res);
 if (!body) return;
+if (body.portfolioId) portfolioId = investPortfolioIdFromReq(req, __url, body);
 const symbol = String(body.symbol || '').trim();
 if (!symbol) return json(res, 400, { error: 'Ticker is verplicht.' });
 const sector = String(body.sector || '').trim();
-const key = investSectorKey(s.email);
+const key = investSectorKey(s.email, portfolioId);
 const map = (await kvGetJson(key)) || {};
 if (sector) map[symbol] = sector; else delete map[symbol];
 await kvSetJson(key, map);
 }
-const transactions = (await kvGetJson(investTxKey(s.email))) || [];
+const transactions = (await kvGetJson(investTxKey(s.email, portfolioId))) || [];
 const holdings = investComputeHoldings(transactions).filter((h) => !h.closed);
-const sectorMap = (await kvGetJson(investSectorKey(s.email))) || {};
+const sectorMap = (await kvGetJson(investSectorKey(s.email, portfolioId))) || {};
 const byCountryMap = new Map();
 const bySectorMap = new Map();
 let total = 0;
@@ -2632,7 +2699,8 @@ async function handleInvestDividendCalendar(req, res) {
 const s = await getSession(req, 'admin');
 if (!s) return json(res, 401, { error: 'Not logged in' });
 try {
-const transactions = (await kvGetJson(investTxKey(s.email))) || [];
+const portfolioId = investPortfolioIdFromReq(req, new URL(req.url, 'http://localhost'), null);
+const transactions = (await kvGetJson(investTxKey(s.email, portfolioId))) || [];
 const holdings = investComputeHoldings(transactions).filter((h) => !h.closed);
 const upcoming = [];
 for (const h of holdings) {
@@ -3080,6 +3148,7 @@ if (p === '/api/invest/dividend-calendar') return handleInvestDividendCalendar(r
 if (p === '/api/invest/dividend-growth') return handleInvestDividendGrowth(req, res);
 if (p === '/api/invest/value-history') return handleInvestValueHistory(req, res);
 if (p === '/api/invest/diversification') return handleInvestDiversification(req, res);
+if (p === '/api/invest/portfolios') return handleInvestPortfolios(req, res);
 
 
 // --- Base Assistant API (AI chat widget, same 'admin' session as Gym) ---
@@ -3486,7 +3555,8 @@ if (!secret || url.searchParams.get('key') !== secret) {
 return json(res, 403, { error: 'Forbidden' });
 }
 try {
-await investSnapshotPortfolio(ADMIN_EMAIL);
+const cronPortfolios = await investGetPortfolios(ADMIN_EMAIL);
+for (const cronPf of cronPortfolios) await investSnapshotPortfolio(ADMIN_EMAIL, cronPf.id);
 const range = url.searchParams.get('range');
 const text = range === 'week' ? await weeklySummaryText() : await dailySummaryText();
 const ok = await tgSend(text);

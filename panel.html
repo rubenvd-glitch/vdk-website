@@ -1048,6 +1048,12 @@ header { padding: 10px 16px; }
 <h2 data-i18n="invest.title">Beleggen</h2>
 </div>
 <div class="section-sub" data-i18n="invest.sub">Dividend-tracker: houd je posities, transacties en dividendinkomsten bij.</div>
+<div class="invest-portfolio-bar" style="display:flex;align-items:center;gap:8px;margin:8px 0 4px;flex-wrap:wrap;">
+<select id="investPortfolioSelect" onchange="investSwitchPortfolio(this.value)"></select>
+<button onclick="investNewPortfolio()">+ Nieuwe portfolio</button>
+<button onclick="investRenamePortfolio()">Naam wijzigen</button>
+<button onclick="investDeletePortfolio()">Verwijderen</button>
+</div>
 
 <div class="invest-summary-grid">
 <div class="invest-stat"><span class="invest-stat-label" data-i18n="invest.portfolioValue">Portfoliowaarde</span><span class="invest-stat-value" id="investValueEUR">–</span></div>
@@ -1107,8 +1113,9 @@ header { padding: 10px 16px; }
 </div>
 
 <div id="investCsvForm" class="invest-form" style="display:none;">
-<div class="section-sub" data-i18n="invest.form.csvHint">Ondersteunt de CSV-export van Trading 212 (Geschiedenis &gt; Exporteren). Koop-/verkooptransacties en dividenduitkeringen worden geïmporteerd; stortingen, opnames, rente en valutaconversies worden overgeslagen.</div>
+<div class="section-sub" data-i18n="invest.form.csvHint">Ondersteunt de CSV-export van Trading 212 (Geschiedenis &gt; Exporteren) en Revolut (Stocks &gt; Statements &gt; Account Statement). Koop-/verkooptransacties en dividenduitkeringen worden geïmporteerd; stortingen, opnames, rente en valutaconversies worden overgeslagen.</div>
 <input type="file" id="investCsvFile" accept=".csv,text/csv" />
+<select id="investCsvBroker" style="margin-top:8px;"><option value="auto">Automatisch herkennen</option><option value="trading212">Trading 212</option><option value="revolut">Revolut</option></select>
 <div id="investCsvPreview" style="margin-top:10px;font-size:13px;opacity:.85;"></div>
 <div class="invest-form-actions">
 <button onclick="investCsvAnalyze()" data-i18n="invest.form.csvAnalyze">Analyseren</button>
@@ -2822,6 +2829,60 @@ if (!r.ok) throw new Error(d.error || 'Er ging iets mis');
 return d;
 }
 
+let investPortfolioId = localStorage.getItem('investPortfolioId') || 'default';
+function investUrl(path) {
+const sep = path.indexOf('?') === -1 ? '?' : '&';
+return path + sep + 'portfolioId=' + encodeURIComponent(investPortfolioId);
+}
+async function investLoadPortfolios() {
+try {
+const list = await api('/api/invest/portfolios');
+const sel = $('investPortfolioSelect');
+if (!sel) return list;
+if (!list.find((p) => p.id === investPortfolioId)) investPortfolioId = (list[0] && list[0].id) || 'default';
+sel.innerHTML = list.map((p) => '<option value="' + p.id + '"' + (p.id === investPortfolioId ? ' selected' : '') + '>' + String(p.name).replace(/</g, '&lt;') + '</option>').join('');
+localStorage.setItem('investPortfolioId', investPortfolioId);
+return list;
+} catch (e) {
+console.error('invest portfolios error', e);
+return [];
+}
+}
+window.investSwitchPortfolio = (id) => {
+investPortfolioId = id;
+localStorage.setItem('investPortfolioId', investPortfolioId);
+loadInvestPage();
+};
+window.investNewPortfolio = async () => {
+const name = prompt('Naam van de nieuwe portfolio?');
+if (!name) return;
+try {
+const d = await api('/api/invest/portfolios', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'create', name }) });
+investPortfolioId = d.created || investPortfolioId;
+await investLoadPortfolios();
+loadInvestPage();
+} catch (e) { alert(e.message); }
+};
+window.investRenamePortfolio = async () => {
+const sel = $('investPortfolioSelect');
+const current = sel && sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].textContent : '';
+const name = prompt('Nieuwe naam?', current);
+if (!name) return;
+try {
+await api('/api/invest/portfolios', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'rename', id: investPortfolioId, name }) });
+await investLoadPortfolios();
+} catch (e) { alert(e.message); }
+};
+window.investDeletePortfolio = async () => {
+if (!confirm('Deze portfolio en alle bijbehorende data verwijderen?')) return;
+try {
+const d = await api('/api/invest/portfolios', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'delete', id: investPortfolioId }) });
+investPortfolioId = (d.portfolios && d.portfolios[0] && d.portfolios[0].id) || 'default';
+await investLoadPortfolios();
+loadInvestPage();
+} catch (e) { alert(e.message); }
+};
+
 function investFmtEUR(n) {
 if (n == null || Number.isNaN(n)) return '–';
 return new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' }).format(n);
@@ -2872,7 +2933,7 @@ list.appendChild(row);
 
 async function investLoadHoldings() {
 try {
-const d = await api('/api/invest/holdings');
+const d = await api(investUrl('/api/invest/holdings'));
 investRenderHoldings(d.holdings || [], d.totals || {});
 } catch (e) {
 console.error('invest holdings error', e);
@@ -2881,7 +2942,7 @@ console.error('invest holdings error', e);
 
 async function investLoadCalendar() {
 try {
-const d = await api('/api/invest/dividend-calendar');
+const d = await api(investUrl('/api/invest/dividend-calendar'));
 investRenderCalendar(d.upcoming || []);
 } catch (e) {
 console.error('invest calendar error', e);
@@ -2914,7 +2975,7 @@ $('investCagrLine').textContent = parts.join('   ·   ');
 
 async function investLoadDividendGrowth() {
 try {
-const d = await api('/api/invest/dividend-growth');
+const d = await api(investUrl('/api/invest/dividend-growth'));
 investRenderDividendGrowth(d || {});
 } catch (e) {
 console.error('invest dividend growth error', e);
@@ -2968,7 +3029,7 @@ $('investValueHistoryLegend').innerHTML = legendParts.join('&nbsp;&nbsp;&nbsp;')
 
 async function investLoadValueHistory() {
 try {
-const d = await api('/api/invest/value-history');
+const d = await api(investUrl('/api/invest/value-history'));
 investRenderValueHistory(d || {});
 } catch (e) {
 console.error('invest value history error', e);
@@ -3008,7 +3069,7 @@ editor.innerHTML = html;
 
 async function investLoadDiversification() {
 try {
-const d = await api('/api/invest/diversification');
+const d = await api(investUrl('/api/invest/diversification'));
 investRenderDiversification(d || {});
 } catch (e) {
 console.error('invest diversification error', e);
@@ -3019,7 +3080,7 @@ window.investEditSector = async (symbol) => {
 const sector = prompt(t('invest.sectorPrompt') + ' (' + symbol + ')');
 if (sector == null) return;
 try {
-const d = await api('/api/invest/diversification', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ symbol, sector }) });
+const d = await api('/api/invest/diversification', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ symbol, sector, portfolioId: investPortfolioId }) });
 investRenderDiversification(d || {});
 } catch (e) {
 alert(e.message);
@@ -3027,6 +3088,7 @@ alert(e.message);
 };
 
 function loadInvestPage() {
+investLoadPortfolios();
 investLoadHoldings();
 investLoadCalendar();
 investLoadDividendGrowth();
@@ -3041,6 +3103,7 @@ window.investCloseDivForm = () => { $('investDivForm').style.display = 'none'; }
 
 window.investSubmitTx = async () => {
 const body = {
+portfolioId: investPortfolioId,
 action: 'create',
 type: $('investTxType').value,
 symbol: $('investTxSymbol').value,
@@ -3063,6 +3126,7 @@ alert(e.message);
 
 window.investSubmitDiv = async () => {
 const body = {
+portfolioId: investPortfolioId,
 action: 'create',
 symbol: $('investDivSymbol').value,
 amountPerShare: Number($('investDivAmount').value),
@@ -3099,15 +3163,24 @@ out.push(cur);
 return out;
 }
 
-function investParseBrokerCsv(text) {
-const lines = text.split(/\r?\n/).filter((l) => l.trim().length);
-if (!lines.length) return { txs: [], divs: [], skipped: 0 };
-const headers = investCsvSplitLine(lines[0]).map((h) => h.trim());
-const col = (row, name) => {
+function investCsvCol(headers, row, name) {
 const i = headers.findIndex((h) => h === name || h.indexOf(name + ' (') === 0);
 return i === -1 ? '' : (row[i] || '').trim();
-};
-const num = (v) => { const n = parseFloat(String(v).replace(',', '.')); return isFinite(n) ? n : 0; };
+}
+function investCsvNum(v) {
+const n = parseFloat(String(v).replace(',', '.'));
+return isFinite(n) ? n : 0;
+}
+function investDetectBrokerCsv(headers) {
+const has = (name) => headers.some((h) => h === name || h.indexOf(name) === 0);
+if (has('Action') && has('ISIN')) return 'trading212';
+if (has('Ticker') || has('Symbol')) return 'revolut';
+return 'trading212';
+}
+function investParseTrading212Csv(lines, headers) {
+const col = (row, name) => investCsvCol(headers, row, name);
+const num = investCsvNum;
+const feeCols = headers.map((h, i) => ({ h, i })).filter((c) => /fee|tax|charge/i.test(c.h) && !/free/i.test(c.h));
 const txs = [], divs = [];
 let skipped = 0;
 for (let i = 1; i < lines.length; i++) {
@@ -3118,12 +3191,13 @@ const dm = timeRaw.match(/(\d{4}-\d{2}-\d{2})/);
 const date = dm ? dm[1] : '';
 const ticker = col(row, 'Ticker');
 const currency = col(row, 'Currency (Price / share)') || 'EUR';
+const isin = col(row, 'ISIN');
+const fees = feeCols.reduce((sum, c) => sum + num(row[c.i]), 0);
 if (action.indexOf('buy') !== -1 || action.indexOf('sell') !== -1) {
 const shares = num(col(row, 'No. of shares'));
 const price = num(col(row, 'Price / share'));
 if (!ticker || !shares || !price || !date) { skipped++; continue; }
-const fees = num(col(row, 'Charge amount')) + num(col(row, 'Stamp duty reserve tax')) + num(col(row, 'French transaction tax')) + num(col(row, 'Currency conversion fee'));
-txs.push({ type: action.indexOf('sell') !== -1 ? 'sell' : 'buy', symbol: ticker, name: col(row, 'Name') || ticker, currency, shares, price, fees, date });
+txs.push({ type: action.indexOf('sell') !== -1 ? 'sell' : 'buy', symbol: ticker, name: col(row, 'Name') || ticker, currency, shares, price, fees, date, note: isin ? ('ISIN: ' + isin) : '' });
 } else if (action.indexOf('dividend') === 0) {
 const shares = num(col(row, 'No. of shares'));
 const amountPerShare = num(col(row, 'Price / share'));
@@ -3135,13 +3209,52 @@ skipped++;
 }
 return { txs, divs, skipped };
 }
+function investParseRevolutCsv(lines, headers) {
+const col = (row, name) => investCsvCol(headers, row, name);
+const num = investCsvNum;
+const txs = [], divs = [];
+let skipped = 0;
+for (let i = 1; i < lines.length; i++) {
+const row = investCsvSplitLine(lines[i]);
+const typeRaw = (col(row, 'Type') || col(row, 'Activity Type') || '').toLowerCase();
+const dateRaw = col(row, 'Date') || col(row, 'Trade Date');
+const dm = dateRaw.match(/(\d{4}-\d{2}-\d{2})/);
+const date = dm ? dm[1] : '';
+const ticker = col(row, 'Ticker') || col(row, 'Symbol');
+const currency = col(row, 'Currency') || 'USD';
+const sharesRaw = Math.abs(num(col(row, 'Quantity')));
+const priceRaw = num(col(row, 'Price per share')) || num(col(row, 'Price'));
+const amountRaw = Math.abs(num(col(row, 'Total Amount')) || num(col(row, 'Amount')) || num(col(row, 'Total')));
+if (typeRaw.indexOf('buy') !== -1 || typeRaw.indexOf('sell') !== -1) {
+const price = priceRaw || (amountRaw && sharesRaw ? amountRaw / sharesRaw : 0);
+if (!ticker || !sharesRaw || !price || !date) { skipped++; continue; }
+txs.push({ type: typeRaw.indexOf('sell') !== -1 ? 'sell' : 'buy', symbol: ticker, name: col(row, 'Description') || ticker, currency, shares: sharesRaw, price, fees: 0, date });
+} else if (typeRaw.indexOf('dividend') !== -1) {
+if (!ticker || !date || !amountRaw) { skipped++; continue; }
+const sharesForDiv = sharesRaw || 1;
+divs.push({ symbol: ticker, amountPerShare: amountRaw / sharesForDiv, shares: sharesForDiv, totalAmount: amountRaw, currency, payDate: date });
+} else {
+skipped++;
+}
+}
+return { txs, divs, skipped };
+}
+function investParseBrokerCsv(text, forceBroker) {
+const lines = text.split(/\r?\n/).filter((l) => l.trim().length);
+if (!lines.length) return { txs: [], divs: [], skipped: 0, broker: 'unknown' };
+const headers = investCsvSplitLine(lines[0]).map((h) => h.trim());
+const broker = (forceBroker && forceBroker !== 'auto') ? forceBroker : investDetectBrokerCsv(headers);
+const result = broker === 'revolut' ? investParseRevolutCsv(lines, headers) : investParseTrading212Csv(lines, headers);
+result.broker = broker;
+return result;
+}
 
 let investCsvParsed = null;
 window.investCsvAnalyze = async () => {
 const f = $('investCsvFile').files[0];
 if (!f) { alert(t('invest.form.csvNoFile')); return; }
 const text = await f.text();
-const parsed = investParseBrokerCsv(text);
+const parsed = investParseBrokerCsv(text, $('investCsvBroker') ? $('investCsvBroker').value : 'auto');
 investCsvParsed = parsed;
 $('investCsvPreview').textContent = parsed.txs.length + ' transactie(s), ' + parsed.divs.length + ' dividend(en) gevonden, ' + parsed.skipped + ' regel(s) overgeslagen.';
 $('investCsvImportBtn').style.display = (parsed.txs.length || parsed.divs.length) ? 'inline-block' : 'none';
@@ -3154,13 +3267,13 @@ btn.disabled = true;
 const total = investCsvParsed.txs.length + investCsvParsed.divs.length;
 let done = 0, failed = 0;
 for (const tx of investCsvParsed.txs) {
-try { await api('/api/invest/transactions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({ action: 'create' }, tx)) }); }
+try { await api('/api/invest/transactions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({ action: 'create', portfolioId: investPortfolioId }, tx)) }); }
 catch (e) { failed++; }
 done++;
 $('investCsvPreview').textContent = 'Importeren... ' + done + '/' + total;
 }
 for (const dv of investCsvParsed.divs) {
-try { await api('/api/invest/dividends', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({ action: 'create' }, dv)) }); }
+try { await api('/api/invest/dividends', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({ action: 'create', portfolioId: investPortfolioId }, dv)) }); }
 catch (e) { failed++; }
 done++;
 $('investCsvPreview').textContent = 'Importeren... ' + done + '/' + total;
