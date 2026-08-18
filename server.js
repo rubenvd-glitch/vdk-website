@@ -2247,12 +2247,13 @@ const bySymbol = new Map();
 const sorted = [...transactions].sort((a, b) => (a.date < b.date ? -1 : 1));
 for (const tx of sorted) {
 if (!bySymbol.has(tx.symbol)) {
-bySymbol.set(tx.symbol, { symbol: tx.symbol, name: tx.name, currency: tx.currency, shares: 0, costBasis: 0, realizedPnl: 0 });
+bySymbol.set(tx.symbol, { symbol: tx.symbol, name: tx.name, currency: tx.currency, shares: 0, costBasis: 0, realizedPnl: 0, firstBuyDate: null })
 }
 const h = bySymbol.get(tx.symbol);
 if (tx.type === 'buy') {
 h.shares += tx.shares;
 h.costBasis += tx.shares * tx.price + (tx.fees || 0);
+if (!h.firstBuyDate) h.firstBuyDate = tx.date
 } else if (tx.type === 'sell') {
 if (h.shares > 0) {
 const costPerShare = h.costBasis / h.shares;
@@ -2266,6 +2267,41 @@ h.realizedPnl -= tx.fees || 0;
 }
 }
 return [...bySymbol.values()].map((h) => ({ ...h, avgCost: h.shares > 0 ? h.costBasis / h.shares : 0, closed: h.shares <= 0 }));
+}
+
+async function handleInvestTimetravel(req, res) {
+const s = await getSession(req, 'admin')
+if (!s) return json(res, 401, { error: 'Not logged in' })
+try {
+const __url = new URL(req.url, 'http://localhost')
+const portfolioId = investPortfolioIdFromReq(req, __url, null)
+const dateParam = __url.searchParams.get('date')
+const date = /^\d{4}-\d{2}-\d{2}$/.test(String(dateParam || '')) ? dateParam : new Date().toISOString().slice(0, 10)
+const allTransactions = (await kvGetJson(investTxKey(s.email, portfolioId))) || []
+const transactions = allTransactions.filter((tx) => tx.date <= date)
+const holdings = investComputeHoldings(transactions).filter((h) => !h.closed)
+const sectorMap = (await kvGetJson(investSectorKey(s.email, portfolioId))) || {}
+const byCountryMap = new Map()
+const bySectorMap = new Map()
+let totalValueEUR = 0
+const enriched = []
+for (const h of holdings) {
+const histPrice = await investGetHistoricalPrice(h.symbol, date)
+const fx = await investGetFxRate(h.currency, 'EUR')
+const valueEUR = histPrice !== null ? histPrice * h.shares * fx : null
+if (valueEUR !== null) totalValueEUR += valueEUR
+const country = (await investGetInstrumentCountry(h.symbol)) || 'Onbekend'
+byCountryMap.set(country, (byCountryMap.get(country) || 0) + (valueEUR || 0))
+const sector = sectorMap[h.symbol] || 'Onbekend'
+bySectorMap.set(sector, (bySectorMap.get(sector) || 0) + (valueEUR || 0))
+enriched.push({ symbol: h.symbol, name: h.name, shares: h.shares, historicalPrice: histPrice, valueEUR, currency: h.currency, firstBuyDate: h.firstBuyDate })
+}
+const toList = (map) => [...map.entries()].map(([key, valueEUR]) => ({ key, valueEUR, pct: totalValueEUR > 0 ? valueEUR / totalValueEUR : 0 })).sort((a, b) => b.valueEUR - a.valueEUR)
+return json(res, 200, { date, holdings: enriched, totalValueEUR, byCountry: toList(byCountryMap), bySector: toList(bySectorMap) })
+} catch (e) {
+console.error('invest timetravel API error:', e.message)
+return json(res, 500, { error: 'Kon tijdreis niet berekenen.' })
+}
 }
 
 function investEstimateNextDividend(history) {
@@ -2541,11 +2577,11 @@ investedEUR += investedInEur;
 investedEURHistorical += investedInEurHist;
 const priceReturnEUR = valueInEur !== null ? valueInEur - investedInEur : null;
 const currencyEffectEUR = investedInEur - investedInEurHist;
-const last12mPerShare = investLast12mDividendPerShare(dividends, h.symbol);
-const hPadiEUR = last12mPerShare * h.shares * fx;
-padiEUR += hPadiEUR;
-const cagrH = investDividendCagrForSymbol(dividends, h.symbol);
-enriched.push({ ...h, currentPrice: price, valueNative, valueEUR: valueInEur, unrealizedEUR: priceReturnEUR, priceReturnEUR, currencyEffectEUR, totalReturnEUR: priceReturnEUR !== null ? priceReturnEUR + currencyEffectEUR : null, yieldOnCost: investYieldOnCost(h, dividends), currentYield: price ? last12mPerShare / price : null, padiEUR: hPadiEUR, cagr1y: cagrH.cagr1y, cagr3y: cagrH.cagr3y, cagr5y: cagrH.cagr5y, cagr10y: cagrH.cagr10y });
+      const last12mPerShare = investLast12mDividendPerShare(dividends, h.symbol);
+      const hPadiEUR = last12mPerShare * h.shares * fx;
+      padiEUR += hPadiEUR;
+      const cagrH = investDividendCagrForSymbol(dividends, h.symbol);
+      enriched.push({ ...h, currentPrice: price, valueNative, valueEUR: valueInEur, unrealizedEUR: priceReturnEUR, priceReturnEUR, currencyEffectEUR, totalReturnEUR: priceReturnEUR !== null ? priceReturnEUR + currencyEffectEUR : null, yieldOnCost: investYieldOnCost(h, dividends), investedEUR: investedInEur, currentYield: price ? last12mPerShare / price : null, padiEUR: hPadiEUR, cagr1y: cagrH.cagr1y, cagr3y: cagrH.cagr3y, cagr5y: cagrH.cagr5y, cagr10y: cagrH.cagr10y });
 }
 const oneYearAgo = Date.now() - 365 * 24 * 60 * 60 * 1000;
 for (const d of dividends) {
@@ -3292,6 +3328,7 @@ if (p === '/api/invest/dividend-growth') return handleInvestDividendGrowth(req, 
 if (p === '/api/invest/value-history') return handleInvestValueHistory(req, res);
 if (p === '/api/invest/diversification') return handleInvestDiversification(req, res);
 if (p === '/api/invest/portfolios') return handleInvestPortfolios(req, res);
+if (p === '/api/invest/timetravel') return handleInvestTimetravel(req, res)
 if (p === '/api/invest/costs') return handleInvestCosts(req, res)
 
 
