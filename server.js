@@ -2226,6 +2226,7 @@ await kvSetJson(investTxKey(s.email, delId), []);
 await kvSetJson(investDivKey(s.email, delId), []);
 await kvSetJson(investSnapKey(s.email, delId), []);
 await kvSetJson(investSectorKey(s.email, delId), {});
+await kvSetJson(investStrategyKey(s.email, delId), {})
 return json(res, 200, { ok: true, portfolios: list });
 }
 throw apiError(400, 'Onbekende actie');
@@ -2375,6 +2376,7 @@ shares, price,
 fees: Math.max(0, Number(body.fees) || 0),
 date,
 note: String(body.note || '').trim().slice(0, 500),
+broker: String(body.broker || '').trim().slice(0, 40),
 createdAt: investValidCreatedAt(body.createdAt) || Date.now(),
 });
 } else if (body.action === 'update') {
@@ -2389,6 +2391,7 @@ if (body.price !== undefined) it.price = Number(body.price) || it.price;
 if (body.fees !== undefined) it.fees = Math.max(0, Number(body.fees) || 0);
 if (body.date !== undefined) it.date = /^\d{4}-\d{2}-\d{2}$/.test(String(body.date)) ? String(body.date) : it.date;
 if (body.note !== undefined) it.note = String(body.note).trim().slice(0, 500);
+if (body.broker !== undefined) it.broker = String(body.broker).trim().slice(0, 40)
 if (body.createdAt !== undefined) { const ca = investValidCreatedAt(body.createdAt); if (ca) it.createdAt = ca; }
 } else if (body.action === 'delete') {
 list = list.filter((x) => x.id !== body.id);
@@ -2681,6 +2684,8 @@ return json(res, 500, { error: 'Kon waardegeschiedenis niet ophalen.' });
 
 function investSectorKey(email, portfolioId) { return (portfolioId && portfolioId !== 'default') ? `investsector:${email}:${portfolioId}` : `investsector:${email}`; }
 
+function investStrategyKey(email, portfolioId) { return (portfolioId && portfolioId !== 'default') ? `investstrategy:${email}:${portfolioId}` : `investstrategy:${email}` }
+
 async function investGetInstrumentCountry(symbol) {
 return investCached(`investcountry:${symbol}`, 365 * 24 * 60 * 60 * 1000, async () => {
 const r = await tdFetch('/stocks', { symbol });
@@ -2688,6 +2693,39 @@ const list = r && r.data;
 if (r.error || !list || !list.length) return null;
 return list[0].country || null;
 });
+}
+
+async function investGetInstrumentExchange(symbol) {
+return investCached(`investexchange:${symbol}`, 365 * 24 * 60 * 60 * 1000, async () => {
+const r = await tdFetch('/stocks', { symbol })
+const list = r && r.data
+if (r.error || !list || !list.length) return null
+return list[0].exchange || null
+})
+}
+
+async function investGetInstrumentType(symbol) {
+return investCached(`investtype:${symbol}`, 365 * 24 * 60 * 60 * 1000, async () => {
+const r = await tdFetch('/stocks', { symbol })
+const list = r && r.data
+if (r.error || !list || !list.length) return null
+return list[0].type || null
+})
+}
+
+const INVEST_CONTINENT_MAP = {
+'United States': 'Noord-Amerika', 'Canada': 'Noord-Amerika', 'Mexico': 'Noord-Amerika',
+'Netherlands': 'Europa', 'Germany': 'Europa', 'France': 'Europa', 'United Kingdom': 'Europa', 'Belgium': 'Europa', 'Spain': 'Europa', 'Italy': 'Europa', 'Switzerland': 'Europa', 'Sweden': 'Europa', 'Norway': 'Europa', 'Denmark': 'Europa', 'Finland': 'Europa', 'Ireland': 'Europa', 'Austria': 'Europa', 'Portugal': 'Europa', 'Poland': 'Europa', 'Luxembourg': 'Europa',
+'Japan': 'Azie', 'China': 'Azie', 'Hong Kong': 'Azie', 'South Korea': 'Azie', 'Taiwan': 'Azie', 'India': 'Azie', 'Singapore': 'Azie', 'Israel': 'Azie',
+'Australia': 'Oceanie', 'New Zealand': 'Oceanie',
+'Brazil': 'Zuid-Amerika', 'Argentina': 'Zuid-Amerika', 'Chile': 'Zuid-Amerika',
+'South Africa': 'Afrika',
+}
+function investContinentFor(country) { return INVEST_CONTINENT_MAP[country] || 'Onbekend' }
+
+function investBrokerForSymbol(transactions, symbol) {
+const matches = transactions.filter((t) => t.symbol === symbol && t.broker).sort((a, b) => (a.date < b.date ? 1 : -1))
+return matches.length ? matches[0].broker : null
 }
 
 async function handleInvestDiversification(req, res) {
@@ -2707,12 +2745,26 @@ const key = investSectorKey(s.email, portfolioId);
 const map = (await kvGetJson(key)) || {};
 if (sector) map[symbol] = sector; else delete map[symbol];
 await kvSetJson(key, map);
+if (body.strategy !== undefined) {
+const stratKey = investStrategyKey(s.email, portfolioId)
+const stratMap = (await kvGetJson(stratKey)) || {}
+const strategy = String(body.strategy || '').trim()
+if (strategy) stratMap[symbol] = strategy; else delete stratMap[symbol]
+await kvSetJson(stratKey, stratMap)
+}
 }
 const transactions = (await kvGetJson(investTxKey(s.email, portfolioId))) || [];
 const holdings = investComputeHoldings(transactions).filter((h) => !h.closed);
 const sectorMap = (await kvGetJson(investSectorKey(s.email, portfolioId))) || {};
 const byCountryMap = new Map();
 const bySectorMap = new Map();
+const strategyMap = (await kvGetJson(investStrategyKey(s.email, portfolioId))) || {}
+const byWorldPartMap = new Map()
+const byCurrencyMap = new Map()
+const byExchangeMap = new Map()
+const byAssetTypeMap = new Map()
+const byStrategyMap = new Map()
+const byBrokerMap = new Map()
 let total = 0;
 for (const h of holdings) {
 const quote = await investGetQuote(h.symbol);
@@ -2724,9 +2776,20 @@ const country = (await investGetInstrumentCountry(h.symbol)) || 'Onbekend';
 byCountryMap.set(country, (byCountryMap.get(country) || 0) + valueEUR);
 const sector = sectorMap[h.symbol] || 'Onbekend';
 bySectorMap.set(sector, (bySectorMap.get(sector) || 0) + valueEUR);
+const continent = investContinentFor(country)
+byWorldPartMap.set(continent, (byWorldPartMap.get(continent) || 0) + valueEUR)
+byCurrencyMap.set(h.currency, (byCurrencyMap.get(h.currency) || 0) + valueEUR)
+const exchange = (await investGetInstrumentExchange(h.symbol)) || 'Onbekend'
+byExchangeMap.set(exchange, (byExchangeMap.get(exchange) || 0) + valueEUR)
+const assetType = (await investGetInstrumentType(h.symbol)) || 'Onbekend'
+byAssetTypeMap.set(assetType, (byAssetTypeMap.get(assetType) || 0) + valueEUR)
+const strategy = strategyMap[h.symbol] || 'Onbekend'
+byStrategyMap.set(strategy, (byStrategyMap.get(strategy) || 0) + valueEUR)
+const broker = investBrokerForSymbol(transactions, h.symbol) || 'Onbekend'
+byBrokerMap.set(broker, (byBrokerMap.get(broker) || 0) + valueEUR)
 }
 const toList = (map) => [...map.entries()].map(([key, valueEUR]) => ({ key, valueEUR, pct: total > 0 ? valueEUR / total : 0 })).sort((a, b) => b.valueEUR - a.valueEUR);
-return json(res, 200, { byCountry: toList(byCountryMap), bySector: toList(bySectorMap), totalValueEUR: total, sectors: sectorMap, holdings: holdings.map((h) => ({ symbol: h.symbol, name: h.name })) });
+return json(res, 200, { byCountry: toList(byCountryMap), bySector: toList(bySectorMap), byWorldPart: toList(byWorldPartMap), byCurrency: toList(byCurrencyMap), byExchange: toList(byExchangeMap), byAssetType: toList(byAssetTypeMap), byStrategy: toList(byStrategyMap), byBroker: toList(byBrokerMap), totalValueEUR: total, sectors: sectorMap, strategies: strategyMap, holdings: holdings.map((h) => ({ symbol: h.symbol, name: h.name })) })
 } catch (e) {
 if (e && e.httpStatus) return json(res, e.httpStatus, { error: e.message });
 console.error('invest diversification API error:', e.message);
