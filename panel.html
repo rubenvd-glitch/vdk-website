@@ -1165,7 +1165,19 @@ header { padding: 10px 16px; }
 </div>
 
 <div class="section-head" style="margin-top:20px;">
-<h2 style="font-size:16px;" data-i18n="invest.dividendCalendar">Dividendkalender</h2>
+<h2 style="font-size:16px;">Kalender</h2>
+</div>
+<div style="margin-bottom:8px;">
+<label style="margin-right:10px;font-size:12px;"><input type="checkbox" id="investCalCatdividend" onchange="investToggleCalendarCategory('dividend', this.checked)"> Ex-dividend/dividend</label>
+<label style="margin-right:10px;font-size:12px;"><input type="checkbox" id="investCalCatmacro" onchange="investToggleCalendarCategory('macro', this.checked)"> Macro-economische data</label>
+<label style="margin-right:10px;font-size:12px;"><input type="checkbox" id="investCalCatearnings" onchange="investToggleCalendarCategory('earnings', this.checked)"> Kwartaal/jaarcijfers</label>
+<label style="margin-right:10px;font-size:12px;"><input type="checkbox" id="investCalCattrading-updates" onchange="investToggleCalendarCategory('trading-updates', this.checked)"> Handelsupdates</label>
+<label style="margin-right:10px;font-size:12px;"><input type="checkbox" id="investCalCatinvestor-days" onchange="investToggleCalendarCategory('investor-days', this.checked)"> Beleggersdagen</label>
+<label style="margin-right:10px;font-size:12px;"><input type="checkbox" id="investCalCatagm" onchange="investToggleCalendarCategory('agm', this.checked)"> Aandeelhoudersvergaderingen</label>
+</div>
+<div style="margin-bottom:8px;">
+<button onclick="investSetCalendarPeriod('week')" id="investCalPeriodWeek" style="margin-right:4px;">Week</button>
+<button onclick="investSetCalendarPeriod('month')" id="investCalPeriodMonth">Maand</button>
 </div>
 <button onclick="investOpenDivForm()" data-i18n="invest.logDividend">+ Dividend loggen</button>
 <div id="investCalendarList"></div>
@@ -3151,18 +3163,68 @@ $('investPosDetailTabTx').innerHTML = tx
 
 
 
+let investCalendarActiveCategories = JSON.parse(localStorage.getItem('investCalendarCategories') || 'null') || { dividend: true, macro: true, earnings: false, 'trading-updates': false, 'investor-days': false, agm: false }
+let investCalendarPeriod = localStorage.getItem('investCalendarPeriod') || 'month'
+let investCalendarRawEvents = []
+let investCalendarCategoryMeta = []
+window.investToggleCalendarCategory = (cat, checked) => {
+investCalendarActiveCategories[cat] = checked
+localStorage.setItem('investCalendarCategories', JSON.stringify(investCalendarActiveCategories))
+investRenderCalendar(investFilterCalendarEvents(investCalendarRawEvents))
+}
+window.investSetCalendarPeriod = (period) => {
+investCalendarPeriod = period
+localStorage.setItem('investCalendarPeriod', period)
+investApplyCalendarPeriodButtons()
+investRenderCalendar(investFilterCalendarEvents(investCalendarRawEvents))
+}
+function investApplyCalendarPeriodButtons() {
+const wk = $('investCalPeriodWeek'), mo = $('investCalPeriodMonth')
+if (wk) wk.style.fontWeight = investCalendarPeriod === 'week' ? '700' : '400'
+if (mo) mo.style.fontWeight = investCalendarPeriod === 'month' ? '700' : '400'
+}
+function investApplyCalendarCategoryCheckboxes() {
+for (const cat in investCalendarActiveCategories) {
+const cb = document.getElementById('investCalCat' + cat)
+if (cb) cb.checked = !!investCalendarActiveCategories[cat]
+}
+}
+function investFilterCalendarEvents(events) {
+const now = new Date()
+const maxDate = new Date(now)
+if (investCalendarPeriod === 'week') maxDate.setDate(maxDate.getDate() + 7)
+else maxDate.setMonth(maxDate.getMonth() + 1)
+const todayStr = now.toISOString().slice(0, 10)
+const maxStr = maxDate.toISOString().slice(0, 10)
+return events.filter((e) => investCalendarActiveCategories[e.category] && e.date >= todayStr && e.date <= maxStr)
+}
 function investRenderCalendar(upcoming) {
-const list = $('investCalendarList');
-list.innerHTML = '';
-if (!upcoming || !upcoming.length) { list.innerHTML = '<div style="opacity:.6;padding:8px 0;">' + t('invest.noUpcoming') + '</div>'; return; }
+const list = $('investCalendarList')
+list.innerHTML = ''
+const unavailableActive = investCalendarCategoryMeta.filter((c) => investCalendarActiveCategories[c.key] && c.available === false)
+for (const c of unavailableActive) {
+const note = document.createElement('div')
+note.style.cssText = 'padding:6px 0;opacity:.5;font-size:12px;font-style:italic;'
+note.textContent = c.label + ': geen databron beschikbaar.'
+list.appendChild(note)
+}
+if (!upcoming || !upcoming.length) {
+if (!unavailableActive.length) list.innerHTML += '<div style="opacity:.6;padding:8px 0;">' + t('invest.noUpcoming') + '</div>'
+return
+}
 for (const item of upcoming) {
-const row = document.createElement('div');
-row.style.padding = '8px 0';
-row.style.borderBottom = '1px solid rgba(255,255,255,.08)';
-row.innerHTML = '<strong>' + item.symbol + '</strong> — ' + item.estimatedDate
+const row = document.createElement('div')
+row.style.padding = '8px 0'
+row.style.borderBottom = '1px solid rgba(255,255,255,.08)'
+if (item.category === 'dividend') {
+row.innerHTML = '<strong>' + item.symbol + '</strong> \u2014 ' + item.date
 + ' <span style="opacity:.6;font-size:12px;">(' + t('invest.estimated') + ')</span>'
-+ '<span style="float:right;">' + item.amountPerShare + ' ' + item.currency + '</span>';
-list.appendChild(row);
++ '<span style="float:right;">' + item.amountPerShare + ' ' + item.currency + '</span>'
+} else {
+row.innerHTML = '<strong>' + item.title + '</strong> \u2014 ' + item.date
++ '<span style="float:right;opacity:.6;font-size:12px;">Macro</span>'
+}
+list.appendChild(row)
 }
 }
 
@@ -3177,10 +3239,14 @@ console.error('invest holdings error', e);
 
 async function investLoadCalendar() {
 try {
-const d = await api(investUrl('/api/invest/dividend-calendar'));
-investRenderCalendar(d.upcoming || []);
+const d = await api(investUrl('/api/invest/extended-calendar'))
+investCalendarRawEvents = d.events || []
+investCalendarCategoryMeta = d.categories || []
+investApplyCalendarCategoryCheckboxes()
+investApplyCalendarPeriodButtons()
+investRenderCalendar(investFilterCalendarEvents(investCalendarRawEvents))
 } catch (e) {
-console.error('invest calendar error', e);
+console.error('invest calendar error', e)
 }
 }
 

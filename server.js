@@ -2953,6 +2953,55 @@ console.error('invest dividend-calendar API error:', e.message);
 return json(res, 500, { error: 'Kon dividendkalender niet ophalen.' });
 }
 }
+const INVEST_MACRO_EVENTS_2026 = [
+  { date: '2026-01-28', title: 'FOMC rentebesluit (VS)' },
+  { date: '2026-03-18', title: 'FOMC rentebesluit (VS)' },
+  { date: '2026-03-19', title: 'ECB rentebesluit (eurozone)' },
+  { date: '2026-04-29', title: 'FOMC rentebesluit (VS)' },
+  { date: '2026-04-30', title: 'ECB rentebesluit (eurozone)' },
+  { date: '2026-06-11', title: 'ECB rentebesluit (eurozone)' },
+  { date: '2026-06-17', title: 'FOMC rentebesluit (VS)' },
+  { date: '2026-07-23', title: 'ECB rentebesluit (eurozone)' },
+  { date: '2026-07-29', title: 'FOMC rentebesluit (VS)' },
+  { date: '2026-09-10', title: 'ECB rentebesluit (eurozone)' },
+  { date: '2026-09-16', title: 'FOMC rentebesluit (VS)' },
+  { date: '2026-10-28', title: 'FOMC rentebesluit (VS)' },
+  { date: '2026-10-29', title: 'ECB rentebesluit (eurozone)' },
+  { date: '2026-12-09', title: 'FOMC rentebesluit (VS)' },
+  { date: '2026-12-17', title: 'ECB rentebesluit (eurozone)' },
+]
+
+async function handleInvestExtendedCalendar(req, res) {
+const s = await getSession(req, 'admin')
+if (!s) return json(res, 401, { error: 'Not logged in' })
+try {
+const __url = new URL(req.url, 'http://localhost')
+const portfolioId = investPortfolioIdFromReq(req, __url, null)
+const transactions = (await kvGetJson(investTxKey(s.email, portfolioId))) || []
+const holdings = investComputeHoldings(transactions).filter((h) => !h.closed)
+const events = []
+for (const h of holdings) {
+const history = await investGetDividendHistory(h.symbol)
+const est = investEstimateNextDividend(history)
+if (est) events.push({ category: 'dividend', date: est.estimatedDate, title: h.symbol + ' verwacht dividend', symbol: h.symbol, amountPerShare: est.amountPerShare, currency: h.currency })
+}
+for (const m of INVEST_MACRO_EVENTS_2026) events.push({ category: 'macro', date: m.date, title: m.title })
+events.sort((a, b) => (a.date < b.date ? -1 : 1))
+const categories = [
+{ key: 'dividend', label: 'Ex-dividend/dividend', available: true },
+{ key: 'macro', label: 'Macro-economische data', available: true },
+{ key: 'earnings', label: 'Kwartaal/jaarcijfers', available: false },
+{ key: 'trading-updates', label: 'Handelsupdates', available: false },
+{ key: 'investor-days', label: 'Beleggersdagen', available: false },
+{ key: 'agm', label: 'Aandeelhoudersvergaderingen', available: false },
+]
+return json(res, 200, { events, categories })
+} catch (e) {
+console.error('invest extended-calendar API error:', e.message)
+return json(res, 500, { error: 'Kon kalender niet ophalen.' })
+}
+}
+
 
 
 
@@ -3383,6 +3432,7 @@ if (p === '/api/invest/transactions') return handleInvestTx(req, res);
 if (p === '/api/invest/dividends') return handleInvestDiv(req, res);
 if (p === '/api/invest/holdings') return handleInvestHoldings(req, res);
 if (p === '/api/invest/dividend-calendar') return handleInvestDividendCalendar(req, res);
+if (p === '/api/invest/extended-calendar') return handleInvestExtendedCalendar(req, res)
 if (p === '/api/invest/dividend-growth') return handleInvestDividendGrowth(req, res);
 if (p === '/api/invest/value-history') return handleInvestValueHistory(req, res);
 if (p === '/api/invest/diversification') return handleInvestDiversification(req, res);
