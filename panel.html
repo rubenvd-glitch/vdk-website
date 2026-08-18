@@ -2998,6 +2998,59 @@ filterSel.innerHTML = '<option value="">Alle posities</option>' + symbols.map((s
 }
 investApplyColumnVisibility()
 }
+let investColumnVisibility = JSON.parse(localStorage.getItem('investColumnVisibility') || '{}')
+function investApplyColumnVisibility() {
+document.querySelectorAll('.invest-table [data-col]').forEach((el) => {
+const col = el.getAttribute('data-col')
+const visible = investColumnVisibility[col] !== undefined ? investColumnVisibility[col] : (col !== 'invested' && col !== 'period')
+el.style.display = visible ? '' : 'none'
+})
+document.querySelectorAll('[data-col-toggle]').forEach((cb) => {
+const col = cb.getAttribute('data-col-toggle')
+cb.checked = investColumnVisibility[col] !== undefined ? investColumnVisibility[col] : (col !== 'invested' && col !== 'period')
+})
+}
+window.investToggleColumn = (col, visible) => {
+investColumnVisibility[col] = visible
+localStorage.setItem('investColumnVisibility', JSON.stringify(investColumnVisibility))
+investApplyColumnVisibility()
+}
+window.investToggleColumnsPanel = () => { const el = $('investColumnsPanel'); el.style.display = el.style.display === 'none' ? 'block' : 'none' }
+window.investToggleTimetravelPanel = () => { const el = $('investTimetravelPanel'); if (el.style.display === 'none' && !$('investTimetravelDate').value) $('investTimetravelDate').value = new Date().toISOString().slice(0, 10); el.style.display = el.style.display === 'none' ? 'block' : 'none' }
+function investHoldingPeriod(dateStr) {
+if (!dateStr) return '–'
+const start = new Date(dateStr)
+const now = new Date()
+let months = (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth())
+if (now.getDate() < start.getDate()) months--
+if (months < 0) months = 0
+const years = Math.floor(months / 12)
+const remMonths = months % 12
+if (years > 0) return years + 'j ' + remMonths + 'm'
+return remMonths + 'm'
+}
+window.investLoadTimetravel = async () => {
+const date = $('investTimetravelDate').value
+if (!date) return
+const el = $('investTimetravelResult')
+el.textContent = 'Laden...'
+try {
+const d = await api(investUrl('/api/invest/timetravel') + '&date=' + encodeURIComponent(date))
+investRenderTimetravel(d || {})
+} catch (e) {
+el.textContent = 'Kon tijdreis niet laden.'
+}
+}
+function investRenderTimetravel(data) {
+const el = $('investTimetravelResult')
+if (!data.holdings || !data.holdings.length) { el.innerHTML = '<div style="opacity:.6;">Geen posities op deze datum.</div>'; return }
+let html = '<div style="margin-bottom:6px;font-weight:600;">Portefeuillewaarde op ' + data.date + ': ' + investFmtEUR(data.totalValueEUR) + '</div>'
+for (const h of data.holdings) {
+html += '<div style="display:flex;justify-content:space-between;padding:2px 0;"><span>' + h.symbol + ' (' + h.shares + ' st.)</span><span>' + (h.valueEUR !== null ? investFmtEUR(h.valueEUR) : '–') + '</span></div>'
+}
+el.innerHTML = html
+}
+
 
 function investRenderCalendar(upcoming) {
 const list = $('investCalendarList');
