@@ -1095,6 +1095,8 @@ header { padding: 10px 16px; }
 <th data-col="value" data-i18n="invest.col.value">Waarde</th>
 <th data-col="unrealized" data-i18n="invest.col.unrealized">Rendement</th>
 <th data-col="yield" data-i18n="invest.col.yield">Yield-on-cost</th>
+<th data-col="currentYield" data-i18n="invest.col.currentYield">Yield</th>
+<th data-col="cagr1y" data-i18n="invest.col.cagr1y">Div. CAGR (1j)</th>
 <th data-col="invested">Geinvesteerd</th>
 <th data-col="period">Periode</th>
 </tr></thead>
@@ -1172,6 +1174,10 @@ header { padding: 10px 16px; }
 <div class="section-head" style="margin-top:20px;">
 <h2 style="font-size:16px;" data-i18n="invest.dividendGrowth">Dividendgroei</h2>
 </div>
+<div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:10px;">
+<div><span style="opacity:.6;font-size:12px;">PADI (verwacht jaarlijks dividend)</span><br><span id="investPadiEUR" style="font-size:16px;font-weight:600;">–</span> <span id="investPadiGrowth" style="font-size:12px;"></span></div>
+</div>
+<select id="investDivFilterSymbol" onchange="investLoadDividendGrowth()" style="margin-bottom:8px;"><option value="">Alle posities</option></select>
 <div id="investDivGrowthChart" style="padding:10px 0;"></div>
 <div id="investCagrLine" style="opacity:.7;font-size:12px;margin-top:4px;"></div>
 <div class="section-head" style="margin-top:20px;">
@@ -1187,6 +1193,19 @@ header { padding: 10px 16px; }
 <div style="font-size:12px;opacity:.7;margin:10px 0 2px;" data-i18n="invest.bySector">Sector</div>
 <div id="investSectorBreakdown" style="padding:4px 0;"></div>
 <div id="investSectorEditor" style="margin-top:10px;font-size:12px;"></div>
+<div style="font-size:12px;opacity:.7;margin:10px 0 2px;">Werelddeel</div>
+<div id="investWorldPartBreakdown" style="padding:4px 0;"></div>
+<div style="font-size:12px;opacity:.7;margin:10px 0 2px;">Valuta</div>
+<div id="investCurrencyBreakdown" style="padding:4px 0;"></div>
+<div style="font-size:12px;opacity:.7;margin:10px 0 2px;">Beurs</div>
+<div id="investExchangeBreakdown" style="padding:4px 0;"></div>
+<div style="font-size:12px;opacity:.7;margin:10px 0 2px;">Effecttype</div>
+<div id="investAssetTypeBreakdown" style="padding:4px 0;"></div>
+<div style="font-size:12px;opacity:.7;margin:10px 0 2px;">Strategie</div>
+<div id="investStrategyBreakdown" style="padding:4px 0;"></div>
+<div id="investStrategyEditor" style="margin-top:10px;font-size:12px;"></div>
+<div style="font-size:12px;opacity:.7;margin:10px 0 2px;">Broker</div>
+<div id="investBrokerBreakdown" style="padding:4px 0;"></div>
 </div>
 
 <div id="view-ideas" style="display:none;">
@@ -2918,6 +2937,8 @@ $('investAvgYield').textContent = investFmtPct(totals.avgYieldOnCost);
 $('investUnrealized').textContent = investFmtEUR(totals.unrealizedEUR) + (totals.unrealizedPct != null ? ' (' + investFmtPct(totals.unrealizedPct) + ')' : '');
 $('investCurrencyEffect').textContent = investFmtEUR(totals.currencyEffectEUR);
 $('investTotalReturn').textContent = investFmtEUR(totals.totalReturnEUR);
+if ($('investPadiEUR')) $('investPadiEUR').textContent = investFmtEUR(totals.padiEUR);
+if ($('investPadiGrowth')) $('investPadiGrowth').textContent = totals.padiGrowthPct !== null && totals.padiGrowthPct !== undefined ? (totals.padiGrowthPct >= 0 ? '+' : '') + investFmtPct(totals.padiGrowthPct) + ' t.o.v. vorig jaar' : '';
 const body = $('investHoldingsBody');
 body.innerHTML = '';
 $('investHoldingsEmpty').style.display = holdings.length ? 'none' : 'block';
@@ -2931,64 +2952,19 @@ tr.innerHTML = '<td>' + h.symbol + '<br><span style="opacity:.6;font-size:12px;"
 + '<td data-col="value">' + investFmtEUR(h.valueEUR) + '</td>'
 + '<td data-col="unrealized" style="color:' + pnlColor + ';">' + investFmtEUR(h.unrealizedEUR) + '</td>'
 + '<td data-col="yield">' + investFmtPct(h.yieldOnCost) + '</td>'
++ '<td data-col="currentYield">' + investFmtPct(h.currentYield) + '</td>'
++ '<td data-col="cagr1y">' + investFmtPct(h.cagr1y) + '</td>'
 + '<td data-col="invested">' + investFmtEUR(h.investedEUR) + '</td>'
-+ '<td data-col="period">' + investHoldingPeriod(h.firstBuyDate) + '</td>'
++ '<td data-col="period">' + investHoldingPeriod(h.firstBuyDate) + '</td>';
 body.appendChild(tr);
 }
+const filterSel = $('investDivFilterSymbol');
+if (filterSel) {
+const current = filterSel.value;
+const symbols = holdings.map((h) => h.symbol);
+filterSel.innerHTML = '<option value="">Alle posities</option>' + symbols.map((sym) => '<option value="' + sym + '"' + (sym === current ? ' selected' : '') + '>' + sym + '</option>').join('');
+}
 investApplyColumnVisibility()
-}
-
-let investColumnVisibility = JSON.parse(localStorage.getItem('investColumnVisibility') || '{}')
-function investApplyColumnVisibility() {
-document.querySelectorAll('.invest-table [data-col]').forEach((el) => {
-const col = el.getAttribute('data-col')
-const visible = investColumnVisibility[col] !== undefined ? investColumnVisibility[col] : (col !== 'invested' && col !== 'period')
-el.style.display = visible ? '' : 'none'
-})
-document.querySelectorAll('[data-col-toggle]').forEach((cb) => {
-const col = cb.getAttribute('data-col-toggle')
-cb.checked = investColumnVisibility[col] !== undefined ? investColumnVisibility[col] : (col !== 'invested' && col !== 'period')
-})
-}
-window.investToggleColumn = (col, visible) => {
-investColumnVisibility[col] = visible
-localStorage.setItem('investColumnVisibility', JSON.stringify(investColumnVisibility))
-investApplyColumnVisibility()
-}
-window.investToggleColumnsPanel = () => { const el = $('investColumnsPanel'); el.style.display = el.style.display === 'none' ? 'block' : 'none' }
-window.investToggleTimetravelPanel = () => { const el = $('investTimetravelPanel'); if (el.style.display === 'none' && !$('investTimetravelDate').value) $('investTimetravelDate').value = new Date().toISOString().slice(0, 10); el.style.display = el.style.display === 'none' ? 'block' : 'none' }
-function investHoldingPeriod(dateStr) {
-if (!dateStr) return '–'
-const start = new Date(dateStr)
-const now = new Date()
-let months = (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth())
-if (now.getDate() < start.getDate()) months--
-if (months < 0) months = 0
-const years = Math.floor(months / 12)
-const remMonths = months % 12
-if (years > 0) return years + 'j ' + remMonths + 'm'
-return remMonths + 'm'
-}
-window.investLoadTimetravel = async () => {
-const date = $('investTimetravelDate').value
-if (!date) return
-const el = $('investTimetravelResult')
-el.textContent = 'Laden...'
-try {
-const d = await api(investUrl('/api/invest/timetravel') + '&date=' + encodeURIComponent(date))
-investRenderTimetravel(d || {})
-} catch (e) {
-el.textContent = 'Kon tijdreis niet laden.'
-}
-}
-function investRenderTimetravel(data) {
-const el = $('investTimetravelResult')
-if (!data.holdings || !data.holdings.length) { el.innerHTML = '<div style="opacity:.6;">Geen posities op deze datum.</div>'; return }
-let html = '<div style="margin-bottom:6px;font-weight:600;">Portefeuillewaarde op ' + data.date + ': ' + investFmtEUR(data.totalValueEUR) + '</div>'
-for (const h of data.holdings) {
-html += '<div style="display:flex;justify-content:space-between;padding:2px 0;"><span>' + h.symbol + ' (' + h.shares + ' st.)</span><span>' + (h.valueEUR !== null ? investFmtEUR(h.valueEUR) : '–') + '</span></div>'
-}
-el.innerHTML = html
 }
 
 function investRenderCalendar(upcoming) {
@@ -3045,12 +3021,16 @@ const parts = [];
 if (data.cagr1y != null) parts.push(t('invest.cagr1y') + ': ' + investFmtPct(data.cagr1y));
 if (data.cagr3y != null) parts.push(t('invest.cagr3y') + ': ' + investFmtPct(data.cagr3y));
 if (data.cagr5y != null) parts.push(t('invest.cagr5y') + ': ' + investFmtPct(data.cagr5y));
+if (data.cagr10y !== null) parts.push(t('invest.cagr10y') + ': ' + investFmtPct(data.cagr10y));
+if (yearly.length >= 2) { const prevY = yearly[yearly.length - 2], curY = yearly[yearly.length - 1]; if (prevY.totalEUR > 0) parts.push(curY.year + ' vs ' + prevY.year + ': ' + ((curY.totalEUR >= prevY.totalEUR ? '+' : '') + investFmtPct((curY.totalEUR - prevY.totalEUR) / prevY.totalEUR))); }
 $('investCagrLine').textContent = parts.join('   ·   ');
 }
 
 async function investLoadDividendGrowth() {
 try {
-const d = await api(investUrl('/api/invest/dividend-growth'));
+const filterSel = $('investDivFilterSymbol');
+const symbolParam = filterSel && filterSel.value ? '&symbol=' + encodeURIComponent(filterSel.value) : '';
+const d = await api(investUrl('/api/invest/dividend-growth') + symbolParam);
 investRenderDividendGrowth(d || {});
 } catch (e) {
 console.error('invest dividend growth error', e);
@@ -3127,6 +3107,12 @@ el.innerHTML = html;
 function investRenderDiversification(data) {
 investRenderBreakdownList($('investCountryBreakdown'), data.byCountry || []);
 investRenderBreakdownList($('investSectorBreakdown'), data.bySector || []);
+investRenderBreakdownList($('investWorldPartBreakdown'), data.byWorldPart || [])
+investRenderBreakdownList($('investCurrencyBreakdown'), data.byCurrency || [])
+investRenderBreakdownList($('investExchangeBreakdown'), data.byExchange || [])
+investRenderBreakdownList($('investAssetTypeBreakdown'), data.byAssetType || [])
+investRenderBreakdownList($('investStrategyBreakdown'), data.byStrategy || [])
+investRenderBreakdownList($('investBrokerBreakdown'), data.byBroker || [])
 const holdings = data.holdings || [];
 const sectors = data.sectors || {};
 const editor = $('investSectorEditor');
@@ -3140,6 +3126,19 @@ html += '<div style="display:flex;justify-content:space-between;align-items:cent
 + '</div>';
 }
 editor.innerHTML = html;
+const strategies = data.strategies || {}
+const stratEditor = $('investStrategyEditor')
+if (stratEditor) {
+let stratHtml = '<div style="opacity:.6;margin-bottom:4px;">Klik om een strategie aan een positie te koppelen (bijv. GARP, Growth, Value, Dividend).</div>'
+for (const h of holdings) {
+const safeSymbol2 = h.symbol.replace(/'/g, "\\'")
+stratHtml += '<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;">'
++ '<span>' + h.symbol + '</span>'
++ '<a href="#" onclick="investEditStrategy(\'' + safeSymbol2 + '\');return false;" style="opacity:.8;">' + (strategies[h.symbol] || 'Strategie instellen') + '</a>'
++ '</div>'
+}
+stratEditor.innerHTML = holdings.length ? stratHtml : ''
+}
 }
 
 async function investLoadDiversification() {
@@ -3161,6 +3160,17 @@ investRenderDiversification(d || {});
 alert(e.message);
 }
 };
+
+window.investEditStrategy = async (symbol) => {
+const strategy = prompt('Strategie voor ' + symbol + ' (bijv. GARP, Growth, Value, Dividend)')
+if (strategy === null) return
+try {
+const d = await api('/api/invest/diversification', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ symbol, strategy, portfolioId: investPortfolioId }) })
+investRenderDiversification(d || {})
+} catch (e) {
+alert(e.message)
+}
+}
 
 function loadInvestPage() {
 investLoadPortfolios();
@@ -3342,7 +3352,7 @@ btn.disabled = true;
 const total = investCsvParsed.txs.length + investCsvParsed.divs.length;
 let done = 0, failed = 0;
 for (const tx of investCsvParsed.txs) {
-try { await api('/api/invest/transactions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({ action: 'create', portfolioId: investPortfolioId }, tx)) }); }
+try { await api('/api/invest/transactions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({ action: 'create', portfolioId: investPortfolioId, broker: investCsvParsed.broker === 'revolut' ? 'Revolut' : 'Trading 212' }, tx)) }) }
 catch (e) { failed++; }
 done++;
 $('investCsvPreview').textContent = 'Importeren... ' + done + '/' + total;
