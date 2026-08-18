@@ -2303,6 +2303,65 @@ console.error('invest timetravel API error:', e.message)
 return json(res, 500, { error: 'Kon tijdreis niet berekenen.' })
 }
 }
+async function handleInvestPositionDetail(req, res) {
+const s = await getSession(req, 'admin')
+if (!s) return json(res, 401, { error: 'Not logged in' })
+try {
+const __url = new URL(req.url, 'http://localhost')
+const portfolioId = investPortfolioIdFromReq(req, __url, null)
+const symbol = String(__url.searchParams.get('symbol') || '').trim()
+if (!symbol) return json(res, 400, { error: 'Symbool ontbreekt' })
+const allTransactions = (await kvGetJson(investTxKey(s.email, portfolioId))) || []
+const transactions = allTransactions.filter((tx) => tx.symbol === symbol).sort((a, b) => (a.date < b.date ? -1 : 1))
+if (!transactions.length) return json(res, 404, { error: 'Geen transacties voor dit symbool' })
+const allDividends = (await kvGetJson(investDivKey(s.email, portfolioId))) || []
+const dividends = allDividends.filter((d) => d.symbol === symbol)
+const holdings = investComputeHoldings(allTransactions)
+const h = holdings.find((x) => x.symbol === symbol) || { shares: 0, costBasis: 0, realizedPnl: 0, avgCost: null, closed: true }
+const last = transactions[transactions.length - 1]
+const currency = last.currency || 'EUR'
+const fx = await investGetFxRate(currency, 'EUR')
+const quote = h.shares > 0 ? await investGetQuote(symbol) : null
+const price = quote ? quote.price : null
+
+const txDetail = []
+for (const tx of transactions) {
+const txFx = await investGetFxRate(tx.currency, 'EUR')
+const feesEUR = (tx.fees || 0) * txFx
+txDetail.push({
+id: tx.id, type: tx.type, date: tx.date, shares: tx.shares, price: tx.price,
+currency: tx.currency, fees: tx.fees || 0, feesEUR, fxRate: txFx,
+valueNative: tx.shares * tx.price, valueEUR: tx.shares * tx.price * txFx,
+broker: tx.broker || null, note: tx.note || '',
+})
+}
+const feesTotalEUR = txDetail.reduce((sum, t) => sum + t.feesEUR, 0)
+
+const valueNative = price !== null ? price * h.shares : null
+const valueEUR = valueNative !== null ? valueNative * fx : null
+const investedEUR = (h.costBasis || 0) * fx
+const unrealizedEUR = valueEUR !== null ? valueEUR - investedEUR : null
+const realizedEUR = (h.realizedPnl || 0) * fx
+
+const history = await investGetDividendHistory(symbol)
+const est = h.shares > 0 ? investEstimateNextDividend(history) : null
+const calendarEvents = []
+if (est) calendarEvents.push({ type: 'dividend-estimate', date: est.estimatedDate, amountPerShare: est.amountPerShare, currency })
+for (const d of dividends) calendarEvents.push({ type: 'dividend-received', date: d.date, amountPerShare: d.amountPerShare, currency: d.currency || currency })
+calendarEvents.sort((a, b) => (a.date < b.date ? -1 : 1))
+
+return json(res, 200, {
+symbol, name: last.name || symbol, currency, shares: h.shares, avgCost: h.avgCost || null,
+currentPrice: price, valueEUR, investedEUR, unrealizedEUR, realizedEUR, feesTotalEUR,
+transactions: txDetail, calendarEvents,
+})
+} catch (e) {
+if (e && e.httpStatus) return json(res, e.httpStatus, { error: e.message })
+console.error('invest position-detail API error:', e.message)
+return json(res, 500, { error: 'Kon positiedetail niet laden.' })
+}
+}
+
 
 function investEstimateNextDividend(history) {
 if (!history || history.length < 2) return null;
@@ -3330,6 +3389,7 @@ if (p === '/api/invest/diversification') return handleInvestDiversification(req,
 if (p === '/api/invest/portfolios') return handleInvestPortfolios(req, res);
 if (p === '/api/invest/timetravel') return handleInvestTimetravel(req, res)
 if (p === '/api/invest/costs') return handleInvestCosts(req, res)
+if (p === '/api/invest/position') return handleInvestPositionDetail(req, res)
 
 
 // --- Base Assistant API (AI chat widget, same 'admin' session as Gym) ---
