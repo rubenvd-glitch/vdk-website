@@ -1086,6 +1086,25 @@ header { padding: 10px 16px; }
 <button onclick="investLoadTimetravel()">Bekijk</button>
 <div id="investTimetravelResult" style="margin-top:8px;"></div>
 </div>
+<div id="investPositionDetailOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;" onclick="if(event.target===this) investClosePositionDetail()">
+<div id="investPositionDetailPanel" style="position:fixed;top:0;right:0;bottom:0;width:min(480px,100%);background:#161616;border-left:1px solid rgba(255,255,255,.15);overflow-y:auto;padding:16px;box-sizing:border-box;">
+<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;">
+<div>
+<div id="investPosDetailSymbol" style="font-size:18px;font-weight:600;"></div>
+<div id="investPosDetailName" style="opacity:.6;font-size:12px;"></div>
+</div>
+<button onclick="investClosePositionDetail()" style="background:none;border:none;color:inherit;font-size:22px;cursor:pointer;opacity:.7;line-height:1;">&times;</button>
+</div>
+<div style="display:flex;gap:4px;margin-bottom:12px;border-bottom:1px solid rgba(255,255,255,.1);">
+<button class="invest-pos-tab" data-tab="invest" onclick="investSetPositionTab('invest')" style="flex:1;padding:8px;background:none;border:none;color:inherit;cursor:pointer;border-bottom:2px solid #7fd68f;font-size:13px;">Investering</button>
+<button class="invest-pos-tab" data-tab="calendar" onclick="investSetPositionTab('calendar')" style="flex:1;padding:8px;background:none;border:none;color:inherit;cursor:pointer;border-bottom:2px solid transparent;font-size:13px;">Kalender</button>
+<button class="invest-pos-tab" data-tab="tx" onclick="investSetPositionTab('tx')" style="flex:1;padding:8px;background:none;border:none;color:inherit;cursor:pointer;border-bottom:2px solid transparent;font-size:13px;">Transacties</button>
+</div>
+<div id="investPosDetailTabInvest" class="invest-pos-tab-content"></div>
+<div id="investPosDetailTabCalendar" class="invest-pos-tab-content" style="display:none;"></div>
+<div id="investPosDetailTabTx" class="invest-pos-tab-content" style="display:none;"></div>
+</div>
+</div>
 <table class="invest-table">
 <thead><tr>
 <th data-i18n="invest.col.symbol">Ticker</th>
@@ -2988,6 +3007,8 @@ tr.innerHTML = '<td>' + h.symbol + '<br><span style="opacity:.6;font-size:12px;"
 + '<td data-col="cagr1y">' + investFmtPct(h.cagr1y) + '</td>'
 + '<td data-col="invested">' + investFmtEUR(h.investedEUR) + '</td>'
 + '<td data-col="period">' + investHoldingPeriod(h.firstBuyDate) + '</td>';
+tr.style.cursor = 'pointer'
+tr.addEventListener('click', () => investOpenPositionDetail(h.symbol))
 body.appendChild(tr);
 }
 const filterSel = $('investDivFilterSymbol');
@@ -3050,6 +3071,84 @@ html += '<div style="display:flex;justify-content:space-between;padding:2px 0;">
 }
 el.innerHTML = html
 }
+let investPositionDetailData = null
+window.investOpenPositionDetail = async (symbol) => {
+$('investPositionDetailOverlay').style.display = 'block'
+$('investPosDetailSymbol').textContent = symbol
+$('investPosDetailName').textContent = 'Laden...'
+$('investPosDetailTabInvest').innerHTML = ''
+$('investPosDetailTabCalendar').innerHTML = ''
+$('investPosDetailTabTx').innerHTML = ''
+investSetPositionTab('invest')
+try {
+const d = await api(investUrl('/api/invest/position') + '&symbol=' + encodeURIComponent(symbol))
+investPositionDetailData = d
+investRenderPositionDetail(d)
+} catch (e) {
+$('investPosDetailName').textContent = ''
+$('investPosDetailTabInvest').innerHTML = '<div style="opacity:.6;padding:12px 0;">' + (e.message || 'Kon positiedetail niet laden.') + '</div>'
+}
+}
+window.investClosePositionDetail = () => {
+$('investPositionDetailOverlay').style.display = 'none'
+investPositionDetailData = null
+}
+window.investSetPositionTab = (tab) => {
+document.querySelectorAll('.invest-pos-tab').forEach((btn) => {
+btn.style.borderBottomColor = btn.getAttribute('data-tab') === tab ? '#7fd68f' : 'transparent'
+})
+const map = { invest: 'investPosDetailTabInvest', calendar: 'investPosDetailTabCalendar', tx: 'investPosDetailTabTx' }
+for (const key in map) $(map[key]).style.display = key === tab ? 'block' : 'none'
+}
+function investRenderPositionDetail(d) {
+$('investPosDetailName').textContent = d.name || ''
+const rows = [
+['Aantal aandelen', d.shares],
+['Gem. aankoopprijs', d.avgCost !== null && d.avgCost !== undefined ? d.avgCost.toFixed(2) + ' ' + d.currency : '–'],
+['Huidige koers', d.currentPrice !== null ? d.currentPrice.toFixed(2) + ' ' + d.currency : '–'],
+['Huidige waarde', d.valueEUR !== null ? investFmtEUR(d.valueEUR) : '–'],
+['Geinvesteerd', investFmtEUR(d.investedEUR)],
+]
+let html = '<table style="width:100%;font-size:13px;border-collapse:collapse;">'
+for (const row of rows) html += '<tr><td style="padding:4px 0;opacity:.7;">' + row[0] + '</td><td style="padding:4px 0;text-align:right;">' + row[1] + '</td></tr>'
+html += '</table>'
+html += '<div style="margin-top:14px;padding-top:10px;border-top:1px solid rgba(255,255,255,.1);font-size:13px;">'
+html += '<div style="font-weight:600;margin-bottom:6px;">Winst/verlies</div>'
+const urColor = (d.unrealizedEUR || 0) >= 0 ? '#7fd68f' : '#f28b8b'
+const rColor = (d.realizedEUR || 0) >= 0 ? '#7fd68f' : '#f28b8b'
+html += '<div style="display:flex;justify-content:space-between;padding:3px 0;"><span style="opacity:.7;">Ongerealiseerd</span><span style="color:' + urColor + ';">' + (d.unrealizedEUR !== null ? investFmtEUR(d.unrealizedEUR) : '–') + '</span></div>'
+html += '<div style="display:flex;justify-content:space-between;padding:3px 0;"><span style="opacity:.7;">Gerealiseerd</span><span style="color:' + rColor + ';">' + investFmtEUR(d.realizedEUR) + '</span></div>'
+html += '<div style="display:flex;justify-content:space-between;padding:3px 0;"><span style="opacity:.7;">Transactiekosten</span><span>' + investFmtEUR(-Math.abs(d.feesTotalEUR || 0)) + '</span></div>'
+html += '<div style="display:flex;justify-content:space-between;padding:3px 0;"><span style="opacity:.7;">Transactiebelasting</span><span style="opacity:.5;">Niet apart bijgehouden</span></div>'
+html += '</div>'
+$('investPosDetailTabInvest').innerHTML = html
+
+if (!d.calendarEvents || !d.calendarEvents.length) {
+$('investPosDetailTabCalendar').innerHTML = '<div style="opacity:.6;padding:12px 0;">Geen kalendergegevens voor dit aandeel.</div>'
+} else {
+let cal = ''
+for (const ev of d.calendarEvents) {
+const label = ev.type === 'dividend-estimate' ? 'Verwacht dividend' : 'Dividend ontvangen'
+const amt = ev.amountPerShare !== undefined && ev.amountPerShare !== null ? ev.amountPerShare.toFixed(4) + ' ' + (ev.currency || '') : ''
+cal += '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px;"><span>' + ev.date + ' \u2014 ' + label + '</span><span>' + amt + '</span></div>'
+}
+$('investPosDetailTabCalendar').innerHTML = cal
+}
+
+if (!d.transactions || !d.transactions.length) {
+$('investPosDetailTabTx').innerHTML = '<div style="opacity:.6;padding:12px 0;">Geen transacties gevonden.</div>'
+} else {
+let tx = '<table style="width:100%;font-size:12px;border-collapse:collapse;">'
+tx += '<tr style="opacity:.6;"><td>Datum</td><td>Type</td><td style="text-align:right;">Aantal</td><td style="text-align:right;">Prijs</td><td style="text-align:right;">Koers</td><td style="text-align:right;">Kosten</td><td style="text-align:right;">Waarde EUR</td></tr>'
+for (const t of d.transactions) {
+const typeLabel = t.type === 'sell' ? 'Verkoop' : 'Aankoop'
+tx += '<tr style="border-top:1px solid rgba(255,255,255,.06);"><td style="padding:4px 0;">' + t.date + '</td><td>' + typeLabel + '</td><td style="text-align:right;">' + t.shares + '</td><td style="text-align:right;">' + t.price.toFixed(2) + ' ' + t.currency + '</td><td style="text-align:right;">' + t.fxRate.toFixed(4) + '</td><td style="text-align:right;">' + investFmtEUR(t.feesEUR) + '</td><td style="text-align:right;">' + investFmtEUR(t.valueEUR) + '</td></tr>'
+}
+tx += '</table>'
+$('investPosDetailTabTx').innerHTML = tx
+}
+}
+
 
 
 function investRenderCalendar(upcoming) {
