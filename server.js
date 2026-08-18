@@ -1432,7 +1432,7 @@ async function buildAssistantContext(email) {
   const recentSets = (gymLog || [])
     .filter((x) => x.date >= twoWeeksAgoISO)
     .slice(-150)
-    .map((x) => ({ exercise: x.exercise, date: x.date, weight: x.weight, reps: x.reps, muscle: x.muscle, restSeconds: x.restSeconds || null }));
+    .map((x) => ({ exercise: x.exercise, date: x.date, weight: x.weight, reps: x.reps, muscle: x.muscle, restSeconds: x.restSeconds || null, time: x.createdAt ? new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Amsterdam', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(x.createdAt)) : null }));
   return {
     today: todayISO,
         memory: mem || '',
@@ -2226,6 +2226,7 @@ await kvSetJson(investTxKey(s.email, delId), []);
 await kvSetJson(investDivKey(s.email, delId), []);
 await kvSetJson(investSnapKey(s.email, delId), []);
 await kvSetJson(investSectorKey(s.email, delId), {});
+await kvSetJson(investStrategyKey(s.email, delId), {})
 return json(res, 200, { ok: true, portfolios: list });
 }
 throw apiError(400, 'Onbekende actie');
@@ -2279,11 +2280,32 @@ const lastAmount = history[history.length - 1].amount;
 return { estimatedDate: new Date(lastDate + avgGapMs).toISOString().slice(0, 10), amountPerShare: lastAmount, confidence: 'estimate' };
 }
 
+function investLast12mDividendPerShare(dividends, symbol) {
+const oneYearAgo = Date.now() - 365 * 24 * 60 * 60 * 1000;
+return dividends.filter((d) => d.symbol === symbol && new Date(d.payDate).getTime() >= oneYearAgo).reduce((sum, d) => sum + d.amountPerShare, 0);
+}
 function investYieldOnCost(holding, dividends) {
 if (!holding.avgCost || holding.shares <= 0) return 0;
-const oneYearAgo = Date.now() - 365 * 24 * 60 * 60 * 1000;
-const last12m = dividends.filter((d) => d.symbol === holding.symbol && new Date(d.payDate).getTime() >= oneYearAgo).reduce((sum, d) => sum + d.amountPerShare, 0);
-return last12m / holding.avgCost;
+return investLast12mDividendPerShare(dividends, holding.symbol) / holding.avgCost;
+}
+function investDividendCagrForSymbol(dividends, symbol) {
+const byYear = new Map();
+for (const d of dividends) {
+if (d.symbol !== symbol) continue;
+const year = String(d.payDate).slice(0, 4);
+byYear.set(year, (byYear.get(year) || 0) + d.amountPerShare);
+}
+const currentYear = String(new Date().getFullYear());
+const completed = [...byYear.entries()].filter(([y]) => y !== currentYear).sort(([a], [b]) => (a < b ? -1 : 1)).map(([, v]) => v);
+const cagr = (years) => {
+const n = completed.length;
+if (n < years + 1) return null;
+const start = completed[n - 1 - years];
+const end = completed[n - 1];
+if (!start || start <= 0) return null;
+return Math.pow(end / start, 1 / years) - 1;
+};
+return { cagr1y: cagr(1), cagr3y: cagr(3), cagr5y: cagr(5), cagr10y: cagr(10) };
 }
 
 async function tdFetch(path, params) {
@@ -2354,6 +2376,7 @@ shares, price,
 fees: Math.max(0, Number(body.fees) || 0),
 date,
 note: String(body.note || '').trim().slice(0, 500),
+broker: String(body.broker || '').trim().slice(0, 40),
 createdAt: investValidCreatedAt(body.createdAt) || Date.now(),
 });
 } else if (body.action === 'update') {
@@ -2368,6 +2391,7 @@ if (body.price !== undefined) it.price = Number(body.price) || it.price;
 if (body.fees !== undefined) it.fees = Math.max(0, Number(body.fees) || 0);
 if (body.date !== undefined) it.date = /^\d{4}-\d{2}-\d{2}$/.test(String(body.date)) ? String(body.date) : it.date;
 if (body.note !== undefined) it.note = String(body.note).trim().slice(0, 500);
+if (body.broker !== undefined) it.broker = String(body.broker).trim().slice(0, 40)
 if (body.createdAt !== undefined) { const ca = investValidCreatedAt(body.createdAt); if (ca) it.createdAt = ca; }
 } else if (body.action === 'delete') {
 list = list.filter((x) => x.id !== body.id);
@@ -2502,22 +2526,26 @@ const transactions = (await kvGetJson(investTxKey(s.email, portfolioId))) || [];
 const dividends = (await kvGetJson(investDivKey(s.email, portfolioId))) || [];
 const holdings = investComputeHoldings(transactions).filter((h) => !h.closed);
 const eurBasis = await investComputeHoldingsEurBasis(transactions);
-let valueEUR = 0, investedEUR = 0, investedEURHistorical = 0, dividendYtdEUR = 0, dividendAllTimeEUR = 0;
+let valueEUR = 0, investedEUR = 0, investedEURHistorical = 0, dividendYtdEUR = 0, dividendAllTimeEUR = 0, padiEUR = 0;
 const enriched = [];
 for (const h of holdings) {
 const quote = await investGetQuote(h.symbol);
 const fx = await investGetFxRate(h.currency, 'EUR');
 const price = quote ? quote.price : null;
-const valueNative = price != null ? price * h.shares : null;
-const valueInEur = valueNative != null ? valueNative * fx : null;
+const valueNative = price !== null ? price * h.shares : null;
+const valueInEur = valueNative !== null ? valueNative * fx : null;
 const investedInEur = h.costBasis * fx;
 const investedInEurHist = (eurBasis.get(h.symbol) || {}).costBasisEUR || investedInEur;
-if (valueInEur != null) valueEUR += valueInEur;
+if (valueInEur !== null) valueEUR += valueInEur;
 investedEUR += investedInEur;
 investedEURHistorical += investedInEurHist;
-const priceReturnEUR = valueInEur != null ? valueInEur - investedInEur : null;
+const priceReturnEUR = valueInEur !== null ? valueInEur - investedInEur : null;
 const currencyEffectEUR = investedInEur - investedInEurHist;
-enriched.push({ ...h, currentPrice: price, valueNative, valueEUR: valueInEur, unrealizedEUR: priceReturnEUR, priceReturnEUR, currencyEffectEUR, totalReturnEUR: priceReturnEUR != null ? priceReturnEUR + currencyEffectEUR : null, yieldOnCost: investYieldOnCost(h, dividends) });
+const last12mPerShare = investLast12mDividendPerShare(dividends, h.symbol);
+const hPadiEUR = last12mPerShare * h.shares * fx;
+padiEUR += hPadiEUR;
+const cagrH = investDividendCagrForSymbol(dividends, h.symbol);
+enriched.push({ ...h, currentPrice: price, valueNative, valueEUR: valueInEur, unrealizedEUR: priceReturnEUR, priceReturnEUR, currencyEffectEUR, totalReturnEUR: priceReturnEUR !== null ? priceReturnEUR + currencyEffectEUR : null, yieldOnCost: investYieldOnCost(h, dividends), currentYield: price ? last12mPerShare / price : null, padiEUR: hPadiEUR, cagr1y: cagrH.cagr1y, cagr3y: cagrH.cagr3y, cagr5y: cagrH.cagr5y, cagr10y: cagrH.cagr10y });
 }
 const oneYearAgo = Date.now() - 365 * 24 * 60 * 60 * 1000;
 for (const d of dividends) {
@@ -2527,6 +2555,17 @@ dividendAllTimeEUR += amountEUR;
 if (new Date(d.payDate).getTime() >= oneYearAgo) dividendYtdEUR += amountEUR;
 }
 const currencyEffectEURTotal = investedEUR - investedEURHistorical;
+const padi12mAgo = Date.now() - 365 * 24 * 60 * 60 * 1000;
+const padi24mAgo = Date.now() - 730 * 24 * 60 * 60 * 1000;
+let padiPrior12mEUR = 0;
+for (const d of dividends) {
+const dt = new Date(d.payDate).getTime();
+if (dt >= padi24mAgo && dt < padi12mAgo) {
+const fxp = await investGetFxRate(d.currency, 'EUR');
+padiPrior12mEUR += d.totalAmount * fxp;
+}
+}
+const padiGrowthPct = padiPrior12mEUR > 0 ? (dividendYtdEUR - padiPrior12mEUR) / padiPrior12mEUR : null;
 return json(res, 200, {
 holdings: enriched,
 totals: {
@@ -2536,6 +2575,7 @@ investedEURHistorical, currencyEffectEUR: currencyEffectEURTotal,
 totalReturnEUR: valueEUR - investedEURHistorical,
 dividendYtdEUR, dividendAllTimeEUR,
 avgYieldOnCost: investedEUR > 0 ? dividendYtdEUR / investedEUR : 0,
+padiEUR, padiGrowthPct,
 },
 });
 } catch (e) {
@@ -2550,9 +2590,11 @@ if (!s) return json(res, 401, { error: 'Not logged in' });
 try {
 const portfolioId = investPortfolioIdFromReq(req, new URL(req.url, 'http://localhost'), null);
 const dividends = (await kvGetJson(investDivKey(s.email, portfolioId))) || [];
+const filterSymbol = String(new URL(req.url, 'http://localhost').searchParams.get('symbol') || '').trim();
+const filteredDividends = filterSymbol ? dividends.filter((d) => d.symbol === filterSymbol) : dividends;
 const byYear = new Map();
 const byMonth = new Map();
-for (const d of dividends) {
+for (const d of filteredDividends) {
 const fx = await investGetFxRate(d.currency, 'EUR');
 const amountEUR = d.totalAmount * fx;
 const year = String(d.payDate).slice(0, 4);
@@ -2572,7 +2614,7 @@ const end = completed[n - 1].totalEUR;
 if (!start || start <= 0) return null;
 return Math.pow(end / start, 1 / years) - 1;
 };
-return json(res, 200, { yearly, monthly, cagr1y: cagr(1), cagr3y: cagr(3), cagr5y: cagr(5) });
+return json(res, 200, { yearly, monthly, cagr1y: cagr(1), cagr3y: cagr(3), cagr5y: cagr(5), cagr10y: cagr(10) });
 } catch (e) {
 console.error('invest dividend growth API error:', e.message);
 return json(res, 500, { error: 'Kon dividendgroei niet berekenen.' });
@@ -2683,6 +2725,8 @@ return json(res, 500, { error: 'Kon kostenoverzicht niet berekenen.' })
 
 function investSectorKey(email, portfolioId) { return (portfolioId && portfolioId !== 'default') ? `investsector:${email}:${portfolioId}` : `investsector:${email}`; }
 
+function investStrategyKey(email, portfolioId) { return (portfolioId && portfolioId !== 'default') ? `investstrategy:${email}:${portfolioId}` : `investstrategy:${email}` }
+
 async function investGetInstrumentCountry(symbol) {
 return investCached(`investcountry:${symbol}`, 365 * 24 * 60 * 60 * 1000, async () => {
 const r = await tdFetch('/stocks', { symbol });
@@ -2690,6 +2734,39 @@ const list = r && r.data;
 if (r.error || !list || !list.length) return null;
 return list[0].country || null;
 });
+}
+
+async function investGetInstrumentExchange(symbol) {
+return investCached(`investexchange:${symbol}`, 365 * 24 * 60 * 60 * 1000, async () => {
+const r = await tdFetch('/stocks', { symbol })
+const list = r && r.data
+if (r.error || !list || !list.length) return null
+return list[0].exchange || null
+})
+}
+
+async function investGetInstrumentType(symbol) {
+return investCached(`investtype:${symbol}`, 365 * 24 * 60 * 60 * 1000, async () => {
+const r = await tdFetch('/stocks', { symbol })
+const list = r && r.data
+if (r.error || !list || !list.length) return null
+return list[0].type || null
+})
+}
+
+const INVEST_CONTINENT_MAP = {
+'United States': 'Noord-Amerika', 'Canada': 'Noord-Amerika', 'Mexico': 'Noord-Amerika',
+'Netherlands': 'Europa', 'Germany': 'Europa', 'France': 'Europa', 'United Kingdom': 'Europa', 'Belgium': 'Europa', 'Spain': 'Europa', 'Italy': 'Europa', 'Switzerland': 'Europa', 'Sweden': 'Europa', 'Norway': 'Europa', 'Denmark': 'Europa', 'Finland': 'Europa', 'Ireland': 'Europa', 'Austria': 'Europa', 'Portugal': 'Europa', 'Poland': 'Europa', 'Luxembourg': 'Europa',
+'Japan': 'Azie', 'China': 'Azie', 'Hong Kong': 'Azie', 'South Korea': 'Azie', 'Taiwan': 'Azie', 'India': 'Azie', 'Singapore': 'Azie', 'Israel': 'Azie',
+'Australia': 'Oceanie', 'New Zealand': 'Oceanie',
+'Brazil': 'Zuid-Amerika', 'Argentina': 'Zuid-Amerika', 'Chile': 'Zuid-Amerika',
+'South Africa': 'Afrika',
+}
+function investContinentFor(country) { return INVEST_CONTINENT_MAP[country] || 'Onbekend' }
+
+function investBrokerForSymbol(transactions, symbol) {
+const matches = transactions.filter((t) => t.symbol === symbol && t.broker).sort((a, b) => (a.date < b.date ? 1 : -1))
+return matches.length ? matches[0].broker : null
 }
 
 async function handleInvestDiversification(req, res) {
@@ -2709,12 +2786,26 @@ const key = investSectorKey(s.email, portfolioId);
 const map = (await kvGetJson(key)) || {};
 if (sector) map[symbol] = sector; else delete map[symbol];
 await kvSetJson(key, map);
+if (body.strategy !== undefined) {
+const stratKey = investStrategyKey(s.email, portfolioId)
+const stratMap = (await kvGetJson(stratKey)) || {}
+const strategy = String(body.strategy || '').trim()
+if (strategy) stratMap[symbol] = strategy; else delete stratMap[symbol]
+await kvSetJson(stratKey, stratMap)
+}
 }
 const transactions = (await kvGetJson(investTxKey(s.email, portfolioId))) || [];
 const holdings = investComputeHoldings(transactions).filter((h) => !h.closed);
 const sectorMap = (await kvGetJson(investSectorKey(s.email, portfolioId))) || {};
 const byCountryMap = new Map();
 const bySectorMap = new Map();
+const strategyMap = (await kvGetJson(investStrategyKey(s.email, portfolioId))) || {}
+const byWorldPartMap = new Map()
+const byCurrencyMap = new Map()
+const byExchangeMap = new Map()
+const byAssetTypeMap = new Map()
+const byStrategyMap = new Map()
+const byBrokerMap = new Map()
 let total = 0;
 for (const h of holdings) {
 const quote = await investGetQuote(h.symbol);
@@ -2726,9 +2817,20 @@ const country = (await investGetInstrumentCountry(h.symbol)) || 'Onbekend';
 byCountryMap.set(country, (byCountryMap.get(country) || 0) + valueEUR);
 const sector = sectorMap[h.symbol] || 'Onbekend';
 bySectorMap.set(sector, (bySectorMap.get(sector) || 0) + valueEUR);
+const continent = investContinentFor(country)
+byWorldPartMap.set(continent, (byWorldPartMap.get(continent) || 0) + valueEUR)
+byCurrencyMap.set(h.currency, (byCurrencyMap.get(h.currency) || 0) + valueEUR)
+const exchange = (await investGetInstrumentExchange(h.symbol)) || 'Onbekend'
+byExchangeMap.set(exchange, (byExchangeMap.get(exchange) || 0) + valueEUR)
+const assetType = (await investGetInstrumentType(h.symbol)) || 'Onbekend'
+byAssetTypeMap.set(assetType, (byAssetTypeMap.get(assetType) || 0) + valueEUR)
+const strategy = strategyMap[h.symbol] || 'Onbekend'
+byStrategyMap.set(strategy, (byStrategyMap.get(strategy) || 0) + valueEUR)
+const broker = investBrokerForSymbol(transactions, h.symbol) || 'Onbekend'
+byBrokerMap.set(broker, (byBrokerMap.get(broker) || 0) + valueEUR)
 }
 const toList = (map) => [...map.entries()].map(([key, valueEUR]) => ({ key, valueEUR, pct: total > 0 ? valueEUR / total : 0 })).sort((a, b) => b.valueEUR - a.valueEUR);
-return json(res, 200, { byCountry: toList(byCountryMap), bySector: toList(bySectorMap), totalValueEUR: total, sectors: sectorMap, holdings: holdings.map((h) => ({ symbol: h.symbol, name: h.name })) });
+return json(res, 200, { byCountry: toList(byCountryMap), bySector: toList(bySectorMap), byWorldPart: toList(byWorldPartMap), byCurrency: toList(byCurrencyMap), byExchange: toList(byExchangeMap), byAssetType: toList(byAssetTypeMap), byStrategy: toList(byStrategyMap), byBroker: toList(byBrokerMap), totalValueEUR: total, sectors: sectorMap, strategies: strategyMap, holdings: holdings.map((h) => ({ symbol: h.symbol, name: h.name })) })
 } catch (e) {
 if (e && e.httpStatus) return json(res, e.httpStatus, { error: e.message });
 console.error('invest diversification API error:', e.message);
