@@ -3068,6 +3068,54 @@ const matches = transactions.filter((t) => t.symbol === symbol && t.broker).sort
 return matches.length ? matches[0].broker : null
 }
 
+function investStrategyDefsKey(email, portfolioId) { return (portfolioId && portfolioId !== 'default') ? `investstrategydefs:${email}:${portfolioId}` : `investstrategydefs:${email}`; }
+
+async function applyInvestStrategyDefAction(email, portfolioId, body) {
+  const key = investStrategyDefsKey(email, portfolioId)
+  let list = (await kvGetJson(key)) || []
+  if (body.action === 'create') {
+    const name = String(body.name || '').trim().slice(0, 40)
+    if (!name) throw apiError(400, 'Vul een naam in.')
+    list.push({
+      id: crypto.randomUUID(),
+      name,
+      icon: String(body.icon || '').trim().slice(0, 8),
+      color: /^#[0-9a-fA-F]{6}$/.test(String(body.color || '')) ? body.color : '#4f8cff',
+    })
+  } else if (body.action === 'update') {
+    const it = list.find((x) => x.id === body.id)
+    if (!it) throw apiError(404, 'Niet gevonden')
+    if (body.name !== undefined) it.name = String(body.name).trim().slice(0, 40) || it.name
+    if (body.icon !== undefined) it.icon = String(body.icon).trim().slice(0, 8)
+    if (body.color !== undefined) it.color = /^#[0-9a-fA-F]{6}$/.test(String(body.color)) ? body.color : it.color
+  } else if (body.action === 'delete') {
+    list = list.filter((x) => x.id !== body.id)
+  } else {
+    throw apiError(400, 'Onbekende actie')
+  }
+  await kvSetJson(key, list)
+  return list
+}
+
+async function handleInvestStrategyDefs(req, res) {
+  const s = await getSession(req, 'admin')
+  if (!s) return json(res, 401, { error: 'Not logged in' })
+  try {
+    const __url = new URL(req.url, 'http://localhost')
+    if (req.method === 'GET') return json(res, 200, (await kvGetJson(investStrategyDefsKey(s.email, investPortfolioIdFromReq(req, __url, null)))) || [])
+    if (req.method === 'POST') {
+      const body = await readBody(req, res)
+      if (!body) return
+      const list = await applyInvestStrategyDefAction(s.email, investPortfolioIdFromReq(req, __url, body), body)
+      return json(res, 200, { ok: true, items: list })
+    }
+  } catch (e) {
+    if (e && e.httpStatus) return json(res, e.httpStatus, { error: e.message })
+    console.error('invest strategy-defs API error:', e.message)
+    return json(res, 500, { error: 'Opslag niet bereikbaar. Is Upstash gekoppeld?' })
+  }
+}
+
 async function handleInvestDiversification(req, res) {
 const s = await getSession(req, 'admin');
 if (!s) return json(res, 401, { error: 'Not logged in' });
@@ -3099,6 +3147,7 @@ const sectorMap = (await kvGetJson(investSectorKey(s.email, portfolioId))) || {}
 const byCountryMap = new Map();
 const bySectorMap = new Map();
 const strategyMap = (await kvGetJson(investStrategyKey(s.email, portfolioId))) || {}
+    const strategyDefs = (await kvGetJson(investStrategyDefsKey(s.email, portfolioId))) || []
 const byWorldPartMap = new Map()
 const byCurrencyMap = new Map()
 const byExchangeMap = new Map()
@@ -3129,7 +3178,7 @@ const broker = investBrokerForSymbol(transactions, h.symbol) || 'Onbekend'
 byBrokerMap.set(broker, (byBrokerMap.get(broker) || 0) + valueEUR)
 }
 const toList = (map) => [...map.entries()].map(([key, valueEUR]) => ({ key, valueEUR, pct: total > 0 ? valueEUR / total : 0 })).sort((a, b) => b.valueEUR - a.valueEUR);
-return json(res, 200, { byCountry: toList(byCountryMap), bySector: toList(bySectorMap), byWorldPart: toList(byWorldPartMap), byCurrency: toList(byCurrencyMap), byExchange: toList(byExchangeMap), byAssetType: toList(byAssetTypeMap), byStrategy: toList(byStrategyMap), byBroker: toList(byBrokerMap), totalValueEUR: total, sectors: sectorMap, strategies: strategyMap, holdings: holdings.map((h) => ({ symbol: h.symbol, name: h.name })) })
+return json(res, 200, { byCountry: toList(byCountryMap), bySector: toList(bySectorMap), byWorldPart: toList(byWorldPartMap), byCurrency: toList(byCurrencyMap), byExchange: toList(byExchangeMap), byAssetType: toList(byAssetTypeMap), byStrategy: toList(byStrategyMap), byBroker: toList(byBrokerMap), totalValueEUR: total, sectors: sectorMap, strategies: strategyMap, strategyDefs, holdings: holdings.map((h) => ({ symbol: h.symbol, name: h.name })) })
 } catch (e) {
 if (e && e.httpStatus) return json(res, e.httpStatus, { error: e.message });
 console.error('invest diversification API error:', e.message);
@@ -3648,6 +3697,7 @@ if (p === '/api/invest/other-actions') return handleInvestOther(req, res)
 if (p === '/api/invest/action-log') return handleInvestActionLog(req, res)
 if (p === '/api/invest/mwrr') return handleInvestMwrr(req, res)
 if (p === '/api/invest/settings') return handleInvestSettings(req, res)
+if (p === '/api/invest/strategy-defs') return handleInvestStrategyDefs(req, res)
 
 
 // --- Base Assistant API (AI chat widget, same 'admin' session as Gym) ---
