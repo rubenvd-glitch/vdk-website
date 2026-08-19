@@ -2722,6 +2722,100 @@ h.shares -= sellShares;
 return bySymbol;
 }
 
+function investXirr(cashflows) {
+  if (!cashflows.length) return null
+  const t0 = new Date(cashflows[0].date).getTime()
+  const years = cashflows.map((cf) => (new Date(cf.date).getTime() - t0) / (365.25 * 24 * 3600 * 1000))
+  const npv = (rate) => cashflows.reduce((sum, cf, i) => sum + cf.amount / Math.pow(1 + rate, years[i]), 0)
+  const dNpv = (rate) => cashflows.reduce((sum, cf, i) => sum - years[i] * cf.amount / Math.pow(1 + rate, years[i] + 1), 0)
+  let rate = 0.1
+  for (let i = 0; i < 100; i++) {
+    const f = npv(rate)
+    const df = dNpv(rate)
+    if (Math.abs(df) < 1e-10) break
+    let newRate = rate - f / df
+    if (!Number.isFinite(newRate)) break
+    if (newRate <= -0.99) newRate = -0.99
+    if (Math.abs(newRate - rate) < 1e-7) { rate = newRate; break }
+    rate = newRate
+  }
+  return Number.isFinite(rate) ? rate : null
+}
+
+async function investBuildCashflowsEUR(transactions, dividends, currentValueEUR) {
+  const flows = []
+  for (const tx of transactions) {
+    let fx = await investGetFxRateOnDate(tx.currency, 'EUR', tx.date)
+    if (fx === null) fx = await investGetFxRate(tx.currency, 'EUR')
+    const gross = tx.shares * tx.price * fx
+    const fees = (tx.fees || 0) * fx
+    if (tx.type === 'buy') flows.push({ date: tx.date, amount: -(gross + fees) })
+    else flows.push({ date: tx.date, amount: gross - fees })
+  }
+  for (const d of dividends) {
+    let fx = await investGetFxRateOnDate(d.currency, 'EUR', d.payDate)
+    if (fx === null) fx = await investGetFxRate(d.currency, 'EUR')
+    flows.push({ date: d.payDate, amount: (d.totalAmount || 0) * fx })
+  }
+  flows.sort((a, b) => (a.date < b.date ? -1 : 1))
+  flows.push({ date: new Date().toISOString().slice(0, 10), amount: currentValueEUR })
+  return flows
+}
+
+async function handleInvestMwrr(req, res) {
+  const s = await getSession(req, 'admin')
+  if (!s) return json(res, 401, { error: 'Not logged in' })
+  try {
+    const __url = new URL(req.url, 'http://localhost')
+    const portfolioId = investPortfolioIdFromReq(req, __url, null)
+    const transactions = (await kvGetJson(investTxKey(s.email, portfolioId))) || []
+    const dividends = (await kvGetJson(investDivKey(s.email, portfolioId))) || []
+    if (!transactions.length) return json(res, 200, { mwrr: null })
+    const holdings = investComputeHoldings(transactions).filter((h) => !h.closed)
+    let currentValueEUR = 0
+    for (const h of holdings) {
+      const quote = await investGetQuote(h.symbol)
+      const fx = await investGetFxRate(h.currency, 'EUR')
+      if (quote) currentValueEUR += quote.price * h.shares * fx
+    }
+    const flows = await investBuildCashflowsEUR(transactions, dividends, currentValueEUR)
+    const hasOutflow = flows.some((f) => f.amount < 0)
+    if (!hasOutflow) return json(res, 200, { mwrr: null })
+    const rate = investXirr(flows)
+    return json(res, 200, { mwrr: rate })
+  } catch (e) {
+    console.error('invest mwrr API error:', e.message)
+    return json(res, 500, { error: 'Kon MWRR niet berekenen.' })
+  }
+}
+
+function investSettingsKey(email, portfolioId) { return (portfolioId && portfolioId !== 'default') ? `investsettings:${email}:${portfolioId}` : `investsettings:${email}`; }
+
+async function handleInvestSettings(req, res) {
+  const s = await getSession(req, 'admin')
+  if (!s) return json(res, 401, { error: 'Not logged in' })
+  try {
+    const __url = new URL(req.url, 'http://localhost')
+    const portfolioId = investPortfolioIdFromReq(req, __url, null)
+    const key = investSettingsKey(s.email, portfolioId)
+    if (req.method === 'GET') {
+      const settings = (await kvGetJson(key)) || { returnMethod: 'absolute' }
+      return json(res, 200, settings)
+    }
+    if (req.method === 'POST') {
+      const body = await readBody(req, res)
+      if (!body) return
+      const returnMethod = body.returnMethod === 'mwrr' ? 'mwrr' : 'absolute'
+      const settings = { returnMethod }
+      await kvSetJson(key, settings)
+      return json(res, 200, settings)
+    }
+  } catch (e) {
+    console.error('invest settings API error:', e.message)
+    return json(res, 500, { error: 'Kon instellingen niet opslaan.' })
+  }
+}
+
 async function handleInvestHoldings(req, res) {
 const s = await getSession(req, 'admin');
 if (!s) return json(res, 401, { error: 'Not logged in' });
@@ -3552,6 +3646,8 @@ if (p === '/api/invest/costs') return handleInvestCosts(req, res)
 if (p === '/api/invest/position') return handleInvestPositionDetail(req, res)
 if (p === '/api/invest/other-actions') return handleInvestOther(req, res)
 if (p === '/api/invest/action-log') return handleInvestActionLog(req, res)
+if (p === '/api/invest/mwrr') return handleInvestMwrr(req, res)
+if (p === '/api/invest/settings') return handleInvestSettings(req, res)
 
 
 // --- Base Assistant API (AI chat widget, same 'admin' session as Gym) ---
