@@ -3002,6 +3002,94 @@ return json(res, 500, { error: 'Kon dividendgroei niet berekenen.' });
 
 function investSnapKey(email, portfolioId) { return (portfolioId && portfolioId !== 'default') ? `investsnap:${email}:${portfolioId}` : `investsnap:${email}`; }
 
+async function investGetPriceHistory(symbol, days) {
+  return investCached(`investpricehist:${symbol}:${days}`, 6 * 60 * 60 * 1000, async () => {
+    const r = await tdFetch('/time_series', { symbol, interval: '1day', outputsize: days })
+    const vals = r && r.values
+    if (r.error || !vals || !vals.length) return []
+    return vals.map((v) => ({ date: v.datetime, close: parseFloat(v.close) })).reverse()
+  })
+}
+
+function investComputeDrawdownSeries(history) {
+  let peak = -Infinity
+  let peakDate = null
+  let maxDrawdown = 0
+  let maxDrawdownDate = null
+  let longestDrawdownDays = 0
+  let currentDrawdownStart = null
+  const series = []
+  for (const pt of history) {
+    if (pt.valueEUR > peak) {
+      peak = pt.valueEUR
+      peakDate = pt.date
+      if (currentDrawdownStart) {
+        const days = Math.round((new Date(pt.date) - new Date(currentDrawdownStart)) / 86400000)
+        if (days > longestDrawdownDays) longestDrawdownDays = days
+        currentDrawdownStart = null
+      }
+    } else if (pt.valueEUR < peak) {
+      if (!currentDrawdownStart) currentDrawdownStart = peakDate
+    }
+    const dd = peak > 0 ? (pt.valueEUR - peak) / peak : 0
+    if (dd < maxDrawdown) { maxDrawdown = dd; maxDrawdownDate = pt.date }
+    series.push({ date: pt.date, valueEUR: pt.valueEUR, peak, drawdown: dd })
+  }
+  let ongoingDrawdownDays = 0
+  if (currentDrawdownStart && history.length) {
+    const lastDate = history[history.length - 1].date
+    ongoingDrawdownDays = Math.round((new Date(lastDate) - new Date(currentDrawdownStart)) / 86400000)
+    if (ongoingDrawdownDays > longestDrawdownDays) longestDrawdownDays = ongoingDrawdownDays
+  }
+  const last = series.length ? series[series.length - 1] : null
+  return {
+    series,
+    currentDrawdown: last ? last.drawdown : 0,
+    lastAth: { date: peakDate, valueEUR: peak > -Infinity ? peak : null },
+    maxDrawdown,
+    maxDrawdownDate,
+    longestDrawdownDays,
+  }
+}
+
+async function investComputePositionDrawdowns(holdings) {
+  const results = []
+  for (const h of holdings) {
+    const hist = await investGetPriceHistory(h.symbol, 252)
+    if (!hist || !hist.length) { results.push({ symbol: h.symbol, currentDrawdown: null, maxDrawdown: null }); continue }
+    let peak = -Infinity
+    let maxDD = 0
+    for (const pt of hist) {
+      if (pt.close > peak) peak = pt.close
+      const dd = peak > 0 ? (pt.close - peak) / peak : 0
+      if (dd < maxDD) maxDD = dd
+    }
+    const last = hist[hist.length - 1]
+    const currentDD = peak > 0 ? (last.close - peak) / peak : 0
+    results.push({ symbol: h.symbol, currentDrawdown: currentDD, maxDrawdown: maxDD })
+  }
+  return results
+}
+
+async function handleInvestDrawdown(req, res) {
+  const s = await getSession(req, 'admin')
+  if (!s) return json(res, 401, { error: 'Not logged in' })
+  try {
+    const __url = new URL(req.url, 'http://localhost')
+    const portfolioId = investPortfolioIdFromReq(req, __url, null)
+    const history = (await kvGetJson(investSnapKey(s.email, portfolioId))) || []
+    const sorted = [...history].sort((a, b) => (a.date < b.date ? -1 : 1))
+    const dd = investComputeDrawdownSeries(sorted)
+    const transactions = (await kvGetJson(investTxKey(s.email, portfolioId))) || []
+    const holdings = investComputeHoldings(transactions).filter((h) => !h.closed)
+    const positions = await investComputePositionDrawdowns(holdings)
+    return json(res, 200, { series: dd.series, currentDrawdown: dd.currentDrawdown, lastAth: dd.lastAth, maxDrawdown: dd.maxDrawdown, maxDrawdownDate: dd.maxDrawdownDate, longestDrawdownDays: dd.longestDrawdownDays, positions })
+  } catch (e) {
+    console.error('invest drawdown API error:', e.message)
+    return json(res, 500, { error: 'Kon drawdown-analyse niet laden.' })
+  }
+}
+
 async function investGetHistoricalPrice(symbol, date) {
 return investCached(`investhist:${symbol}:${date}`, 365 * 24 * 60 * 60 * 1000, async () => {
 const r = await tdFetch('/time_series', { symbol, interval: '1day', start_date: date, end_date: date, outputsize: 1 });
@@ -3778,6 +3866,7 @@ if (p === '/api/invest/action-log') return handleInvestActionLog(req, res)
 if (p === '/api/invest/mwrr') return handleInvestMwrr(req, res)
 if (p === '/api/invest/settings') return handleInvestSettings(req, res)
 if (p === '/api/invest/strategy-defs') return handleInvestStrategyDefs(req, res)
+if (p === '/api/invest/drawdown') return handleInvestDrawdown(req, res)
 
 
 // --- Base Assistant API (AI chat widget, same 'admin' session as Gym) ---

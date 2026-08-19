@@ -1363,6 +1363,21 @@ header { padding: 10px 16px; }
 <button onclick="investCloseStrategyDefForm()">Annuleren</button>
 </div>
 </div>
+<div class="section-head" style="margin-top:20px;">
+<h2 style="font-size:16px;">Drawdown-analyse</h2>
+</div>
+<div class="section-sub" style="font-size:12px;opacity:.6;">Bèta-functie: hoe ver staat je portfolio onder de laatste piek, en hoe lang duurde de langste terugval?</div>
+<div class="invest-summary-grid" style="margin-bottom:10px;">
+<div class="invest-stat"><span class="invest-stat-label">Huidige drawdown</span><span class="invest-stat-value" id="investDrawdownCurrent">–</span></div>
+<div class="invest-stat"><span class="invest-stat-label">Laatste all-time high</span><span class="invest-stat-value" id="investDrawdownAth">–</span></div>
+<div class="invest-stat"><span class="invest-stat-label">Maximale drawdown</span><span class="invest-stat-value" id="investDrawdownMax">–</span></div>
+<div class="invest-stat"><span class="invest-stat-label">Langste drawdown-periode</span><span class="invest-stat-value" id="investDrawdownLongest">–</span></div>
+</div>
+<div id="investDrawdownChart" style="margin-bottom:10px;"></div>
+<table class="invest-table" id="investDrawdownTable">
+<thead><tr><th>Positie</th><th>Huidige drawdown</th><th>Maximale drawdown (1j)</th></tr></thead>
+<tbody id="investDrawdownTableBody"></tbody>
+</table>
 </div>
 
 <div id="view-ideas" style="display:none;">
@@ -3755,6 +3770,61 @@ if (typeof window.investLoadHoldings === 'function') {
     return r
   }
 }
+
+window.investLoadDrawdown = async () => {
+  try {
+    const d = await api(investUrl('/api/invest/drawdown'))
+    investRenderDrawdown(d)
+  } catch (e) {
+    console.error('invest drawdown load error', e)
+  }
+}
+
+function investRenderDrawdown(data) {
+  const fmtPct = (v) => (v === null || v === undefined) ? '–' : (Math.round(v * 1000) / 10) + '%'
+  $('investDrawdownCurrent').textContent = fmtPct(data.currentDrawdown)
+  $('investDrawdownAth').textContent = (data.lastAth && data.lastAth.date) ? (data.lastAth.date + ' (\u20ac' + Math.round(data.lastAth.valueEUR).toLocaleString('nl-NL') + ')') : '–'
+  $('investDrawdownMax').textContent = fmtPct(data.maxDrawdown) + (data.maxDrawdownDate ? ' (' + data.maxDrawdownDate + ')' : '')
+  $('investDrawdownLongest').textContent = (data.longestDrawdownDays || 0) + ' dagen'
+  const box = $('investDrawdownChart')
+  const series = data.series || []
+  if (!series.length) { box.innerHTML = '<div style="opacity:.6;padding:8px 0;">Nog geen historische data.</div>'; return }
+  const w = 600, h = 140, padL = 4, padR = 4, padB = 20, padT = 10
+  const ddValues = series.map((p) => p.drawdown * 100)
+  const maxDD = (data.maxDrawdown || 0) * 100
+  const minY = Math.min(maxDD, Math.min.apply(null, ddValues), -1)
+  const maxY = 1
+  const range = (maxY - minY) || 1
+  const n = series.length
+  const xStep = n > 1 ? (w - padL - padR) / (n - 1) : 0
+  const yFor = (v) => padT + (h - padT - padB) * (1 - (v - minY) / range)
+  const xFor = (i) => padL + i * xStep
+  let d = ''
+  for (let i = 0; i < series.length; i++) {
+    const x = xFor(i)
+    const y = yFor(series[i].drawdown * 100)
+    d += (i === 0 ? 'M' : 'L') + x.toFixed(1) + ',' + y.toFixed(1) + ' '
+  }
+  const zeroY = yFor(0).toFixed(1)
+  const maxDDY = yFor(maxDD).toFixed(1)
+  box.innerHTML = '<svg viewBox="0 0 ' + w + ' ' + h + '" style="width:100%;height:140px;">'
+    + '<line x1="' + padL + '" y1="' + zeroY + '" x2="' + (w - padR) + '" y2="' + zeroY + '" stroke="rgba(255,255,255,.2)" stroke-width="1" />'
+    + '<line x1="' + padL + '" y1="' + maxDDY + '" x2="' + (w - padR) + '" y2="' + maxDDY + '" stroke="#ff6b6b" stroke-width="1" stroke-dasharray="4,3" />'
+    + '<path d="' + d.trim() + '" fill="none" stroke="#7fd68f" stroke-width="1.5" />'
+    + '</svg>'
+  const tbody = $('investDrawdownTableBody')
+  tbody.innerHTML = ''
+  const positions = data.positions || []
+  if (!positions.length) {
+    tbody.innerHTML = '<tr><td colspan="3" style="opacity:.6;">Geen open posities.</td></tr>'
+  } else {
+    for (const p of positions) {
+      const tr = document.createElement('tr')
+      tr.innerHTML = '<td>' + p.symbol + '</td><td>' + fmtPct(p.currentDrawdown) + '</td><td>' + fmtPct(p.maxDrawdown) + '</td>'
+      tbody.appendChild(tr)
+    }
+  }
+}
 function loadInvestPage() {
 investLoadPortfolios();
 investLoadHoldings();
@@ -3766,6 +3836,7 @@ investLoadCosts()
   investLoadActionLog();
   investLoadSettings();
   investLoadStrategyDefs();
+  investLoadDrawdown();
 }
 const INVEST_ACTION_LABELS = { buy: 'Koop', sell: 'Verkoop', dividend: 'Dividend', deposit: 'Storting', withdrawal: 'Opname', 'broker-fee': 'Brokerkosten', 'corporate-action': 'Corporate action', 'securities-lending': 'Securities lending', 'isin-change': 'ISIN-wijziging' }
 let investActionLogItems = []
