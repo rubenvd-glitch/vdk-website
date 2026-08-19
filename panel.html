@@ -1268,6 +1268,64 @@ header { padding: 10px 16px; }
 <div id="investStrategyEditor" style="margin-top:10px;font-size:12px;"></div>
 <div style="font-size:12px;opacity:.7;margin:10px 0 2px;">Broker</div>
 <div id="investBrokerBreakdown" style="padding:4px 0;"></div>
+<div class="section-head" style="margin-top:20px;">
+<h2 style="font-size:16px;">Acties</h2>
+<button onclick="investOpenOtherActionForm()" style="margin-left:6px;">+ Overige actie</button>
+</div>
+<div style="margin-bottom:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+<input type="text" id="investActionSearch" placeholder="Zoek op ticker, naam, notitie..." style="flex:1;min-width:180px;padding:6px 8px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.12);border-radius:6px;color:inherit;" oninput="investFilterActionLog()" />
+<select id="investActionTypeFilter" onchange="investFilterActionLog()" style="padding:6px 8px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.12);border-radius:6px;color:inherit;">
+<option value="">Alle types</option>
+<option value="buy">Koop</option>
+<option value="sell">Verkoop</option>
+<option value="dividend">Dividend</option>
+<option value="deposit">Storting</option>
+<option value="withdrawal">Opname</option>
+<option value="broker-fee">Brokerkosten</option>
+<option value="corporate-action">Corporate action</option>
+<option value="securities-lending">Securities lending</option>
+<option value="isin-change">ISIN-wijziging</option>
+</select>
+<input type="date" id="investActionDateFrom" onchange="investFilterActionLog()" style="padding:6px 8px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.12);border-radius:6px;color:inherit;" />
+<input type="date" id="investActionDateTo" onchange="investFilterActionLog()" style="padding:6px 8px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.12);border-radius:6px;color:inherit;" />
+</div>
+<table class="invest-table" id="investActionLogTable">
+<thead><tr>
+<th>Datum</th><th>Type</th><th>Symbool</th><th>Bedrag</th><th>Broker</th><th>Notitie</th>
+</tr></thead>
+<tbody id="investActionLogBody"></tbody>
+</table>
+
+<div id="investOtherActionForm" class="invest-form" style="display:none;">
+<label>Type</label>
+<select id="investOtherType">
+<option value="deposit">Storting</option>
+<option value="withdrawal">Opname</option>
+<option value="broker-fee">Brokerkosten</option>
+<option value="corporate-action">Corporate action</option>
+<option value="securities-lending">Securities lending</option>
+<option value="isin-change">ISIN-wijziging</option>
+</select>
+<label>Ticker (optioneel)</label>
+<input type="text" id="investOtherSymbol" />
+<label>Bedrag</label>
+<input type="number" id="investOtherAmount" step="any" />
+<label>Valuta</label>
+<select id="investOtherCurrency">
+<option value="EUR">EUR</option>
+<option value="USD">USD</option>
+</select>
+<label>Datum</label>
+<input type="date" id="investOtherDate" />
+<label>Broker (optioneel)</label>
+<input type="text" id="investOtherBroker" />
+<label>Notitie (optioneel)</label>
+<input type="text" id="investOtherNote" />
+<div class="invest-form-actions">
+<button onclick="investSubmitOtherAction()">Opslaan</button>
+<button onclick="investCloseOtherActionForm()">Annuleren</button>
+</div>
+</div>
 </div>
 
 <div id="view-ideas" style="display:none;">
@@ -3527,6 +3585,75 @@ investLoadDividendGrowth();
 investLoadValueHistory();
 investLoadDiversification();
 investLoadCosts()
+  investLoadActionLog();
+}
+const INVEST_ACTION_LABELS = { buy: 'Koop', sell: 'Verkoop', dividend: 'Dividend', deposit: 'Storting', withdrawal: 'Opname', 'broker-fee': 'Brokerkosten', 'corporate-action': 'Corporate action', 'securities-lending': 'Securities lending', 'isin-change': 'ISIN-wijziging' }
+let investActionLogItems = []
+
+window.investLoadActionLog = async () => {
+  try {
+    const d = await api(investUrl('/api/invest/action-log'))
+    investActionLogItems = d.items || []
+    investFilterActionLog()
+  } catch (e) {
+    console.error('invest action-log load error', e)
+  }
+}
+
+window.investFilterActionLog = () => {
+  const q = ($('investActionSearch') ? $('investActionSearch').value : '').trim().toLowerCase()
+  const type = $('investActionTypeFilter') ? $('investActionTypeFilter').value : ''
+  const from = $('investActionDateFrom') ? $('investActionDateFrom').value : ''
+  const to = $('investActionDateTo') ? $('investActionDateTo').value : ''
+  let items = investActionLogItems
+  if (type) items = items.filter((it) => it.category === type)
+  if (from) items = items.filter((it) => it.date >= from)
+  if (to) items = items.filter((it) => it.date <= to)
+  if (q) items = items.filter((it) => (it.symbol || '').toLowerCase().includes(q) || (it.name || '').toLowerCase().includes(q) || (it.note || '').toLowerCase().includes(q) || (it.broker || '').toLowerCase().includes(q))
+  investRenderActionLog(items)
+}
+
+function investRenderActionLog(items) {
+  const body = $('investActionLogBody')
+  if (!body) return
+  body.innerHTML = ''
+  if (!items.length) {
+    const tr = document.createElement('tr')
+    tr.innerHTML = '<td colspan="6" style="opacity:.6;">Geen acties gevonden.</td>'
+    body.appendChild(tr)
+    return
+  }
+  for (const it of items) {
+    const tr = document.createElement('tr')
+    const label = INVEST_ACTION_LABELS[it.category] || it.category
+    const amountStr = (it.amount !== null && it.amount !== undefined) ? (Math.round(it.amount * 100) / 100) + ' ' + (it.currency || '') : ''
+    tr.innerHTML = '<td>' + it.date + '</td><td>' + label + '</td><td>' + (it.symbol || '') + '</td><td>' + amountStr + '</td><td>' + (it.broker || '') + '</td><td>' + (it.note || '') + '</td>'
+    body.appendChild(tr)
+  }
+}
+
+window.investOpenOtherActionForm = () => { $('investOtherActionForm').style.display = 'block' }
+window.investCloseOtherActionForm = () => { $('investOtherActionForm').style.display = 'none' }
+
+window.investSubmitOtherAction = async () => {
+  const body = {
+    portfolioId: investPortfolioId,
+    action: 'create',
+    type: $('investOtherType').value,
+    symbol: $('investOtherSymbol').value,
+    amount: Number($('investOtherAmount').value),
+    currency: $('investOtherCurrency').value,
+    date: $('investOtherDate').value,
+    broker: $('investOtherBroker').value,
+    note: $('investOtherNote').value,
+  }
+  try {
+    await api('/api/invest/other-actions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    $('investOtherActionForm').style.display = 'none'
+    investLoadActionLog()
+  } catch (e) {
+    alert(e.message)
+  }
 }
 
 window.investOpenTxForm = () => { $('investTxForm').style.display = 'block'; };

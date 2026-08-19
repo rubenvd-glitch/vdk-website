@@ -2177,6 +2177,7 @@ return Number.isFinite(t) && t > 1577836800000 && t <= Date.now() + 5 * 60 * 100
 }
 function investTxKey(email, portfolioId) { return (portfolioId && portfolioId !== 'default') ? `investtx:${email}:${portfolioId}` : `investtx:${email}`; }
 function investDivKey(email, portfolioId) { return (portfolioId && portfolioId !== 'default') ? `investdiv:${email}:${portfolioId}` : `investdiv:${email}`; }
+function investOtherKey(email, portfolioId) { return (portfolioId && portfolioId !== 'default') ? `investother:${email}:${portfolioId}` : `investother:${email}`; }
 function investPortfoliosKey(email) { return `investportfolios:${email}`; }
 function investPortfolioIdFromReq(req, url, body) {
 const raw = (body && body.portfolioId !== undefined) ? body.portfolioId : (url ? url.searchParams.get('portfolioId') : null);
@@ -2541,6 +2542,115 @@ await kvSetJson(key, list);
 return list;
 }
 
+
+const INVEST_OTHER_TYPES = ['deposit', 'withdrawal', 'broker-fee', 'corporate-action', 'securities-lending', 'isin-change']
+
+async function applyInvestOtherAction(email, portfolioId, body) {
+  const key = investOtherKey(email, portfolioId)
+  let list = (await kvGetJson(key)) || []
+  if (body.action === 'create') {
+    const type = INVEST_OTHER_TYPES.includes(body.type) ? body.type : null
+    if (!type) throw apiError(400, 'Onbekend actietype.')
+    const date = /^\d{4}-\d{2}-\d{2}$/.test(String(body.date || '')) ? String(body.date) : new Date().toISOString().slice(0, 10)
+    list.push({
+      id: crypto.randomUUID(),
+      type,
+      symbol: String(body.symbol || '').trim().slice(0, 30),
+      amount: Number(body.amount) || 0,
+      currency: /^[A-Z]{3}$/.test(String(body.currency || '')) ? body.currency : 'EUR',
+      date,
+      note: String(body.note || '').trim().slice(0, 500),
+      broker: String(body.broker || '').trim().slice(0, 40),
+      createdAt: investValidCreatedAt(body.createdAt) || Date.now(),
+    })
+  } else if (body.action === 'update') {
+    const it = list.find((x) => x.id === body.id)
+    if (!it) throw apiError(404, 'Niet gevonden')
+    if (body.type !== undefined && INVEST_OTHER_TYPES.includes(body.type)) it.type = body.type
+    if (body.symbol !== undefined) it.symbol = String(body.symbol).trim().slice(0, 30)
+    if (body.amount !== undefined) it.amount = Number(body.amount) || it.amount
+    if (body.currency !== undefined) it.currency = /^[A-Z]{3}$/.test(String(body.currency)) ? body.currency : it.currency
+    if (body.date !== undefined) it.date = /^\d{4}-\d{2}-\d{2}$/.test(String(body.date)) ? String(body.date) : it.date
+    if (body.note !== undefined) it.note = String(body.note).trim().slice(0, 500)
+    if (body.broker !== undefined) it.broker = String(body.broker).trim().slice(0, 40)
+  } else if (body.action === 'delete') {
+    list = list.filter((x) => x.id !== body.id)
+  } else {
+    throw apiError(400, 'Onbekende actie')
+  }
+  await kvSetJson(key, list)
+  return list
+}
+
+async function handleInvestOther(req, res) {
+  const s = await getSession(req, 'admin')
+  if (!s) return json(res, 401, { error: 'Not logged in' })
+  try {
+    const __url = new URL(req.url, 'http://localhost')
+    if (req.method === 'GET') return json(res, 200, (await kvGetJson(investOtherKey(s.email, investPortfolioIdFromReq(req, __url, null)))) || [])
+    if (req.method === 'POST') {
+      const body = await readBody(req, res)
+      if (!body) return
+      const list = await applyInvestOtherAction(s.email, investPortfolioIdFromReq(req, __url, body), body)
+      return json(res, 200, { ok: true, items: list })
+    }
+  } catch (e) {
+    if (e && e.httpStatus) return json(res, e.httpStatus, { error: e.message })
+    console.error('invest other API error:', e.message)
+    return json(res, 500, { error: 'Opslag niet bereikbaar. Is Upstash gekoppeld?' })
+  }
+}
+
+async function handleInvestActionLog(req, res) {
+  const s = await getSession(req, 'admin')
+  if (!s) return json(res, 401, { error: 'Not logged in' })
+  try {
+    const __url = new URL(req.url, 'http://localhost')
+    const portfolioId = investPortfolioIdFromReq(req, __url, null)
+    const [txs, divs, others] = await Promise.all([
+      kvGetJson(investTxKey(s.email, portfolioId)),
+      kvGetJson(investDivKey(s.email, portfolioId)),
+      kvGetJson(investOtherKey(s.email, portfolioId)),
+    ])
+    const items = []
+    for (const tx of (txs || [])) {
+      items.push({
+        id: tx.id, category: tx.type, date: tx.date, symbol: tx.symbol, name: tx.name,
+        amount: tx.shares * tx.price, currency: tx.currency, shares: tx.shares, price: tx.price,
+        fees: tx.fees || 0, broker: tx.broker || '', note: tx.note || '',
+      })
+    }
+    for (const d of (divs || [])) {
+      items.push({
+        id: d.id, category: 'dividend', date: d.payDate, symbol: d.symbol, name: d.symbol,
+        amount: d.totalAmount, currency: d.currency, shares: d.shares, price: d.amountPerShare,
+        fees: 0, broker: '', note: d.note || '',
+      })
+    }
+    for (const o of (others || [])) {
+      items.push({
+        id: o.id, category: o.type, date: o.date, symbol: o.symbol || '', name: o.symbol || '',
+        amount: o.amount, currency: o.currency, shares: null, price: null,
+        fees: 0, broker: o.broker || '', note: o.note || '',
+      })
+    }
+    const typeFilter = String(__url.searchParams.get('type') || '').trim()
+    const dateFrom = String(__url.searchParams.get('dateFrom') || '').trim()
+    const dateTo = String(__url.searchParams.get('dateTo') || '').trim()
+    const q = String(__url.searchParams.get('q') || '').trim().toLowerCase()
+    let filtered = items
+    if (typeFilter) filtered = filtered.filter((it) => it.category === typeFilter)
+    if (dateFrom) filtered = filtered.filter((it) => it.date >= dateFrom)
+    if (dateTo) filtered = filtered.filter((it) => it.date <= dateTo)
+    if (q) filtered = filtered.filter((it) => (it.symbol || '').toLowerCase().includes(q) || (it.name || '').toLowerCase().includes(q) || (it.note || '').toLowerCase().includes(q) || (it.broker || '').toLowerCase().includes(q))
+    filtered.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
+    const categories = ['buy', 'sell', 'dividend', 'deposit', 'withdrawal', 'broker-fee', 'corporate-action', 'securities-lending', 'isin-change']
+    return json(res, 200, { items: filtered, categories, total: items.length })
+  } catch (e) {
+    console.error('invest action-log API error:', e.message)
+    return json(res, 500, { error: 'Kon logboek niet laden.' })
+  }
+}
 async function handleInvestTx(req, res) {
 const s = await getSession(req, 'admin');
 if (!s) return json(res, 401, { error: 'Not logged in' });
@@ -3440,6 +3550,8 @@ if (p === '/api/invest/portfolios') return handleInvestPortfolios(req, res);
 if (p === '/api/invest/timetravel') return handleInvestTimetravel(req, res)
 if (p === '/api/invest/costs') return handleInvestCosts(req, res)
 if (p === '/api/invest/position') return handleInvestPositionDetail(req, res)
+if (p === '/api/invest/other-actions') return handleInvestOther(req, res)
+if (p === '/api/invest/action-log') return handleInvestActionLog(req, res)
 
 
 // --- Base Assistant API (AI chat widget, same 'admin' session as Gym) ---
