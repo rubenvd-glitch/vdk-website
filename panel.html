@@ -1334,6 +1334,25 @@ header { padding: 10px 16px; }
 <label style="margin-right:10px;font-size:12px;"><input type="radio" name="investReturnMethod" value="mwrr" id="investReturnMethodMwrr" onchange="investSaveSettings()" /> MWRR (geldgewogen rendement)</label>
 </div>
 <div class="section-sub" style="font-size:12px;opacity:.6;">MWRR (money-weighted rate of return) houdt rekening met de timing van stortingen, verkopen en dividend (interne rentevoet, op jaarbasis). Absoluut toont simpelweg huidige waarde min inleg.</div>
+<div class="section-head" style="margin-top:20px;">
+<h2 style="font-size:16px;">Strategieën</h2>
+<button onclick="investOpenStrategyDefForm()" style="margin-left:6px;">+ Nieuwe strategie</button>
+</div>
+<div class="section-sub" style="font-size:12px;opacity:.6;">Eigen labels met icoon en kleur. Koppel ze aan posities via "Strategie bewerken" bij Diversificatie hierboven.</div>
+<div id="investStrategyDefList"></div>
+
+<div id="investStrategyDefForm" class="invest-form" style="display:none;">
+<label>Naam</label>
+<input type="text" id="investStrategyDefName" placeholder="bijv. GARP, Growth, Value, Dividend" />
+<label>Icoon (emoji, optioneel)</label>
+<input type="text" id="investStrategyDefIcon" placeholder="bijv. 📈" maxlength="4" />
+<label>Kleur</label>
+<input type="color" id="investStrategyDefColor" value="#4f8cff" />
+<div class="invest-form-actions">
+<button onclick="investSubmitStrategyDef()">Opslaan</button>
+<button onclick="investCloseStrategyDefForm()">Annuleren</button>
+</div>
+</div>
 </div>
 
 <div id="view-ideas" style="display:none;">
@@ -3478,6 +3497,81 @@ html += '<div style="margin:6px 0;">'
 el.innerHTML = html;
 }
 
+
+function investRenderStrategyBreakdown(el, list, defs) {
+  if (!list || !list.length) { el.innerHTML = '<div style="opacity:.6;padding:4px 0;">' + t('invest.noDiversificationData') + '</div>'; return }
+  let html = ''
+  for (const item of list) {
+    const pct = Math.round((item.pct || 0) * 1000) / 10
+    const def = (defs || []).find((d) => d.name === item.key)
+    const swatch = def ? '<span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:' + def.color + ';margin-right:4px;"></span>' : ''
+    const label = (def && def.icon ? def.icon + ' ' : '') + item.key
+    html += '<div style="margin:6px 0;">'
+      + '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px;"><span>' + swatch + label + '</span><span style="opacity:.6;">' + pct + '%</span></div>'
+      + '<div style="background:rgba(255,255,255,.08);border-radius:4px;height:6px;overflow:hidden;"><div style="background:' + (def ? def.color : '#7fd68f') + ';height:100%;width:' + pct + '%;"></div></div>'
+      + '</div>'
+  }
+  el.innerHTML = html
+}
+
+let investStrategyDefsCache = []
+
+window.investLoadStrategyDefs = async () => {
+  try {
+    const list = await api(investUrl('/api/invest/strategy-defs'))
+    investStrategyDefsCache = list || []
+    investRenderStrategyDefList()
+  } catch (e) {
+    console.error('invest strategy-defs load error', e)
+  }
+}
+
+function investRenderStrategyDefList() {
+  const el = $('investStrategyDefList')
+  if (!el) return
+  if (!investStrategyDefsCache.length) { el.innerHTML = '<div style="opacity:.6;padding:4px 0;">Nog geen strategieën gedefinieerd.</div>'; return }
+  let html = ''
+  for (const def of investStrategyDefsCache) {
+    html += '<div style="display:flex;align-items:center;gap:8px;margin:6px 0;padding:6px 8px;background:rgba(255,255,255,.03);border-radius:6px;">'
+      + '<span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:' + def.color + ';"></span>'
+      + '<span>' + (def.icon || '') + ' ' + def.name + '</span>'
+      + '<button onclick="investDeleteStrategyDef(\'' + def.id + '\')" style="margin-left:auto;font-size:11px;opacity:.7;">Verwijderen</button>'
+      + '</div>'
+  }
+  el.innerHTML = html
+}
+
+window.investOpenStrategyDefForm = () => { $('investStrategyDefForm').style.display = 'block' }
+window.investCloseStrategyDefForm = () => { $('investStrategyDefForm').style.display = 'none' }
+
+window.investSubmitStrategyDef = async () => {
+  const body = {
+    portfolioId: investPortfolioId,
+    action: 'create',
+    name: $('investStrategyDefName').value,
+    icon: $('investStrategyDefIcon').value,
+    color: $('investStrategyDefColor').value,
+  }
+  try {
+    await api('/api/invest/strategy-defs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    $('investStrategyDefForm').style.display = 'none'
+    $('investStrategyDefName').value = ''
+    $('investStrategyDefIcon').value = ''
+    investLoadStrategyDefs()
+  } catch (e) {
+    alert(e.message)
+  }
+}
+
+window.investDeleteStrategyDef = async (id) => {
+  if (!confirm('Deze strategie verwijderen?')) return
+  try {
+    await api('/api/invest/strategy-defs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ portfolioId: investPortfolioId, action: 'delete', id }) })
+    investLoadStrategyDefs()
+  } catch (e) {
+    alert(e.message)
+  }
+}
 function investRenderDiversification(data) {
 investRenderBreakdownList($('investCountryBreakdown'), data.byCountry || []);
 investRenderBreakdownList($('investSectorBreakdown'), data.bySector || []);
@@ -3485,7 +3579,7 @@ investRenderBreakdownList($('investWorldPartBreakdown'), data.byWorldPart || [])
 investRenderBreakdownList($('investCurrencyBreakdown'), data.byCurrency || [])
 investRenderBreakdownList($('investExchangeBreakdown'), data.byExchange || [])
 investRenderBreakdownList($('investAssetTypeBreakdown'), data.byAssetType || [])
-investRenderBreakdownList($('investStrategyBreakdown'), data.byStrategy || [])
+investRenderStrategyBreakdown($('investStrategyBreakdown'), data.byStrategy || [], data.strategyDefs || [])
 investRenderBreakdownList($('investBrokerBreakdown'), data.byBroker || [])
 const holdings = data.holdings || [];
 const sectors = data.sectors || {};
@@ -3643,6 +3737,7 @@ investLoadDiversification();
 investLoadCosts()
   investLoadActionLog();
   investLoadSettings();
+  investLoadStrategyDefs();
 }
 const INVEST_ACTION_LABELS = { buy: 'Koop', sell: 'Verkoop', dividend: 'Dividend', deposit: 'Storting', withdrawal: 'Opname', 'broker-fee': 'Brokerkosten', 'corporate-action': 'Corporate action', 'securities-lending': 'Securities lending', 'isin-change': 'ISIN-wijziging' }
 let investActionLogItems = []
