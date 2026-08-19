@@ -1326,6 +1326,14 @@ header { padding: 10px 16px; }
 <button onclick="investCloseOtherActionForm()">Annuleren</button>
 </div>
 </div>
+<div class="section-head" style="margin-top:20px;">
+<h2 style="font-size:16px;">Instellingen</h2>
+</div>
+<div style="margin-bottom:8px;">
+<label style="margin-right:10px;font-size:12px;"><input type="radio" name="investReturnMethod" value="absolute" id="investReturnMethodAbsolute" onchange="investSaveSettings()" checked /> Absoluut rendement</label>
+<label style="margin-right:10px;font-size:12px;"><input type="radio" name="investReturnMethod" value="mwrr" id="investReturnMethodMwrr" onchange="investSaveSettings()" /> MWRR (geldgewogen rendement)</label>
+</div>
+<div class="section-sub" style="font-size:12px;opacity:.6;">MWRR (money-weighted rate of return) houdt rekening met de timing van stortingen, verkopen en dividend (interne rentevoet, op jaarbasis). Absoluut toont simpelweg huidige waarde min inleg.</div>
 </div>
 
 <div id="view-ideas" style="display:none;">
@@ -3577,6 +3585,54 @@ alert(e.message)
 }
 }
 
+
+let investReturnMethod = 'absolute'
+
+window.investLoadSettings = async () => {
+  try {
+    const d = await api(investUrl('/api/invest/settings'))
+    investReturnMethod = d.returnMethod || 'absolute'
+    const radio = document.querySelector('input[name="investReturnMethod"][value="' + investReturnMethod + '"]')
+    if (radio) radio.checked = true
+    if (investReturnMethod === 'mwrr') investLoadTotalReturnStat()
+  } catch (e) {
+    console.error('invest settings load error', e)
+  }
+}
+
+window.investSaveSettings = async () => {
+  const selected = document.querySelector('input[name="investReturnMethod"]:checked')
+  const returnMethod = selected ? selected.value : 'absolute'
+  investReturnMethod = returnMethod
+  try {
+    await api('/api/invest/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ portfolioId: investPortfolioId, returnMethod }) })
+    if (returnMethod === 'mwrr') investLoadTotalReturnStat()
+    else investLoadHoldings()
+  } catch (e) {
+    alert(e.message)
+  }
+}
+
+window.investLoadTotalReturnStat = async () => {
+  const el = $('investTotalReturn')
+  if (!el || investReturnMethod !== 'mwrr') return
+  el.textContent = '...'
+  try {
+    const d = await api(investUrl('/api/invest/mwrr'))
+    el.textContent = (d.mwrr === null || d.mwrr === undefined) ? 'n.v.t.' : (Math.round(d.mwrr * 1000) / 10) + '% /jr'
+  } catch (e) {
+    el.textContent = 'n.v.t.'
+  }
+}
+
+if (typeof window.investLoadHoldings === 'function') {
+  const _origInvestLoadHoldings = window.investLoadHoldings
+  window.investLoadHoldings = async (...args) => {
+    const r = await _origInvestLoadHoldings(...args)
+    if (investReturnMethod === 'mwrr') investLoadTotalReturnStat()
+    return r
+  }
+}
 function loadInvestPage() {
 investLoadPortfolios();
 investLoadHoldings();
@@ -3586,6 +3642,7 @@ investLoadValueHistory();
 investLoadDiversification();
 investLoadCosts()
   investLoadActionLog();
+  investLoadSettings();
 }
 const INVEST_ACTION_LABELS = { buy: 'Koop', sell: 'Verkoop', dividend: 'Dividend', deposit: 'Storting', withdrawal: 'Opname', 'broker-fee': 'Brokerkosten', 'corporate-action': 'Corporate action', 'securities-lending': 'Securities lending', 'isin-change': 'ISIN-wijziging' }
 let investActionLogItems = []
