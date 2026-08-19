@@ -1335,6 +1335,16 @@ header { padding: 10px 16px; }
 </div>
 <div class="section-sub" style="font-size:12px;opacity:.6;">MWRR (money-weighted rate of return) houdt rekening met de timing van stortingen, verkopen en dividend (interne rentevoet, op jaarbasis). Absoluut toont simpelweg huidige waarde min inleg.</div>
 <div class="section-head" style="margin-top:20px;">
+<h2 style="font-size:16px;">E-mailmeldingen</h2>
+</div>
+<div class="section-sub" style="font-size:12px;opacity:.6;">Ontvang een automatische samenvatting van deze portfolio per e-mail.</div>
+<div style="margin-bottom:8px;">
+<label style="margin-right:10px;font-size:12px;"><input type="checkbox" id="investEmailFreqWeekly" onchange="investSaveEmailFrequencies()" /> Wekelijks</label>
+<label style="margin-right:10px;font-size:12px;"><input type="checkbox" id="investEmailFreqMonthly" onchange="investSaveEmailFrequencies()" /> Maandelijks</label>
+<label style="margin-right:10px;font-size:12px;"><input type="checkbox" id="investEmailFreqQuarterly" onchange="investSaveEmailFrequencies()" /> Per kwartaal</label>
+<label style="margin-right:10px;font-size:12px;"><input type="checkbox" id="investEmailFreqYearly" onchange="investSaveEmailFrequencies()" /> Per jaar</label>
+</div>
+<div class="section-head" style="margin-top:20px;">
 <h2 style="font-size:16px;">Strategieën</h2>
 <button onclick="investOpenStrategyDefForm()" style="margin-left:6px;">+ Nieuwe strategie</button>
 </div>
@@ -3689,6 +3699,11 @@ window.investLoadSettings = async () => {
     const radio = document.querySelector('input[name="investReturnMethod"][value="' + investReturnMethod + '"]')
     if (radio) radio.checked = true
     if (investReturnMethod === 'mwrr') investLoadTotalReturnStat()
+    const freqs = d.emailFrequencies || {}
+    if ($('investEmailFreqWeekly')) $('investEmailFreqWeekly').checked = !!freqs.weekly
+    if ($('investEmailFreqMonthly')) $('investEmailFreqMonthly').checked = !!freqs.monthly
+    if ($('investEmailFreqQuarterly')) $('investEmailFreqQuarterly').checked = !!freqs.quarterly
+    if ($('investEmailFreqYearly')) $('investEmailFreqYearly').checked = !!freqs.yearly
   } catch (e) {
     console.error('invest settings load error', e)
   }
@@ -3707,6 +3722,19 @@ window.investSaveSettings = async () => {
   }
 }
 
+window.investSaveEmailFrequencies = async () => {
+  const emailFrequencies = {
+    weekly: $('investEmailFreqWeekly') ? $('investEmailFreqWeekly').checked : false,
+    monthly: $('investEmailFreqMonthly') ? $('investEmailFreqMonthly').checked : false,
+    quarterly: $('investEmailFreqQuarterly') ? $('investEmailFreqQuarterly').checked : false,
+    yearly: $('investEmailFreqYearly') ? $('investEmailFreqYearly').checked : false,
+  }
+  try {
+    await api('/api/invest/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ portfolioId: investPortfolioId, emailFrequencies }) })
+  } catch (e) {
+    alert(e.message)
+  }
+}
 window.investLoadTotalReturnStat = async () => {
   const el = $('investTotalReturn')
   if (!el || investReturnMethod !== 'mwrr') return

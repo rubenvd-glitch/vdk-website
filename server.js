@@ -2799,14 +2799,27 @@ async function handleInvestSettings(req, res) {
     const portfolioId = investPortfolioIdFromReq(req, __url, null)
     const key = investSettingsKey(s.email, portfolioId)
     if (req.method === 'GET') {
-      const settings = (await kvGetJson(key)) || { returnMethod: 'absolute' }
+      const saved = (await kvGetJson(key)) || {}
+      const settings = {
+        returnMethod: saved.returnMethod === 'mwrr' ? 'mwrr' : 'absolute',
+        emailFrequencies: Object.assign({ weekly: false, monthly: false, quarterly: false, yearly: false }, saved.emailFrequencies || {}),
+      }
       return json(res, 200, settings)
     }
     if (req.method === 'POST') {
       const body = await readBody(req, res)
       if (!body) return
-      const returnMethod = body.returnMethod === 'mwrr' ? 'mwrr' : 'absolute'
-      const settings = { returnMethod }
+      const saved = (await kvGetJson(key)) || {}
+      const settings = {
+        returnMethod: saved.returnMethod === 'mwrr' ? 'mwrr' : 'absolute',
+        emailFrequencies: Object.assign({ weekly: false, monthly: false, quarterly: false, yearly: false }, saved.emailFrequencies || {}),
+      }
+      if (body.returnMethod !== undefined) settings.returnMethod = body.returnMethod === 'mwrr' ? 'mwrr' : 'absolute'
+      if (body.emailFrequencies !== undefined && typeof body.emailFrequencies === 'object') {
+        for (const k of ['weekly', 'monthly', 'quarterly', 'yearly']) {
+          if (body.emailFrequencies[k] !== undefined) settings.emailFrequencies[k] = !!body.emailFrequencies[k]
+        }
+      }
       await kvSetJson(key, settings)
       return json(res, 200, settings)
     }
@@ -2816,6 +2829,73 @@ async function handleInvestSettings(req, res) {
   }
 }
 
+
+function investEmailFreqDue(freq, date) {
+  const day = date.getUTCDay()
+  const dom = date.getUTCDate()
+  const month = date.getUTCMonth()
+  if (freq === 'weekly') return day === 1
+  if (freq === 'monthly') return dom === 1
+  if (freq === 'quarterly') return dom === 1 && (month === 0 || month === 3 || month === 6 || month === 9)
+  if (freq === 'yearly') return dom === 1 && month === 0
+  return false
+}
+
+async function investBuildEmailSummary(email, portfolioId, portfolioName) {
+  const transactions = (await kvGetJson(investTxKey(email, portfolioId))) || []
+  const dividends = (await kvGetJson(investDivKey(email, portfolioId))) || []
+  const holdings = investComputeHoldings(transactions).filter((h) => !h.closed)
+  const eurBasis = await investComputeHoldingsEurBasis(transactions)
+  let valueEUR = 0
+  let investedEUR = 0
+  for (const h of holdings) {
+    const quote = await investGetQuote(h.symbol)
+    const fx = await investGetFxRate(h.currency, 'EUR')
+    const price = quote ? quote.price : null
+    if (price !== null) valueEUR += price * h.shares * fx
+    const basis = eurBasis.get(h.symbol)
+    if (basis) investedEUR += basis.costBasisEUR
+  }
+  const unrealizedEUR = valueEUR - investedEUR
+  const now = new Date()
+  const ytdStart = now.getUTCFullYear() + '-01-01'
+  let dividendYtdEUR = 0
+  for (const d of dividends) {
+    if (!d.payDate || d.payDate < ytdStart) continue
+    let fx = await investGetFxRateOnDate(d.currency, 'EUR', d.payDate)
+    if (fx === null) fx = await investGetFxRate(d.currency, 'EUR')
+    dividendYtdEUR += (d.totalAmount || 0) * fx
+  }
+  const pct = investedEUR > 0 ? ((unrealizedEUR / investedEUR) * 100).toFixed(1) : '0.0'
+  const lines = []
+  lines.push('Portfolio-update: ' + portfolioName)
+  lines.push('Waarde: ' + '\u20ac' + valueEUR.toFixed(2))
+  lines.push('Ingelegd: ' + '\u20ac' + investedEUR.toFixed(2))
+  lines.push('Ongerealiseerd: ' + '\u20ac' + unrealizedEUR.toFixed(2) + ' (' + pct + '%)')
+  lines.push('Dividend dit jaar: ' + '\u20ac' + dividendYtdEUR.toFixed(2))
+  lines.push('Aantal posities: ' + holdings.length)
+  return lines.join('\n')
+}
+
+async function investRunEmailDigests() {
+  const now = new Date()
+  const portfolios = await investGetPortfolios(ADMIN_EMAIL)
+  const results = []
+  for (const pf of portfolios) {
+    const settings = (await kvGetJson(investSettingsKey(ADMIN_EMAIL, pf.id))) || {}
+    const freqs = settings.emailFrequencies || {}
+    const due = ['weekly', 'monthly', 'quarterly', 'yearly'].filter((f) => freqs[f] && investEmailFreqDue(f, now))
+    if (!due.length) continue
+    try {
+      const summary = await investBuildEmailSummary(ADMIN_EMAIL, pf.id, pf.name || pf.id)
+      await sendMail({ to: ADMIN_EMAIL, subject: 'Portfolio-update: ' + (pf.name || pf.id), text: summary })
+      results.push({ portfolioId: pf.id, sent: true, frequencies: due })
+    } catch (e) {
+      results.push({ portfolioId: pf.id, sent: false, error: e.message })
+    }
+  }
+  return results
+}
 async function handleInvestHoldings(req, res) {
 const s = await getSession(req, 'admin');
 if (!s) return json(res, 401, { error: 'Not logged in' });
@@ -4110,7 +4190,8 @@ const range = url.searchParams.get('range');
 const text = range === 'week' ? await weeklySummaryText() : await dailySummaryText();
 const ok = await tgSend(text);
 logEvent('dagoverzicht', ok ? 'verstuurd via Telegram' : 'Telegram niet gekoppeld');
-return json(res, 200, { ok, summary: text });
+const emailDigestResults = await investRunEmailDigests();
+return json(res, 200, { ok, summary: text, emailDigests: emailDigestResults });
 } catch (e) {
 console.error('cron error:', e.message);
 return json(res, 500, { error: 'Samenvatting mislukt.' });
