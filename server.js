@@ -2427,11 +2427,28 @@ await kvSetJson(cacheKey, { data, fetchedAt: now });
 return data;
 }
 
-async function investGetQuote(symbol) {
+async function investGetYahooQuote(symbol, expectedCurrency) {
+const suffixes = ['', '.AS', '.DE', '.PA', '.MI', '.L', '.SW', '.LS'];
+for (const suf of suffixes) {
+try {
+const res = await fetch('https://query1.finance.yahoo.com/v8/finance/chart/' + encodeURIComponent(symbol + suf), { headers: { 'User-Agent': 'Mozilla/5.0' } });
+if (!res.ok) continue;
+const data = await res.json();
+const meta = data && data.chart && data.chart.result && data.chart.result[0] && data.chart.result[0].meta;
+if (!meta || typeof meta.regularMarketPrice !== 'number') continue;
+if (expectedCurrency && meta.currency && meta.currency !== expectedCurrency) continue;
+return meta.regularMarketPrice;
+} catch (e) { /* try next suffix */ }
+}
+return null;
+}
+async function investGetQuote(symbol, currency) {
 return investCached(`investquote:${symbol}`, 15 * 60 * 1000, async () => {
 const r = await tdFetch('/price', { symbol });
-if (r.error || r.price === undefined) return null;
-return { price: parseFloat(r.price) };
+if (!r.error && r.price !== undefined) return { price: parseFloat(r.price) };
+const yahooPrice = await investGetYahooQuote(symbol, currency);
+if (yahooPrice !== null) return { price: yahooPrice };
+return null;
 });
 }
 
@@ -2775,7 +2792,7 @@ async function handleInvestMwrr(req, res) {
     const holdings = investComputeHoldings(transactions).filter((h) => !h.closed)
     let currentValueEUR = 0
     for (const h of holdings) {
-      const quote = await investGetQuote(h.symbol)
+      const quote = await investGetQuote(h.symbol, h.currency)
       const fx = await investGetFxRate(h.currency, 'EUR')
       if (quote) currentValueEUR += quote.price * h.shares * fx
     }
@@ -2850,7 +2867,7 @@ async function investBuildEmailSummary(email, portfolioId, portfolioName) {
   let valueEUR = 0
   let investedEUR = 0
   for (const h of holdings) {
-    const quote = await investGetQuote(h.symbol)
+    const quote = await investGetQuote(h.symbol, h.currency)
     const fx = await investGetFxRate(h.currency, 'EUR')
     const price = quote ? quote.price : null
     if (price !== null) valueEUR += price * h.shares * fx
@@ -2910,7 +2927,7 @@ const eurBasis = await investComputeHoldingsEurBasis(transactions);
 let valueEUR = 0, investedEUR = 0, investedEURHistorical = 0, dividendYtdEUR = 0, dividendAllTimeEUR = 0, padiEUR = 0;
 const enriched = [];
 for (const h of holdings) {
-const quote = await investGetQuote(h.symbol);
+const quote = await investGetQuote(h.symbol, h.currency);
 const fx = await investGetFxRate(h.currency, 'EUR');
 const price = quote ? quote.price : null;
 const valueNative = price !== null ? price * h.shares : null;
@@ -3128,7 +3145,7 @@ if (!transactions.length) return;
 const holdings = investComputeHoldings(transactions).filter((h) => !h.closed);
 let valueEUR = 0, investedEUR = 0;
 for (const h of holdings) {
-const quote = await investGetQuote(h.symbol);
+const quote = await investGetQuote(h.symbol, h.currency);
 const fx = await investGetFxRate(h.currency, 'EUR');
 const price = quote ? quote.price : null;
 if (price != null) valueEUR += price * h.shares * fx;
@@ -3346,7 +3363,7 @@ const byStrategyMap = new Map()
 const byBrokerMap = new Map()
 let total = 0;
 for (const h of holdings) {
-const quote = await investGetQuote(h.symbol);
+const quote = await investGetQuote(h.symbol, h.currency);
 const fx = await investGetFxRate(h.currency, 'EUR');
 const price = quote ? quote.price : null;
 const valueEUR = price != null ? price * h.shares * fx : 0;
