@@ -2421,7 +2421,8 @@ return { error: String((e && e.message) || e) };
 async function investCached(cacheKey, ttlMs, fetchFn) {
 const cache = (await kvGetJson(cacheKey)) || {};
 const now = Date.now();
-if (cache.fetchedAt && now - cache.fetchedAt < ttlMs) return cache.data;
+const effectiveTtl = cache.data === null ? Math.min(ttlMs, 60 * 1000) : ttlMs;
+if (cache.fetchedAt && now - cache.fetchedAt < effectiveTtl) return cache.data;
 const data = await fetchFn();
 await kvSetJson(cacheKey, { data, fetchedAt: now });
 return data;
@@ -2926,38 +2927,6 @@ async function investRunEmailDigests() {
   }
   return results
 }
-async function handleInvestDebugYahoo(req, res) {
-const s = await getSession(req, 'admin');
-if (!s) return json(res, 401, { error: 'Not logged in' });
-const u = new URL(req.url, 'http://localhost');
-const symbol = u.searchParams.get('symbol') || 'YCSH';
-const currency = u.searchParams.get('currency') || 'EUR';
-const out = {};
-const t0 = Date.now();
-try {
-const yq = await investGetYahooQuote(symbol, currency);
-out.investGetYahooQuote_result = yq;
-} catch (e) {
-out.investGetYahooQuote_error = String(e && e.stack || e);
-}
-out.ms_yahoo = Date.now() - t0;
-const t1 = Date.now();
-try {
-const gq = await investGetQuote(symbol, currency);
-out.investGetQuote_result = gq;
-} catch (e) {
-out.investGetQuote_error = String(e && e.stack || e);
-}
-out.ms_getquote = Date.now() - t1;
-try {
-const td = await tdFetch('/price', { symbol });
-out.tdFetch_result = td;
-} catch (e) {
-out.tdFetch_error = String(e && e.stack || e);
-}
-return json(res, 200, out);
-}
-
 async function handleInvestHoldings(req, res) {
 const s = await getSession(req, 'admin');
 if (!s) return json(res, 401, { error: 'Not logged in' });
@@ -3935,7 +3904,6 @@ if (p === '/api/gym/split') return handleGymSplit(req, res);
 if (p === '/api/invest/transactions') return handleInvestTx(req, res);
 if (p === '/api/invest/dividends') return handleInvestDiv(req, res);
 if (p === '/api/invest/holdings') return handleInvestHoldings(req, res);
-if (p === '/api/invest/debug-yahoo') return handleInvestDebugYahoo(req, res);
 if (p === '/api/invest/dividend-calendar') return handleInvestDividendCalendar(req, res);
 if (p === '/api/invest/extended-calendar') return handleInvestExtendedCalendar(req, res)
 if (p === '/api/invest/dividend-growth') return handleInvestDividendGrowth(req, res);
