@@ -1334,6 +1334,7 @@ header { padding: 10px 16px; }
 <option value="deposit">Storting</option>
 <option value="withdrawal">Opname</option>
 <option value="broker-fee">Brokerkosten</option>
+<option value="interest">Rente</option>
 <option value="corporate-action">Corporate action</option>
 <option value="securities-lending">Securities lending</option>
 <option value="isin-change">ISIN-wijziging</option>
@@ -1354,6 +1355,7 @@ header { padding: 10px 16px; }
 <option value="deposit">Storting</option>
 <option value="withdrawal">Opname</option>
 <option value="broker-fee">Brokerkosten</option>
+<option value="interest">Rente</option>
 <option value="corporate-action">Corporate action</option>
 <option value="securities-lending">Securities lending</option>
 <option value="isin-change">ISIN-wijziging</option>
@@ -3905,7 +3907,7 @@ investLoadCosts()
   investLoadStrategyDefs();
   investLoadDrawdown();
 }
-const INVEST_ACTION_LABELS = { buy: 'Koop', sell: 'Verkoop', dividend: 'Dividend', deposit: 'Storting', withdrawal: 'Opname', 'broker-fee': 'Brokerkosten', 'corporate-action': 'Corporate action', 'securities-lending': 'Securities lending', 'isin-change': 'ISIN-wijziging' }
+const INVEST_ACTION_LABELS = { buy: 'Koop', sell: 'Verkoop', dividend: 'Dividend', deposit: 'Storting', withdrawal: 'Opname', 'broker-fee': 'Brokerkosten', interest: 'Rente', 'corporate-action': 'Corporate action', 'securities-lending': 'Securities lending', 'isin-change': 'ISIN-wijziging' }
 let investActionLogItems = []
 
 window.investLoadActionLog = async () => {
@@ -4134,7 +4136,7 @@ return { rows, errors, totalLines: lines.length - 1 }
 }
 
 function investMapRevolutRows(rows) {
-const txs = [], divs = []
+const txs = [], divs = [], others = []
 let ignored = 0
 for (const r of rows) {
 const type = (r.type || '').toLowerCase()
@@ -4146,14 +4148,19 @@ if (!r.ticker || !r.totalAmount) { ignored++; continue }
 const sharesForDiv = r.quantity || 1
 divs.push({ symbol: r.ticker, amountPerShare: r.totalAmount / sharesForDiv, shares: sharesForDiv, totalAmount: r.totalAmount, currency: r.totalCurrency || r.currency || 'USD', payDate: r.date })
 } else {
+const otherType = type.indexOf('deposit') !== -1 ? 'deposit' : type.indexOf('withdraw') !== -1 ? 'withdrawal' : type.indexOf('interest') !== -1 ? 'interest' : (type.indexOf('fee') !== -1 || type.indexOf('custody') !== -1) ? 'broker-fee' : type.indexOf('corporate') !== -1 ? 'corporate-action' : type.indexOf('lending') !== -1 ? 'securities-lending' : null
+if (otherType && r.totalAmount !== undefined && r.totalAmount !== null && r.totalAmount !== '') {
+others.push({ type: otherType, symbol: r.ticker || '', amount: Math.abs(Number(r.totalAmount) || 0), currency: r.totalCurrency || r.currency || 'EUR', date: r.date, broker: 'Revolut', note: r.type || '' })
+} else {
 ignored++
 }
 }
-return { txs, divs, ignored }
+}
+return { txs, divs, others, ignored }
 }
 
 function investMapTrading212Rows(rows) {
-const txs = [], divs = []
+const txs = [], divs = [], others = []
 let ignored = 0
 for (const r of rows) {
 const action = (r.action || '').toLowerCase()
@@ -4165,10 +4172,15 @@ if (!r.ticker || !r.total) { ignored++; continue }
 const sharesForDiv = r.shares || 1
 divs.push({ symbol: r.ticker, amountPerShare: r.total / sharesForDiv, shares: sharesForDiv, totalAmount: r.total, currency: r.totalCurrency || 'EUR', payDate: r.date })
 } else {
+const otherType = action.indexOf('deposit') !== -1 ? 'deposit' : action.indexOf('withdraw') !== -1 ? 'withdrawal' : action.indexOf('interest') !== -1 ? 'interest' : (action.indexOf('fee') !== -1 || action.indexOf('custody') !== -1) ? 'broker-fee' : (action.indexOf('corporate') !== -1 || action.indexOf('split') !== -1 || action.indexOf('merger') !== -1) ? 'corporate-action' : action.indexOf('lending') !== -1 ? 'securities-lending' : null
+if (otherType && r.total !== undefined && r.total !== null && r.total !== '') {
+others.push({ type: otherType, symbol: r.ticker || '', amount: Math.abs(Number(r.total) || 0), currency: r.totalCurrency || 'EUR', date: r.date, broker: 'Trading 212', note: r.notes || '' })
+} else {
 ignored++
 }
 }
-return { txs, divs, ignored }
+}
+return { txs, divs, others, ignored }
 }
 
 function investDetectBrokerCsv(headers) {
@@ -4186,11 +4198,11 @@ const broker = (forceBroker && forceBroker !== 'auto') ? forceBroker : investDet
 if (broker === 'revolut') {
 const parsed = investParseRevolutRows(text)
 const mapped = investMapRevolutRows(parsed.rows)
-return { txs: mapped.txs, divs: mapped.divs, skipped: parsed.errors.length, ignored: mapped.ignored, errors: parsed.errors, broker }
+return { txs: mapped.txs, divs: mapped.divs, others: mapped.others, skipped: parsed.errors.length, ignored: mapped.ignored, errors: parsed.errors, broker }
 }
 const parsed = investParseTrading212Rows(text)
 const mapped = investMapTrading212Rows(parsed.rows)
-return { txs: mapped.txs, divs: mapped.divs, skipped: parsed.errors.length, ignored: mapped.ignored, errors: parsed.errors, broker }
+return { txs: mapped.txs, divs: mapped.divs, others: mapped.others, skipped: parsed.errors.length, ignored: mapped.ignored, errors: parsed.errors, broker }
 }
 
 let investCsvParsed = null;
@@ -4201,11 +4213,11 @@ const text = await f.text()
 try {
 const parsed = investParseBrokerCsv(text, $('investCsvBroker') ? $('investCsvBroker').value : 'auto')
 investCsvParsed = parsed
-let msg = parsed.txs.length + ' transactie(s), ' + parsed.divs.length + ' dividend(en) gevonden'
-if (parsed.ignored) msg += ', ' + parsed.ignored + ' regel(s) genegeerd (stortingen/opnames/rente e.d.)'
+let msg = parsed.txs.length + ' transactie(s), ' + parsed.divs.length + ' dividend(en)' + ((parsed.others && parsed.others.length) ? ', ' + parsed.others.length + ' overige actie(s)' : '') + ' gevonden'
+if (parsed.ignored) msg += ', ' + parsed.ignored + ' regel(s) genegeerd (onbekend type)'
 if (parsed.skipped) msg += ', ' + parsed.skipped + ' regel(s) met een fout'
 $('investCsvPreview').textContent = msg + '.'
-$('investCsvImportBtn').style.display = (parsed.txs.length || parsed.divs.length) ? 'inline-block' : 'none'
+$('investCsvImportBtn').style.display = (parsed.txs.length || parsed.divs.length || (parsed.others && parsed.others.length)) ? 'inline-block' : 'none'
 } catch (e) {
 investCsvParsed = null
 $('investCsvPreview').textContent = 'Kon dit bestand niet lezen: ' + e.message
@@ -4217,7 +4229,7 @@ window.investCsvImport = async () => {
 if (!investCsvParsed) return;
 const btn = $('investCsvImportBtn');
 btn.disabled = true;
-const total = investCsvParsed.txs.length + investCsvParsed.divs.length;
+const total = investCsvParsed.txs.length + investCsvParsed.divs.length + (investCsvParsed.others ? investCsvParsed.others.length : 0);
 let done = 0, failed = 0;
 for (const tx of investCsvParsed.txs) {
 try { await api('/api/invest/transactions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({ action: 'create', portfolioId: investPortfolioId, broker: investCsvParsed.broker === 'revolut' ? 'Revolut' : 'Trading 212' }, tx)) }) }
@@ -4227,6 +4239,12 @@ $('investCsvPreview').textContent = 'Importeren... ' + done + '/' + total;
 }
 for (const dv of investCsvParsed.divs) {
 try { await api('/api/invest/dividends', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({ action: 'create', portfolioId: investPortfolioId }, dv)) }); }
+catch (e) { failed++; }
+done++;
+$('investCsvPreview').textContent = 'Importeren... ' + done + '/' + total;
+}
+for (const oa of (investCsvParsed.others || [])) {
+try { await api('/api/invest/other-actions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({ action: 'create', portfolioId: investPortfolioId }, oa)) }); }
 catch (e) { failed++; }
 done++;
 $('investCsvPreview').textContent = 'Importeren... ' + done + '/' + total;
