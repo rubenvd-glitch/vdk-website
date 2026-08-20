@@ -1041,6 +1041,22 @@ header { padding: 10px 16px; }
 .invest-form label{display:block;font-size:12px;opacity:.7;margin:10px 0 4px;}
 .invest-form input,.invest-form select{width:100%;box-sizing:border-box;padding:8px;border-radius:6px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.03);color:inherit;font-size:14px;}
 .invest-form-actions{margin-top:14px;display:flex;gap:8px;}
+.invest-tabnav{display:flex;gap:4px;margin:16px 0 20px;border-bottom:1px solid rgba(255,255,255,.1);overflow-x:auto;}
+.invest-tab-btn{background:none;border:none;color:inherit;opacity:.55;font-size:14px;font-weight:500;padding:10px 14px;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;}
+.invest-tab-btn:hover{opacity:.85;}
+.invest-tab-btn.active{opacity:1;border-bottom-color:#7fb0ff;color:#7fb0ff;}
+.invest-subtabs{display:flex;gap:4px;margin:4px 0 14px;border-bottom:1px solid rgba(255,255,255,.08);overflow-x:auto;}
+.invest-subtab-btn{background:none;border:none;color:inherit;opacity:.5;font-size:12px;font-weight:500;padding:7px 10px;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;}
+.invest-subtab-btn:hover{opacity:.8;}
+.invest-subtab-btn.active{opacity:1;border-bottom-color:#7fb0ff;color:#7fb0ff;}
+.invest-stat{background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.07);border-radius:12px;padding:14px 16px;}
+.invest-stat-label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.03em;opacity:.5;margin-bottom:6px;}
+.invest-stat-value{display:block;font-size:19px;font-weight:600;}
+.invest-table th{text-transform:uppercase;letter-spacing:.03em;font-size:11px;}
+.invest-table tbody tr:hover{background:rgba(255,255,255,.03);}
+#view-invest button:not(.invest-tab-btn):not(.invest-subtab-btn){background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);color:inherit;border-radius:999px;padding:7px 14px;font-size:13px;cursor:pointer;}
+#view-invest button:not(.invest-tab-btn):not(.invest-subtab-btn):hover{background:rgba(255,255,255,.15);}
+#view-invest select{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);color:inherit;border-radius:8px;padding:6px 10px;font-size:13px;}
 </style>
 
 <div id="view-invest" style="display:none;">
@@ -1064,7 +1080,15 @@ header { padding: 10px 16px; }
 <div class="invest-stat"><span class="invest-stat-label" data-i18n="invest.totalReturn">Totaal rendement</span><span class="invest-stat-value" id="investTotalReturn">–</span></div>
 </div>
 
-<div class="section-head" style="margin-top:20px;">
+<div class="invest-tabnav">
+<button class="invest-tab-btn active" data-tab-target="portfolio" onclick="investSwitchTab('portfolio')">Portfolio</button>
+<button class="invest-tab-btn" data-tab-target="performance" onclick="investSwitchTab('performance')">Prestaties</button>
+<button class="invest-tab-btn" data-tab-target="dividend" onclick="investSwitchTab('dividend')">Dividend</button>
+<button class="invest-tab-btn" data-tab-target="calendar" onclick="investSwitchTab('calendar')">Kalender</button>
+<button class="invest-tab-btn" data-tab-target="actions" onclick="investSwitchTab('actions')">Acties</button>
+<button class="invest-tab-btn" data-tab-target="settings" onclick="investSwitchTab('settings')">Instellingen</button>
+</div>
+<div data-invest-tab="portfolio"><div class="section-head" style="margin-top:20px;">
 <h2 style="font-size:16px;" data-i18n="invest.holdings">Posities</h2>
 </div>
 <button onclick="investOpenTxForm()" data-i18n="invest.addTransaction">+ Transactie</button>
@@ -1164,6 +1188,8 @@ header { padding: 10px 16px; }
 </div>
 </div>
 
+</div>
+<div data-invest-tab="calendar" style="display:none;">
 <div class="section-head" style="margin-top:20px;">
 <h2 style="font-size:16px;">Kalender</h2>
 </div>
@@ -1202,6 +1228,8 @@ header { padding: 10px 16px; }
 </div>
 </div>
 
+</div>
+<div data-invest-tab="dividend" style="display:none;">
 <div class="section-head" style="margin-top:20px;">
 <h2 style="font-size:16px;" data-i18n="invest.dividendGrowth">Dividendgroei</h2>
 </div>
@@ -1211,6 +1239,8 @@ header { padding: 10px 16px; }
 <select id="investDivFilterSymbol" onchange="investLoadDividendGrowth()" style="margin-bottom:8px;"><option value="">Alle posities</option></select>
 <div id="investDivGrowthChart" style="padding:10px 0;"></div>
 <div id="investCagrLine" style="opacity:.7;font-size:12px;margin-top:4px;"></div>
+</div>
+<div data-invest-tab="performance" style="display:none;">
 <div class="section-head" style="margin-top:20px;">
 <h2 style="font-size:16px;" data-i18n="invest.valueHistory">Portefeuillewaarde over tijd</h2>
 </div>
@@ -1247,27 +1277,49 @@ header { padding: 10px 16px; }
 <div id="investCostsByBroker" style="padding:4px 0;"></div>
 <div style="font-size:12px;opacity:.7;margin:10px 0 2px;">Per positie</div>
 <div id="investCostsBySymbol" style="padding:4px 0;"></div>
+</div>
+<div data-invest-tab="portfolio">
 <div class="section-head" style="margin-top:20px;">
 <h2 style="font-size:16px;" data-i18n="invest.diversification">Diversificatie</h2>
 </div>
-<div style="font-size:12px;opacity:.7;margin-bottom:2px;" data-i18n="invest.byCountry">Land</div>
+<div class="invest-subtabs">
+<button class="invest-subtab-btn active" data-axis="country" onclick="investSwitchAxis('country')">Land</button>
+<button class="invest-subtab-btn" data-axis="sector" onclick="investSwitchAxis('sector')">Sector</button>
+<button class="invest-subtab-btn" data-axis="worldpart" onclick="investSwitchAxis('worldpart')">Werelddeel</button>
+<button class="invest-subtab-btn" data-axis="currency" onclick="investSwitchAxis('currency')">Valuta</button>
+<button class="invest-subtab-btn" data-axis="exchange" onclick="investSwitchAxis('exchange')">Beurs</button>
+<button class="invest-subtab-btn" data-axis="assettype" onclick="investSwitchAxis('assettype')">Effecttype</button>
+<button class="invest-subtab-btn" data-axis="strategy" onclick="investSwitchAxis('strategy')">Strategie</button>
+<button class="invest-subtab-btn" data-axis="broker" onclick="investSwitchAxis('broker')">Broker</button>
+</div>
+<div data-axis-panel="country">
 <div id="investCountryBreakdown" style="padding:4px 0;"></div>
-<div style="font-size:12px;opacity:.7;margin:10px 0 2px;" data-i18n="invest.bySector">Sector</div>
+</div>
+<div data-axis-panel="sector" style="display:none;">
 <div id="investSectorBreakdown" style="padding:4px 0;"></div>
 <div id="investSectorEditor" style="margin-top:10px;font-size:12px;"></div>
-<div style="font-size:12px;opacity:.7;margin:10px 0 2px;">Werelddeel</div>
+</div>
+<div data-axis-panel="worldpart" style="display:none;">
 <div id="investWorldPartBreakdown" style="padding:4px 0;"></div>
-<div style="font-size:12px;opacity:.7;margin:10px 0 2px;">Valuta</div>
+</div>
+<div data-axis-panel="currency" style="display:none;">
 <div id="investCurrencyBreakdown" style="padding:4px 0;"></div>
-<div style="font-size:12px;opacity:.7;margin:10px 0 2px;">Beurs</div>
+</div>
+<div data-axis-panel="exchange" style="display:none;">
 <div id="investExchangeBreakdown" style="padding:4px 0;"></div>
-<div style="font-size:12px;opacity:.7;margin:10px 0 2px;">Effecttype</div>
+</div>
+<div data-axis-panel="assettype" style="display:none;">
 <div id="investAssetTypeBreakdown" style="padding:4px 0;"></div>
-<div style="font-size:12px;opacity:.7;margin:10px 0 2px;">Strategie</div>
+</div>
+<div data-axis-panel="strategy" style="display:none;">
 <div id="investStrategyBreakdown" style="padding:4px 0;"></div>
 <div id="investStrategyEditor" style="margin-top:10px;font-size:12px;"></div>
-<div style="font-size:12px;opacity:.7;margin:10px 0 2px;">Broker</div>
+</div>
+<div data-axis-panel="broker" style="display:none;">
 <div id="investBrokerBreakdown" style="padding:4px 0;"></div>
+</div>
+</div>
+<div data-invest-tab="actions" style="display:none;">
 <div class="section-head" style="margin-top:20px;">
 <h2 style="font-size:16px;">Acties</h2>
 <button onclick="investOpenOtherActionForm()" style="margin-left:6px;">+ Overige actie</button>
@@ -1326,6 +1378,8 @@ header { padding: 10px 16px; }
 <button onclick="investCloseOtherActionForm()">Annuleren</button>
 </div>
 </div>
+</div>
+<div data-invest-tab="settings" style="display:none;">
 <div class="section-head" style="margin-top:20px;">
 <h2 style="font-size:16px;">Instellingen</h2>
 </div>
@@ -1363,6 +1417,8 @@ header { padding: 10px 16px; }
 <button onclick="investCloseStrategyDefForm()">Annuleren</button>
 </div>
 </div>
+</div>
+<div data-invest-tab="performance" style="display:none;">
 <div class="section-head" style="margin-top:20px;">
 <h2 style="font-size:16px;">Drawdown-analyse</h2>
 </div>
@@ -1378,6 +1434,7 @@ header { padding: 10px 16px; }
 <thead><tr><th>Positie</th><th>Huidige drawdown</th><th>Maximale drawdown (1j)</th></tr></thead>
 <tbody id="investDrawdownTableBody"></tbody>
 </table>
+</div>
 </div>
 
 <div id="view-ideas" style="display:none;">
@@ -3824,6 +3881,16 @@ function investRenderDrawdown(data) {
       tbody.appendChild(tr)
     }
   }
+}
+window.investSwitchTab = (tab) => {
+  document.querySelectorAll('[data-invest-tab]').forEach((el) => { el.style.display = (el.getAttribute('data-invest-tab') === tab) ? '' : 'none' })
+  document.querySelectorAll('.invest-tab-btn').forEach((btn) => { btn.classList.toggle('active', btn.getAttribute('data-tab-target') === tab) })
+  try { localStorage.setItem('investActiveTab', tab) } catch (e) {}
+}
+
+window.investSwitchAxis = (axis) => {
+  document.querySelectorAll('[data-axis-panel]').forEach((el) => { el.style.display = (el.getAttribute('data-axis-panel') === axis) ? '' : 'none' })
+  document.querySelectorAll('.invest-subtab-btn').forEach((btn) => { btn.classList.toggle('active', btn.getAttribute('data-axis') === axis) })
 }
 function loadInvestPage() {
 investLoadPortfolios();
