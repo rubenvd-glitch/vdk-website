@@ -2427,18 +2427,30 @@ await kvSetJson(cacheKey, { data, fetchedAt: now });
 return data;
 }
 
-async function investGetYahooQuote(symbol, expectedCurrency) {
-const suffixes = ['', '.AS', '.DE', '.PA', '.MI', '.L', '.SW', '.LS'];
-for (const suf of suffixes) {
+async function investFetchYahoo(symbol, suf, timeoutMs) {
+const controller = new AbortController();
+const timer = setTimeout(() => controller.abort(), timeoutMs);
 try {
-const res = await fetch('https://query1.finance.yahoo.com/v8/finance/chart/' + encodeURIComponent(symbol + suf), { headers: { 'User-Agent': 'Mozilla/5.0' } });
-if (!res.ok) continue;
+const res = await fetch('https://query1.finance.yahoo.com/v8/finance/chart/' + encodeURIComponent(symbol + suf), { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: controller.signal });
+if (!res.ok) return null;
 const data = await res.json();
 const meta = data && data.chart && data.chart.result && data.chart.result[0] && data.chart.result[0].meta;
-if (!meta || typeof meta.regularMarketPrice !== 'number') continue;
-if (expectedCurrency && meta.currency && meta.currency !== expectedCurrency) continue;
-return meta.regularMarketPrice;
-} catch (e) { /* try next suffix */ }
+if (!meta || typeof meta.regularMarketPrice !== 'number') return null;
+return { price: meta.regularMarketPrice, currency: meta.currency || null };
+} catch (e) {
+return null;
+} finally {
+clearTimeout(timer);
+}
+}
+async function investGetYahooQuote(symbol, expectedCurrency) {
+const suffixes = ['', '.AS', '.DE', '.PA', '.MI', '.L', '.SW', '.LS'];
+const settled = await Promise.allSettled(suffixes.map((suf) => investFetchYahoo(symbol, suf, 4000)));
+for (let i = 0; i < settled.length; i++) {
+const r = settled[i].status === 'fulfilled' ? settled[i].value : null;
+if (!r) continue;
+if (expectedCurrency && r.currency && r.currency !== expectedCurrency) continue;
+return r.price;
 }
 return null;
 }
