@@ -2938,29 +2938,36 @@ const others = (await kvGetJson(investOtherKey(s.email, portfolioId))) || [];
 const holdings = investComputeHoldings(transactions).filter((h) => !h.closed);
 const eurBasis = await investComputeHoldingsEurBasis(transactions);
 let valueEUR = 0, investedEUR = 0, investedEURHistorical = 0, dividendYtdEUR = 0, dividendAllTimeEUR = 0, padiEUR = 0;
+const uniqueCurrencies = Array.from(new Set([...holdings.map((h) => h.currency), ...dividends.map((d) => d.currency), 'EUR']));
+const fxEntries = await Promise.all(uniqueCurrencies.map(async (cur) => [cur, await investGetFxRate(cur, 'EUR')]));
+const fxMap = Object.fromEntries(fxEntries);
 const enriched = [];
-for (const h of holdings) {
+const holdingResults = await Promise.all(holdings.map(async (h) => {
 const quote = await investGetQuote(h.symbol, h.currency);
-const fx = await investGetFxRate(h.currency, 'EUR');
+const fx = fxMap[h.currency] != null ? fxMap[h.currency] : await investGetFxRate(h.currency, 'EUR');
 const price = quote ? quote.price : null;
 const valueNative = price !== null ? price * h.shares : null;
 const valueInEur = valueNative !== null ? valueNative * fx : null;
 const investedInEur = h.costBasis * fx;
 const investedInEurHist = (eurBasis.get(h.symbol) || {}).costBasisEUR || investedInEur;
-if (valueInEur !== null) valueEUR += valueInEur;
-investedEUR += investedInEur;
-investedEURHistorical += investedInEurHist;
 const priceReturnEUR = valueInEur !== null ? valueInEur - investedInEur : null;
 const currencyEffectEUR = investedInEur - investedInEurHist;
-      const last12mPerShare = investLast12mDividendPerShare(dividends, h.symbol);
-      const hPadiEUR = last12mPerShare * h.shares * fx;
-      padiEUR += hPadiEUR;
-      const cagrH = investDividendCagrForSymbol(dividends, h.symbol);
-      enriched.push({ ...h, currentPrice: price, valueNative, valueEUR: valueInEur, unrealizedEUR: priceReturnEUR, priceReturnEUR, currencyEffectEUR, totalReturnEUR: priceReturnEUR !== null ? priceReturnEUR + currencyEffectEUR : null, yieldOnCost: investYieldOnCost(h, dividends), investedEUR: investedInEur, currentYield: price ? last12mPerShare / price : null, padiEUR: hPadiEUR, cagr1y: cagrH.cagr1y, cagr3y: cagrH.cagr3y, cagr5y: cagrH.cagr5y, cagr10y: cagrH.cagr10y });
+const last12mPerShare = investLast12mDividendPerShare(dividends, h.symbol);
+const hPadiEUR = last12mPerShare * h.shares * fx;
+const cagrH = investDividendCagrForSymbol(dividends, h.symbol);
+const obj = { ...h, currentPrice: price, valueNative, valueEUR: valueInEur, unrealizedEUR: priceReturnEUR, priceReturnEUR, currencyEffectEUR, totalReturnEUR: priceReturnEUR !== null ? priceReturnEUR + currencyEffectEUR : null, yieldOnCost: investYieldOnCost(h, dividends), investedEUR: investedInEur, currentYield: price ? last12mPerShare / price : null, padiEUR: hPadiEUR, cagr1y: cagrH.cagr1y, cagr3y: cagrH.cagr3y, cagr5y: cagrH.cagr5y, cagr10y: cagrH.cagr10y };
+return { obj, valueInEur, investedInEur, investedInEurHist, hPadiEUR };
+}));
+for (const r of holdingResults) {
+if (r.valueInEur !== null) valueEUR += r.valueInEur;
+investedEUR += r.investedInEur;
+investedEURHistorical += r.investedInEurHist;
+padiEUR += r.hPadiEUR;
+enriched.push(r.obj);
 }
 const oneYearAgo = Date.now() - 365 * 24 * 60 * 60 * 1000;
 for (const d of dividends) {
-const fx = await investGetFxRate(d.currency, 'EUR');
+const fx = fxMap[d.currency] != null ? fxMap[d.currency] : await investGetFxRate(d.currency, 'EUR');
 const amountEUR = d.totalAmount * fx;
 dividendAllTimeEUR += amountEUR;
 if (new Date(d.payDate).getTime() >= oneYearAgo) dividendYtdEUR += amountEUR;
@@ -2972,7 +2979,7 @@ let padiPrior12mEUR = 0;
 for (const d of dividends) {
 const dt = new Date(d.payDate).getTime();
 if (dt >= padi24mAgo && dt < padi12mAgo) {
-const fxp = await investGetFxRate(d.currency, 'EUR');
+const fxp = fxMap[d.currency] != null ? fxMap[d.currency] : await investGetFxRate(d.currency, 'EUR');
 padiPrior12mEUR += d.totalAmount * fxp;
 }
 }
@@ -2993,7 +3000,7 @@ else if (o.type === 'withdrawal' || o.type === 'broker-fee') investAddCash(o.cur
 }
 let cashEUR = 0;
 for (const [cur, amt] of Object.entries(cashByCurrency)) {
-const fxc = await investGetFxRate(cur, 'EUR');
+const fxc = fxMap[cur] != null ? fxMap[cur] : await investGetFxRate(cur, 'EUR');
 cashEUR += amt * fxc;
 }
 return json(res, 200, {
