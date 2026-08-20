@@ -2427,11 +2427,16 @@ await kvSetJson(cacheKey, { data, fetchedAt: now });
 return data;
 }
 
+const INVEST_EU_MIC_CANDIDATES = ['XLON', 'XAMS', 'XETR', 'XPAR', 'XMIL'];
 async function investGetQuote(symbol) {
 return investCached(`investquote:${symbol}`, 15 * 60 * 1000, async () => {
 const r = await tdFetch('/price', { symbol });
-if (r.error || r.price === undefined) return null;
-return { price: parseFloat(r.price) };
+if (!r.error && r.price !== undefined) return { price: parseFloat(r.price) };
+for (const mic of INVEST_EU_MIC_CANDIDATES) {
+const r2 = await tdFetch('/price', { symbol, mic_code: mic });
+if (!r2.error && r2.price !== undefined) return { price: parseFloat(r2.price) };
+}
+return null;
 });
 }
 
@@ -2904,6 +2909,7 @@ try {
 const portfolioId = investPortfolioIdFromReq(req, new URL(req.url, 'http://localhost'), null);
 const transactions = (await kvGetJson(investTxKey(s.email, portfolioId))) || [];
 const dividends = (await kvGetJson(investDivKey(s.email, portfolioId))) || [];
+const others = (await kvGetJson(investOtherKey(s.email, portfolioId))) || [];
 const holdings = investComputeHoldings(transactions).filter((h) => !h.closed);
 const eurBasis = await investComputeHoldingsEurBasis(transactions);
 let valueEUR = 0, investedEUR = 0, investedEURHistorical = 0, dividendYtdEUR = 0, dividendAllTimeEUR = 0, padiEUR = 0;
@@ -2946,16 +2952,36 @@ padiPrior12mEUR += d.totalAmount * fxp;
 }
 }
 const padiGrowthPct = padiPrior12mEUR > 0 ? (dividendYtdEUR - padiPrior12mEUR) / padiPrior12mEUR : null;
+const cashByCurrency = {};
+const investAddCash = (currency, amount) => { if (!currency) return; cashByCurrency[currency] = (cashByCurrency[currency] || 0) + amount; };
+for (const t of transactions) {
+const gross = (t.shares || 0) * (t.price || 0);
+const fees = t.fees || 0;
+if (t.type === 'buy') investAddCash(t.currency, -(gross + fees));
+else if (t.type === 'sell') investAddCash(t.currency, gross - fees);
+}
+for (const d of dividends) investAddCash(d.currency, d.totalAmount || 0);
+for (const o of others) {
+const amt = o.amount || 0;
+if (o.type === 'deposit' || o.type === 'interest' || o.type === 'corporate-action' || o.type === 'securities-lending') investAddCash(o.currency, amt);
+else if (o.type === 'withdrawal' || o.type === 'broker-fee') investAddCash(o.currency, -amt);
+}
+let cashEUR = 0;
+for (const [cur, amt] of Object.entries(cashByCurrency)) {
+const fxc = await investGetFxRate(cur, 'EUR');
+cashEUR += amt * fxc;
+}
 return json(res, 200, {
 holdings: enriched,
 totals: {
-valueEUR, investedEUR, unrealizedEUR: valueEUR - investedEUR,
+valueEUR: valueEUR + cashEUR, investedEUR, unrealizedEUR: valueEUR - investedEUR,
 unrealizedPct: investedEUR > 0 ? (valueEUR - investedEUR) / investedEUR : 0,
 investedEURHistorical, currencyEffectEUR: currencyEffectEURTotal,
 totalReturnEUR: valueEUR - investedEURHistorical,
 dividendYtdEUR, dividendAllTimeEUR,
 avgYieldOnCost: investedEUR > 0 ? dividendYtdEUR / investedEUR : 0,
 padiEUR, padiGrowthPct,
+cashEUR, cashByCurrency, positionsValueEUR: valueEUR,
 },
 });
 } catch (e) {
