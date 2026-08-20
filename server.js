@@ -2268,7 +2268,10 @@ h.realizedPnl -= tx.fees || 0;
 }
 }
 }
-return [...bySymbol.values()].map((h) => ({ ...h, avgCost: h.shares > 0 ? h.costBasis / h.shares : 0, closed: h.shares <= 0 }));
+return [...bySymbol.values()].map((h) => {
+const shares = Math.abs(h.shares) < 1e-6 ? 0 : h.shares;
+return { ...h, shares, avgCost: shares > 0 ? h.costBasis / shares : 0, closed: shares <= 0 };
+});
 }
 
 async function handleInvestTimetravel(req, res) {
