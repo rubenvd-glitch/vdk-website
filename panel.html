@@ -4858,14 +4858,20 @@ function gymUnit() { return gymProfile.unit || 'kg'; }
 function gymRefreshUnitLabels() {
 ['gymUnitLbl1', 'gymUnitLbl2', 'gymUnitLbl3', 'gymUnitLbl4'].forEach((id) => { if ($(id)) $(id).textContent = gymUnit(); });
 }
+let __gymDefaultExLower = null;
 function gymGuessMuscle(name) {
 if (!name) return 'Other';
-if (GYM_DEFAULT_EXERCISES[name]) return GYM_DEFAULT_EXERCISES[name];
-const n = name.toLowerCase();
-if (/squat|leg|deadlift|hip|lunge|calf/.test(n)) return 'Legs';
-if (/press|push|dip|chest|shoulder|fly/.test(n)) return 'Push';
-if (/row|pull|curl|lat|back/.test(n)) return 'Pull';
-if (/plank|ab|core|crunch/.test(n)) return 'Core';
+if (!__gymDefaultExLower) {
+__gymDefaultExLower = {};
+Object.keys(GYM_DEFAULT_EXERCISES).forEach((k) => { __gymDefaultExLower[k.toLowerCase()] = GYM_DEFAULT_EXERCISES[k]; });
+}
+const n = name.trim().toLowerCase();
+if (__gymDefaultExLower[n]) return __gymDefaultExLower[n];
+if (/\b(rear delt|reverse fly|rear fly)\b/.test(n)) return 'Pull';
+if (/\b(squat|leg|deadlift|hip|lunge|calf)\b/.test(n)) return 'Legs';
+if (/\b(press|push|dip|chest|shoulder|fly)\b/.test(n)) return 'Push';
+if (/\b(row|pull|curl|lat|back)\b/.test(n)) return 'Pull';
+if (/\b(plank|ab|abs|core|crunch|sit-up|situp)\b/.test(n)) return 'Core';
 return 'Other';
 }
 function gymAllExerciseNames() {
