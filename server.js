@@ -2427,16 +2427,11 @@ await kvSetJson(cacheKey, { data, fetchedAt: now });
 return data;
 }
 
-const INVEST_EU_MIC_CANDIDATES = ['XLON', 'XAMS', 'XETR', 'XPAR', 'XMIL'];
 async function investGetQuote(symbol) {
 return investCached(`investquote:${symbol}`, 15 * 60 * 1000, async () => {
 const r = await tdFetch('/price', { symbol });
-if (!r.error && r.price !== undefined) return { price: parseFloat(r.price) };
-for (const mic of INVEST_EU_MIC_CANDIDATES) {
-const r2 = await tdFetch('/price', { symbol, mic_code: mic });
-if (!r2.error && r2.price !== undefined) return { price: parseFloat(r2.price) };
-}
-return null;
+if (r.error || r.price === undefined) return null;
+return { price: parseFloat(r.price) };
 });
 }
 
@@ -2902,20 +2897,6 @@ async function investRunEmailDigests() {
   }
   return results
 }
-async function handleInvestDebugQuote(req, res) {
-const s = await getSession(req, 'admin');
-if (!s) return json(res, 401, { error: 'Not logged in' });
-const symbol = new URL(req.url, 'http://localhost').searchParams.get('symbol') || '';
-const attempts = [];
-const bare = await tdFetch('/price', { symbol });
-attempts.push({ mic: null, result: bare });
-for (const mic of ['XLON', 'XAMS', 'XETR', 'XPAR', 'XMIL']) {
-const r = await tdFetch('/price', { symbol, mic_code: mic });
-attempts.push({ mic, result: r });
-}
-return json(res, 200, { symbol, attempts });
-}
-
 async function handleInvestHoldings(req, res) {
 const s = await getSession(req, 'admin');
 if (!s) return json(res, 401, { error: 'Not logged in' });
@@ -3893,7 +3874,6 @@ if (p === '/api/gym/split') return handleGymSplit(req, res);
 if (p === '/api/invest/transactions') return handleInvestTx(req, res);
 if (p === '/api/invest/dividends') return handleInvestDiv(req, res);
 if (p === '/api/invest/holdings') return handleInvestHoldings(req, res);
-if (p === '/api/invest/debug-quote') return handleInvestDebugQuote(req, res);
 if (p === '/api/invest/dividend-calendar') return handleInvestDividendCalendar(req, res);
 if (p === '/api/invest/extended-calendar') return handleInvestExtendedCalendar(req, res)
 if (p === '/api/invest/dividend-growth') return handleInvestDividendGrowth(req, res);
