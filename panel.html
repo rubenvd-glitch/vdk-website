@@ -4148,7 +4148,7 @@ if (!r.ticker || !r.totalAmount) { ignored++; continue }
 const sharesForDiv = r.quantity || 1
 divs.push({ symbol: r.ticker, amountPerShare: r.totalAmount / sharesForDiv, shares: sharesForDiv, totalAmount: r.totalAmount, currency: r.totalCurrency || r.currency || 'USD', payDate: r.date })
 } else {
-const otherType = type.indexOf('deposit') !== -1 ? 'deposit' : type.indexOf('withdraw') !== -1 ? 'withdrawal' : type.indexOf('interest') !== -1 ? 'interest' : (type.indexOf('fee') !== -1 || type.indexOf('custody') !== -1) ? 'broker-fee' : type.indexOf('corporate') !== -1 ? 'corporate-action' : type.indexOf('lending') !== -1 ? 'securities-lending' : null
+const otherType = (type.indexOf('deposit') !== -1 || type.indexOf('top-up') !== -1 || type.indexOf('top up') !== -1 || type.indexOf('topup') !== -1) ? 'deposit' : type.indexOf('withdraw') !== -1 ? 'withdrawal' : type.indexOf('interest') !== -1 ? 'interest' : (type.indexOf('fee') !== -1 || type.indexOf('custody') !== -1) ? 'broker-fee' : type.indexOf('corporate') !== -1 ? 'corporate-action' : type.indexOf('lending') !== -1 ? 'securities-lending' : null
 if (otherType && r.totalAmount !== undefined && r.totalAmount !== null && r.totalAmount !== '') {
 others.push({ type: otherType, symbol: r.ticker || '', amount: Math.abs(Number(r.totalAmount) || 0), currency: r.totalCurrency || r.currency || 'EUR', date: r.date, broker: 'Revolut', note: r.type || '' })
 } else {
@@ -4167,12 +4167,12 @@ const action = (r.action || '').toLowerCase()
 if (action.indexOf('buy') !== -1 || action.indexOf('sell') !== -1) {
 if (!r.ticker || !r.shares || !r.pricePerShare) { ignored++; continue }
 txs.push({ type: action.indexOf('sell') !== -1 ? 'sell' : 'buy', symbol: r.ticker, name: r.name || r.ticker, currency: r.priceCurrency || r.totalCurrency || 'EUR', shares: r.shares, price: r.pricePerShare, fees: Math.abs(r.conversionFee || 0), date: r.date, note: r.isin ? ('ISIN: ' + r.isin) : '' })
-} else if (action.indexOf('dividend') !== -1) {
-if (!r.ticker || !r.total) { ignored++; continue }
+} else if (action.indexOf('dividend') !== -1 && r.ticker) {
+if (!r.total) { ignored++; continue }
 const sharesForDiv = r.shares || 1
 divs.push({ symbol: r.ticker, amountPerShare: r.total / sharesForDiv, shares: sharesForDiv, totalAmount: r.total, currency: r.totalCurrency || 'EUR', payDate: r.date })
 } else {
-const otherType = action.indexOf('deposit') !== -1 ? 'deposit' : action.indexOf('withdraw') !== -1 ? 'withdrawal' : action.indexOf('interest') !== -1 ? 'interest' : (action.indexOf('fee') !== -1 || action.indexOf('custody') !== -1) ? 'broker-fee' : (action.indexOf('corporate') !== -1 || action.indexOf('split') !== -1 || action.indexOf('merger') !== -1) ? 'corporate-action' : action.indexOf('lending') !== -1 ? 'securities-lending' : null
+const otherType = action.indexOf('deposit') !== -1 ? 'deposit' : action.indexOf('withdraw') !== -1 ? 'withdrawal' : action.indexOf('interest') !== -1 ? 'interest' : (action.indexOf('fee') !== -1 || action.indexOf('custody') !== -1) ? 'broker-fee' : (action.indexOf('corporate') !== -1 || action.indexOf('split') !== -1 || action.indexOf('merger') !== -1 || action.indexOf('dividend') !== -1) ? 'corporate-action' : action.indexOf('lending') !== -1 ? 'securities-lending' : null
 if (otherType && r.total !== undefined && r.total !== null && r.total !== '') {
 others.push({ type: otherType, symbol: r.ticker || '', amount: Math.abs(Number(r.total) || 0), currency: r.totalCurrency || 'EUR', date: r.date, broker: 'Trading 212', note: r.notes || '' })
 } else {
