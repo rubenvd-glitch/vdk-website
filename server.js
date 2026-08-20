@@ -2107,6 +2107,7 @@ sanitize(r, body);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw apiError(400, 'Ongeldige datum');
     r.doneDates = Array.isArray(r.doneDates) ? r.doneDates : [];
     if (!r.doneDates.includes(date)) r.doneDates.push(date);
+    r.nextDue = addCycle(r, r.nextDue > todayISO ? r.nextDue : todayISO);
   
 } else if (body.action === 'done' || body.action === 'skip') {
 if (!r) throw apiError(404, 'Niet gevonden');
