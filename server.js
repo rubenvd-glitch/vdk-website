@@ -2733,11 +2733,25 @@ return parseFloat(vals[0].close);
 async function investComputeHoldingsEurBasis(transactions) {
 const bySymbol = new Map();
 const sorted = [...transactions].sort((a, b) => (a.date < b.date ? -1 : 1));
+const dateKeys = Array.from(new Set(sorted.filter((tx) => tx.currency !== 'EUR').map((tx) => tx.currency + '|' + tx.date)));
+const dateFxEntries = await Promise.all(dateKeys.map(async (key) => {
+const [cur, date] = key.split('|');
+const fx = await investGetFxRateOnDate(cur, 'EUR', date);
+return [key, fx];
+}));
+const dateFxMap = Object.fromEntries(dateFxEntries);
+const fallbackCurrencies = Array.from(new Set(dateKeys.filter((key) => dateFxMap[key] === null).map((key) => key.split('|')[0])));
+const fallbackEntries = await Promise.all(fallbackCurrencies.map(async (cur) => [cur, await investGetFxRate(cur, 'EUR')]));
+const fallbackFxMap = Object.fromEntries(fallbackEntries);
 for (const tx of sorted) {
 if (!bySymbol.has(tx.symbol)) bySymbol.set(tx.symbol, { symbol: tx.symbol, shares: 0, costBasisEUR: 0 });
 const h = bySymbol.get(tx.symbol);
-let fx = await investGetFxRateOnDate(tx.currency, 'EUR', tx.date);
-if (fx == null) fx = await investGetFxRate(tx.currency, 'EUR');
+let fx = 1;
+if (tx.currency !== 'EUR') {
+const key = tx.currency + '|' + tx.date;
+fx = dateFxMap[key];
+if (fx === null || fx === undefined) fx = fallbackFxMap[tx.currency];
+}
 if (tx.type === 'buy') {
 h.shares += tx.shares;
 h.costBasisEUR += (tx.shares * tx.price + (tx.fees || 0)) * fx;
