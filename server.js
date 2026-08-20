@@ -2926,6 +2926,29 @@ async function investRunEmailDigests() {
   }
   return results
 }
+async function handleInvestDebugYahoo(req, res) {
+const s = await getSession(req, 'admin');
+if (!s) return json(res, 401, { error: 'Not logged in' });
+const u = new URL(req.url, 'http://localhost');
+const symbol = u.searchParams.get('symbol') || 'YCSH';
+const suffixes = ['', '.AS', '.DE', '.PA', '.MI', '.L', '.SW', '.LS'];
+const out = [];
+for (const suf of suffixes) {
+try {
+const t0 = Date.now();
+const res2 = await fetch('https://query1.finance.yahoo.com/v8/finance/chart/' + encodeURIComponent(symbol + suf), { headers: { 'User-Agent': 'Mozilla/5.0' } });
+const ms = Date.now() - t0;
+const status = res2.status;
+let body = null;
+try { body = await res2.text(); } catch (e2) { body = 'READ_ERR:' + e2.message; }
+out.push({ suf, status, ms, body: (body || '').slice(0, 400) });
+} catch (e) {
+out.push({ suf, error: String(e && e.message || e) });
+}
+}
+return json(res, 200, { symbol, out });
+}
+
 async function handleInvestHoldings(req, res) {
 const s = await getSession(req, 'admin');
 if (!s) return json(res, 401, { error: 'Not logged in' });
@@ -3903,6 +3926,7 @@ if (p === '/api/gym/split') return handleGymSplit(req, res);
 if (p === '/api/invest/transactions') return handleInvestTx(req, res);
 if (p === '/api/invest/dividends') return handleInvestDiv(req, res);
 if (p === '/api/invest/holdings') return handleInvestHoldings(req, res);
+if (p === '/api/invest/debug-yahoo') return handleInvestDebugYahoo(req, res);
 if (p === '/api/invest/dividend-calendar') return handleInvestDividendCalendar(req, res);
 if (p === '/api/invest/extended-calendar') return handleInvestExtendedCalendar(req, res)
 if (p === '/api/invest/dividend-growth') return handleInvestDividendGrowth(req, res);
