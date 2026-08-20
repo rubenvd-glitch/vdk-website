@@ -2544,7 +2544,7 @@ return list;
 }
 
 
-const INVEST_OTHER_TYPES = ['deposit', 'withdrawal', 'broker-fee', 'corporate-action', 'securities-lending', 'isin-change']
+const INVEST_OTHER_TYPES = ['deposit', 'withdrawal', 'broker-fee', 'interest', 'corporate-action', 'securities-lending', 'isin-change']
 
 async function applyInvestOtherAction(email, portfolioId, body) {
   const key = investOtherKey(email, portfolioId)
@@ -2645,7 +2645,7 @@ async function handleInvestActionLog(req, res) {
     if (dateTo) filtered = filtered.filter((it) => it.date <= dateTo)
     if (q) filtered = filtered.filter((it) => (it.symbol || '').toLowerCase().includes(q) || (it.name || '').toLowerCase().includes(q) || (it.note || '').toLowerCase().includes(q) || (it.broker || '').toLowerCase().includes(q))
     filtered.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
-    const categories = ['buy', 'sell', 'dividend', 'deposit', 'withdrawal', 'broker-fee', 'corporate-action', 'securities-lending', 'isin-change']
+    const categories = ['buy', 'sell', 'dividend', 'deposit', 'withdrawal', 'broker-fee', 'interest', 'corporate-action', 'securities-lending', 'isin-change']
     return json(res, 200, { items: filtered, categories, total: items.length })
   } catch (e) {
     console.error('invest action-log API error:', e.message)
