@@ -2931,22 +2931,31 @@ const s = await getSession(req, 'admin');
 if (!s) return json(res, 401, { error: 'Not logged in' });
 const u = new URL(req.url, 'http://localhost');
 const symbol = u.searchParams.get('symbol') || 'YCSH';
-const suffixes = ['', '.AS', '.DE', '.PA', '.MI', '.L', '.SW', '.LS'];
-const out = [];
-for (const suf of suffixes) {
-try {
+const currency = u.searchParams.get('currency') || 'EUR';
+const out = {};
 const t0 = Date.now();
-const res2 = await fetch('https://query1.finance.yahoo.com/v8/finance/chart/' + encodeURIComponent(symbol + suf), { headers: { 'User-Agent': 'Mozilla/5.0' } });
-const ms = Date.now() - t0;
-const status = res2.status;
-let body = null;
-try { body = await res2.text(); } catch (e2) { body = 'READ_ERR:' + e2.message; }
-out.push({ suf, status, ms, body: (body || '').slice(0, 400) });
+try {
+const yq = await investGetYahooQuote(symbol, currency);
+out.investGetYahooQuote_result = yq;
 } catch (e) {
-out.push({ suf, error: String(e && e.message || e) });
+out.investGetYahooQuote_error = String(e && e.stack || e);
 }
+out.ms_yahoo = Date.now() - t0;
+const t1 = Date.now();
+try {
+const gq = await investGetQuote(symbol, currency);
+out.investGetQuote_result = gq;
+} catch (e) {
+out.investGetQuote_error = String(e && e.stack || e);
 }
-return json(res, 200, { symbol, out });
+out.ms_getquote = Date.now() - t1;
+try {
+const td = await tdFetch('/price', { symbol });
+out.tdFetch_result = td;
+} catch (e) {
+out.tdFetch_error = String(e && e.stack || e);
+}
+return json(res, 200, out);
 }
 
 async function handleInvestHoldings(req, res) {
