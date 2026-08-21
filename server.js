@@ -1653,7 +1653,7 @@ async function handleAssistantChat(req, res) {
     const d = await r.json().catch(() => ({}));
     if (!r.ok) {
       console.error('assistant chat failed:', d && d.error);
-      return json(res, 502, { error: 'De assistent kon niet antwoorden. Probeer het zo nog eens.' });
+      return json(res, 502, { error: 'De assistent kon niet antwoorden. Probeer het zo nog eens.', debugDetail: (d && d.error) ? String(typeof d.error === 'string' ? d.error : JSON.stringify(d.error)).slice(0,500) : ('status ' + r.status) });
     }
     const rawContent = (d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content) || '';
     let replyText = '';
