@@ -1589,7 +1589,7 @@ async function handleAssistantNewSession(req, res) {
     const apiKey = (process.env.GROQ_API_KEY || '').trim();
     if (!apiKey) { await kvDel(histKey); return json(res, 200, { ok: true }); }
     const oldMemory = (await kvGetJson(memKey)) || '';
-    const model = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
+    const model = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
     const convoText = history.slice(-40).map((m) => (m.role === 'user' ? 'User: ' : 'Base: ') + String(m.content || '').slice(0, 500)).join('\n');
     const sumPrompt = [
       'Update the running memory summary for this user\'s assistant "Base" (VDK Business Services admin panel).',
@@ -1641,7 +1641,7 @@ async function handleAssistantChat(req, res) {
       .concat(history.slice(-20).map((m) => ({ role: m.role, content: m.content })));
     apiMessages.push({ role: 'user', content: message });
 
-    const model = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
+    const model = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
     const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -1653,7 +1653,7 @@ async function handleAssistantChat(req, res) {
     const d = await r.json().catch(() => ({}));
     if (!r.ok) {
       console.error('assistant chat failed:', d && d.error);
-      return json(res, 502, { error: 'De assistent kon niet antwoorden. Probeer het zo nog eens.', debugDetail: (d && d.error) ? String(typeof d.error === 'string' ? d.error : JSON.stringify(d.error)).slice(0,500) : ('status ' + r.status) });
+      return json(res, 502, { error: 'De assistent kon niet antwoorden. Probeer het zo nog eens.' });
     }
     const rawContent = (d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content) || '';
     let replyText = '';
@@ -1832,7 +1832,7 @@ async function handleAssistantProactive(req, res) {
 
     const apiMessages = [{ role: 'system', content: systemPrompt }];
 
-    const model = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
+    const model = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
     const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
