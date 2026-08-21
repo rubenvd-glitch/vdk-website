@@ -1414,15 +1414,15 @@ async function buildAssistantContext(email) {
 .filter((r) => !r.tl)
     .filter((r) => !r.done)
     .filter((r) => !r.due || r.due <= weekAheadISO)
-    .slice(0, 30)
+    .slice(0, 20)
     .map((r) => ({ id: r.id, title: r.title, due: r.due || null, time: r.time || null, prio: r.prio }));
   const dueSuggestions = (sugs || [])
     .filter((x) => x.nextDue && x.nextDue <= weekAheadISO)
-    .slice(0, 15)
+    .slice(0, 10)
     .map((x) => ({ id: x.id, text: x.text, nextDue: x.nextDue }));
   const openIdeas = (ideas || [])
     .filter((x) => !x.archived)
-    .slice(0, 20)
+    .slice(0, 12)
     .map((x) => ({ id: x.id, title: x.title, nextReview: x.nextReview }));
   const openGoals = (gymGoals || [])
     .filter((g) => !g.done)
@@ -1431,7 +1431,7 @@ async function buildAssistantContext(email) {
       : { type: "general", title: g.title, category: g.category, targetValue: g.targetValue, targetUnit: g.targetUnit }));
   const recentSets = (gymLog || [])
     .filter((x) => x.date >= twoWeeksAgoISO)
-    .slice(-150)
+    .slice(-40)
     .map((x) => ({ exercise: x.exercise, date: x.date, weight: x.weight, reps: x.reps, muscle: x.muscle, restSeconds: x.restSeconds || null, time: x.createdAt ? new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Amsterdam', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(x.createdAt)) : null }));
   return {
     today: todayISO,
@@ -1589,7 +1589,7 @@ async function handleAssistantNewSession(req, res) {
     const apiKey = (process.env.GROQ_API_KEY || '').trim();
     if (!apiKey) { await kvDel(histKey); return json(res, 200, { ok: true }); }
     const oldMemory = (await kvGetJson(memKey)) || '';
-    const model = process.env.GROQ_MODEL || 'meta-llama/llama-4-scout-17b-16e-instruct';
+    const model = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
     const convoText = history.slice(-40).map((m) => (m.role === 'user' ? 'User: ' : 'Base: ') + String(m.content || '').slice(0, 500)).join('\n');
     const sumPrompt = [
       'Update the running memory summary for this user\'s assistant "Base" (VDK Business Services admin panel).',
@@ -1638,10 +1638,10 @@ async function handleAssistantChat(req, res) {
     const systemPrompt = buildAssistantSystemPrompt(page, lang, context);
 
     const apiMessages = [{ role: "system", content: systemPrompt }]
-      .concat(history.slice(-20).map((m) => ({ role: m.role, content: m.content })));
+      .concat(history.slice(-10).map((m) => ({ role: m.role, content: m.content })));
     apiMessages.push({ role: 'user', content: message });
 
-    const model = process.env.GROQ_MODEL || 'meta-llama/llama-4-scout-17b-16e-instruct';
+    const model = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
     const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -1653,7 +1653,7 @@ async function handleAssistantChat(req, res) {
     const d = await r.json().catch(() => ({}));
     if (!r.ok) {
       console.error('assistant chat failed:', d && d.error);
-      return json(res, 502, { error: 'De assistent kon niet antwoorden. Probeer het zo nog eens.', debugDetail: (d && d.error) ? String(typeof d.error === 'string' ? d.error : JSON.stringify(d.error)).slice(0,500) : ('status ' + r.status + ' model ' + model) });
+      return json(res, 502, { error: 'De assistent kon niet antwoorden. Probeer het zo nog eens.' });
     }
     const rawContent = (d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content) || '';
     let replyText = '';
@@ -1832,7 +1832,7 @@ async function handleAssistantProactive(req, res) {
 
     const apiMessages = [{ role: 'system', content: systemPrompt }];
 
-    const model = process.env.GROQ_MODEL || 'meta-llama/llama-4-scout-17b-16e-instruct';
+    const model = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
     const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
